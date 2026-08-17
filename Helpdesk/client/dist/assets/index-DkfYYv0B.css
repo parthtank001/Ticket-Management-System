@@ -1,0 +1,1 @@
+@tailwind base;@tailwind components;@tailwind utilities;@layer utilities{.glass-card{background:#0f172abf;backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,.1)}.glow-cyan{box-shadow:0 0 35px -5px #06b6d440}}
