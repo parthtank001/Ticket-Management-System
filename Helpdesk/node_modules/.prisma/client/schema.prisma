@@ -1,0 +1,105 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+enum Role {
+  ADMIN
+  AGENT
+}
+
+enum Category {
+  GENERAL_QUESTION
+  TECHNICAL_QUESTION
+  REFUND_REQUEST
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum TicketStatus {
+  NEW
+  ASSIGNED
+  IN_PROGRESS
+  PENDING_STUDENT
+  RESOLVED
+  CLOSED
+}
+
+enum SenderType {
+  STUDENT
+  AGENT
+  SYSTEM
+}
+
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  passwordHash String
+  name         String
+  role         Role      @default(AGENT)
+  isActive     Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  sessions     Session[]
+  tickets      Ticket[]  @relation("AssignedAgent")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Ticket {
+  id              String          @id @default(cuid())
+  ticketNumber    Int             @unique @default(autoincrement())
+  subject         String
+  studentEmail    String
+  studentName     String?
+  category        Category        @default(GENERAL_QUESTION)
+  priority        Priority        @default(MEDIUM)
+  status          TicketStatus    @default(NEW)
+  summary         String?
+  aiDraftResponse String?
+  assignedAgentId String?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  assignedAgent   User?           @relation("AssignedAgent", fields: [assignedAgentId], references: [id])
+  messages        TicketMessage[]
+}
+
+model TicketMessage {
+  id             String     @id @default(cuid())
+  ticketId       String
+  senderType     SenderType
+  senderEmail    String
+  body           String
+  isInternalNote Boolean    @default(false)
+  messageId      String?    @unique
+  inReplyTo      String?
+  createdAt      DateTime   @default(now())
+  ticket         Ticket     @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+}
+
+model KnowledgeBaseDocument {
+  id        String   @id @default(cuid())
+  title     String
+  category  Category
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
