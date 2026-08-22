@@ -10,3 +10,9 @@ GEMINI_API_KEY=""
 
 # SendGrid / Mailgun API Key & Webhook Secret
 EMAIL_WEBHOOK_SECRET="helpdesk_secret_key"
+
+# Admin & Agent Seed Credentials
+ADMIN_EMAIL="admin@example.com"
+ADMIN_PASSWORD="password123"
+AGENT_EMAIL="agent@example.com"
+AGENT_PASSWORD="password123"
