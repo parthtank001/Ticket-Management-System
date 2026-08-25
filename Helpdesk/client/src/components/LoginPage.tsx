@@ -1,30 +1,52 @@
 import React, { useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import { Mail, Lock, Eye, EyeOff, LogIn, Loader2, Ticket, AlertCircle, ShieldCheck, UserCheck } from 'lucide-react';
 import { authClient, AuthUser } from '../lib/auth-client';
+
+const loginSchema = z.object({
+  email: z
+    .string()
+    .min(1, 'Email address is required')
+    .email('Please enter a valid email address'),
+  password: z
+    .string()
+    .min(1, 'Password is required')
+    .min(6, 'Password must be at least 6 characters'),
+});
+
+type LoginFormData = z.infer<typeof loginSchema>;
 
 interface LoginPageProps {
   onLoginSuccess: (user: AuthUser) => void;
 }
 
 export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!email || !password) {
-      setErrorMessage('Please enter both your email address and password.');
-      return;
-    }
+  const {
+    register,
+    handleSubmit,
+    setValue,
+    clearErrors,
+    formState: { errors },
+  } = useForm<LoginFormData>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: {
+      email: '',
+      password: '',
+    },
+  });
 
+  const onSubmit = async (data: LoginFormData) => {
     setErrorMessage(null);
     setIsLoading(true);
 
     try {
-      const result = await authClient.signIn(email.trim(), password);
+      const result = await authClient.signIn(data.email.trim(), data.password);
 
       if (!result.success) {
         setErrorMessage(result.error || 'Invalid credentials. Please verify your email and password.');
@@ -39,8 +61,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
       } else {
         onLoginSuccess({
           id: 'user-id',
-          name: email.split('@')[0],
-          email,
+          name: data.email.split('@')[0],
+          email: data.email,
           role: 'ADMIN',
           isActive: true,
           createdAt: new Date().toISOString(),
@@ -55,8 +77,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
   };
 
   const handleQuickFill = (fillEmail: string, fillPass: string) => {
-    setEmail(fillEmail);
-    setPassword(fillPass);
+    setValue('email', fillEmail, { shouldValidate: true });
+    setValue('password', fillPass, { shouldValidate: true });
+    clearErrors();
     setErrorMessage(null);
   };
 
@@ -84,26 +107,35 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-3">
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-3" noValidate>
           {/* Email */}
           <div>
             <label htmlFor="email" className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">
               Work Email
             </label>
             <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+              <div className={`absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none transition-colors ${
+                errors.email ? 'text-red-500' : 'text-slate-400'
+              }`}>
                 <Mail className="h-3.5 w-3.5" />
               </div>
               <input
                 id="email"
                 type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                {...register('email')}
                 placeholder="admin@example.com"
-                className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white text-xs font-medium transition-all"
+                className={`w-full pl-9 pr-3 py-2 rounded-lg text-slate-900 placeholder-slate-400 text-xs font-medium transition-all focus:outline-none focus:ring-2 ${
+                  errors.email
+                    ? 'bg-red-50/30 border border-red-500 ring-1 ring-red-500 focus:ring-red-500 focus:border-red-500'
+                    : 'bg-slate-50 border border-slate-300 focus:ring-indigo-500 focus:bg-white'
+                }`}
               />
             </div>
+            {errors.email && (
+              <p className="text-red-500 text-[10px] mt-1 font-medium flex items-center space-x-1">
+                <span>{errors.email.message}</span>
+              </p>
+            )}
           </div>
 
           {/* Password */}
@@ -112,17 +144,21 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
               Password
             </label>
             <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+              <div className={`absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none transition-colors ${
+                errors.password ? 'text-red-500' : 'text-slate-400'
+              }`}>
                 <Lock className="h-3.5 w-3.5" />
               </div>
               <input
                 id="password"
                 type={showPassword ? 'text' : 'password'}
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                {...register('password')}
                 placeholder="••••••••••••"
-                className="w-full pl-9 pr-9 py-2 bg-slate-50 border border-slate-300 rounded-lg text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white text-xs font-medium transition-all"
+                className={`w-full pl-9 pr-9 py-2 rounded-lg text-slate-900 placeholder-slate-400 text-xs font-medium transition-all focus:outline-none focus:ring-2 ${
+                  errors.password
+                    ? 'bg-red-50/30 border border-red-500 ring-1 ring-red-500 focus:ring-red-500 focus:border-red-500'
+                    : 'bg-slate-50 border border-slate-300 focus:ring-indigo-500 focus:bg-white'
+                }`}
               />
               <button
                 type="button"
@@ -133,6 +169,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
                 {showPassword ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
               </button>
             </div>
+            {errors.password && (
+              <p className="text-red-500 text-[10px] mt-1 font-medium">{errors.password.message}</p>
+            )}
           </div>
 
           {/* Submit Button */}
