@@ -1,52 +1,74 @@
 import React, { useState, useEffect } from 'react';
-
-interface HealthCheckData {
-  status: string;
-  message: string;
-}
+import { authClient, AuthUser } from './lib/auth-client';
+import { Navbar } from './components/Navbar';
+import { LoginPage } from './components/LoginPage';
+import { HomePage } from './components/HomePage';
+import { Ticket, Loader2 } from 'lucide-react';
 
 export default function App() {
-  const [healthData, setHealthData] = useState<HealthCheckData | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [isLoadingSession, setIsLoadingSession] = useState<boolean>(true);
 
-  const fetchHealthCheck = async () => {
+  // Check active authentication session on initial load
+  const checkSession = async () => {
+    setIsLoadingSession(true);
     try {
-      const response = await fetch('/api/health');
-      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-      const data: HealthCheckData = await response.json();
-      setHealthData(data);
-    } catch (err: any) {
-      setError(err.message || 'Failed to connect to backend API');
+      const sessionData = await authClient.getSession();
+      if (sessionData && sessionData.user) {
+        setUser(sessionData.user);
+      } else {
+        setUser(null);
+      }
+    } catch (err) {
+      console.error('Session check failed:', err);
+      setUser(null);
     } finally {
-      setLoading(false);
+      setIsLoadingSession(false);
     }
   };
 
   useEffect(() => {
-    fetchHealthCheck();
+    checkSession();
   }, []);
 
-  return (
-    <main className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-6">
-      <div className="text-center p-8 bg-slate-900/90 rounded-2xl border border-slate-800 shadow-2xl max-w-md w-full">
-        {loading ? (
-          <p className="text-slate-400 font-medium animate-pulse text-lg">Checking system status...</p>
-        ) : error ? (
-          <p className="text-red-400 font-semibold text-lg">{error}</p>
-        ) : healthData ? (
-          <div className="space-y-3">
-            <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-emerald-950 border border-emerald-500/30 text-emerald-400 text-xs font-semibold uppercase tracking-wider">
-              <span className="h-2 w-2 rounded-full bg-emerald-400 animate-ping" />
-              <span>{healthData.status}</span>
-            </div>
-            <h1 className="text-2xl font-bold text-white tracking-tight" id="health-message">
-              {healthData.message}
-            </h1>
+  const handleLoginSuccess = (loggedInUser: AuthUser) => {
+    setUser(loggedInUser);
+  };
+
+  const handleSignOut = async () => {
+    await authClient.signOut();
+    setUser(null);
+  };
+
+  // Fullscreen loading spinner while session status is verifying
+  if (isLoadingSession) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-6 text-slate-200">
+        <div className="flex flex-col items-center space-y-4">
+          <div className="h-14 w-14 rounded-2xl bg-gradient-to-tr from-indigo-600 to-blue-500 flex items-center justify-center shadow-xl shadow-indigo-500/20 animate-pulse">
+            <Ticket className="h-7 w-7 text-white" />
           </div>
-        ) : null}
+          <div className="flex items-center space-x-2 text-slate-400 font-medium text-sm">
+            <Loader2 className="h-4 w-4 animate-spin text-indigo-400" />
+            <span>Verifying session...</span>
+          </div>
+        </div>
       </div>
-    </main>
+    );
+  }
+
+  // If user is not logged in, show Login Page
+  if (!user) {
+    return <LoginPage onLoginSuccess={handleLoginSuccess} />;
+  }
+
+  // If user is logged in, show Navbar & HomePage dashboard
+  return (
+    <div className="min-h-screen bg-slate-950 flex flex-col">
+      <Navbar user={user} onSignOut={handleSignOut} />
+      <main className="flex-1">
+        <HomePage user={user} />
+      </main>
+    </div>
   );
 }
-
