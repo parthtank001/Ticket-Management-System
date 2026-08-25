@@ -43,14 +43,14 @@ export default function App() {
   // Fullscreen loading spinner while session status is verifying
   if (isLoadingSession) {
     return (
-      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-6 text-slate-200">
+      <div className="min-h-screen bg-slate-100 flex flex-col items-center justify-center p-6 text-slate-800 font-sans">
         <div className="flex flex-col items-center space-y-4">
-          <div className="h-14 w-14 rounded-2xl bg-gradient-to-tr from-indigo-600 to-blue-500 flex items-center justify-center shadow-xl shadow-indigo-500/20 animate-pulse">
-            <Ticket className="h-7 w-7 text-white" />
+          <div className="h-12 w-12 rounded-2xl bg-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-200 animate-pulse">
+            <Ticket className="h-6 w-6 text-white" />
           </div>
-          <div className="flex items-center space-x-2 text-slate-400 font-medium text-sm">
-            <Loader2 className="h-4 w-4 animate-spin text-indigo-400" />
-            <span>Verifying session...</span>
+          <div className="flex items-center space-x-2 text-slate-500 font-medium text-xs">
+            <Loader2 className="h-4 w-4 animate-spin text-indigo-600" />
+            <span>Verifying workspace session...</span>
           </div>
         </div>
       </div>
@@ -64,7 +64,7 @@ export default function App() {
 
   // If user is logged in, show Navbar & HomePage dashboard
   return (
-    <div className="min-h-screen bg-slate-950 flex flex-col">
+    <div className="min-h-screen bg-slate-100 text-slate-900 flex flex-col font-sans">
       <Navbar user={user} onSignOut={handleSignOut} />
       <main className="flex-1">
         <HomePage user={user} />
