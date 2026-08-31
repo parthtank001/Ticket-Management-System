@@ -43,6 +43,23 @@ export const authClient = {
 
       const data = await response.json();
       if (data && data.user) {
+        // Fetch full profile via /api/me to guarantee `role` field is retrieved
+        const meRes = await fetch('/api/me', {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+        }).catch(() => null);
+
+        if (meRes && meRes.ok) {
+          const meData = await meRes.json();
+          if (meData?.user) {
+            return {
+              user: meData.user,
+              session: meData.session || data.session || null,
+            };
+          }
+        }
+
         return {
           user: data.user,
           session: data.session || null,
@@ -74,18 +91,20 @@ export const authClient = {
       const data = await response.json().catch(() => ({}));
 
       if (!response.ok) {
-        const errorMsg = data?.message || data?.error || 'Invalid email or password';
+        const errorMsg = data?.message || data?.error || 'invalid email or password';
         return { success: false, error: errorMsg };
       }
 
+      const session = await this.getSession();
+
       return {
         success: true,
-        user: data.user,
+        user: session.user || data.user,
       };
     } catch (err: any) {
       return {
         success: false,
-        error: err?.message || 'Network error while attempting to log in',
+        error: err?.message || 'failed to fetch',
       };
     }
   },

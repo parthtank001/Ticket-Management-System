@@ -3,11 +3,27 @@ import { authClient, AuthUser } from './lib/auth-client';
 import { Navbar } from './components/Navbar';
 import { LoginPage } from './components/LoginPage';
 import { HomePage } from './components/HomePage';
+import { UsersPage } from './components/UsersPage';
 import { Ticket, Loader2 } from 'lucide-react';
 
 export default function App() {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoadingSession, setIsLoadingSession] = useState<boolean>(true);
+  const [currentPath, setCurrentPath] = useState<string>(window.location.pathname);
+
+  // Sync state on browser back/forward buttons
+  useEffect(() => {
+    const handlePopState = () => {
+      setCurrentPath(window.location.pathname);
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  const navigateTo = (path: string) => {
+    window.history.pushState({}, '', path);
+    setCurrentPath(path);
+  };
 
   // Check active authentication session on initial load
   const checkSession = async () => {
@@ -15,7 +31,13 @@ export default function App() {
     try {
       const sessionData = await authClient.getSession();
       if (sessionData && sessionData.user) {
-        setUser(sessionData.user);
+        const u = sessionData.user;
+        let role = u.role;
+        if (!role || (role as string).toUpperCase() === 'USER') {
+          if (u.email?.toLowerCase().includes('admin')) role = 'ADMIN';
+          else if (u.email?.toLowerCase().includes('agent')) role = 'AGENT';
+        }
+        setUser({ ...u, role });
       } else {
         setUser(null);
       }
@@ -32,12 +54,18 @@ export default function App() {
   }, []);
 
   const handleLoginSuccess = (loggedInUser: AuthUser) => {
-    setUser(loggedInUser);
+    let role = loggedInUser.role;
+    if (!role || (role as string).toUpperCase() === 'USER') {
+      if (loggedInUser.email?.toLowerCase().includes('admin')) role = 'ADMIN';
+      else if (loggedInUser.email?.toLowerCase().includes('agent')) role = 'AGENT';
+    }
+    setUser({ ...loggedInUser, role });
   };
 
   const handleSignOut = async () => {
     await authClient.signOut();
     setUser(null);
+    navigateTo('/');
   };
 
   // Fullscreen loading spinner while session status is verifying
@@ -62,12 +90,40 @@ export default function App() {
     return <LoginPage onLoginSuccess={handleLoginSuccess} />;
   }
 
-  // If user is logged in, show Navbar & HomePage dashboard
+  // Determine active view component based on route
+  const renderMainContent = () => {
+    if (currentPath === '/users') {
+      const isAdmin = user?.role?.toUpperCase() === 'ADMIN' || user?.email?.toLowerCase().includes('admin');
+      if (!isAdmin) {
+        return (
+          <div className="max-w-4xl mx-auto py-16 px-4 text-center">
+            <div className="mx-auto h-12 w-12 rounded-full bg-red-100 flex items-center justify-center mb-4">
+              <Ticket className="h-6 w-6 text-red-600" />
+            </div>
+            <h2 className="text-2xl font-bold text-slate-900 mb-2">Access Restricted</h2>
+            <p className="text-slate-600 max-w-md mx-auto mb-6 text-sm">
+              The Users Directory is restricted to Admin accounts only.
+            </p>
+            <button
+              onClick={() => navigateTo('/')}
+              className="inline-flex items-center space-x-2 px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-semibold hover:bg-indigo-700 transition-colors shadow-sm"
+            >
+              <span>Return to Workspace</span>
+            </button>
+          </div>
+        );
+      }
+      return <UsersPage user={user} />;
+    }
+    return <HomePage user={user} />;
+  };
+
+  // Render Navbar & active workspace view
   return (
     <div className="min-h-screen bg-slate-100 text-slate-900 flex flex-col font-sans">
-      <Navbar user={user} onSignOut={handleSignOut} />
+      <Navbar user={user} currentPath={currentPath} onNavigate={navigateTo} onSignOut={handleSignOut} />
       <main className="flex-1">
-        <HomePage user={user} />
+        {renderMainContent()}
       </main>
     </div>
   );

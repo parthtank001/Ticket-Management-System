@@ -3,7 +3,8 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import { toNodeHandler } from 'better-auth/node';
 import { auth } from './auth';
-import { requireAuth } from './middleware/auth';
+import { requireAuth, requireRole } from './middleware/auth';
+import { Role } from './types';
 import { prisma, checkDatabaseConnection } from './db';
 
 dotenv.config();
@@ -42,6 +43,28 @@ app.get('/api/me', requireAuth, (req: Request, res: Response) => {
     user: req.user,
     session: req.session,
   });
+});
+
+// List all users for Admin directory (ADMIN ONLY)
+app.get('/api/users', requireAuth, requireRole(Role.ADMIN), async (req: Request, res: Response) => {
+  try {
+    const users = await prisma.user.findMany({
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        isActive: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    res.json(users);
+  } catch (error: any) {
+    console.error('Error fetching users list:', error);
+    res.status(500).json({ error: 'Failed to fetch users directory' });
+  }
 });
 
 // List Agents for ticket assignment

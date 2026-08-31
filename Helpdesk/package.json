@@ -8,7 +8,8 @@
     "dev": "ts-node server/index.ts",
     "build": "npm --prefix client run build",
     "start": "ts-node server/index.ts",
-    "seed": "ts-node prisma/seed.ts"
+    "seed": "ts-node prisma/seed.ts",
+    "create-user": "ts-node scripts/create-user.ts"
   },
   "prisma": {
     "seed": "ts-node prisma/seed.ts"

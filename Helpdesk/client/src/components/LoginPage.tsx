@@ -55,7 +55,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
       const result = await authClient.signIn(data.email.trim(), data.password);
 
       if (!result.success) {
-        setErrorMessage(result.error || 'Invalid credentials. Please verify your email and password.');
+        setErrorMessage(result.error || 'failed to fetch');
         return;
       }
 
@@ -76,7 +76,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
         });
       }
     } catch (err: any) {
-      setErrorMessage(err.message || 'Connection error while contacting authentication server.');
+      setErrorMessage(err.message || 'failed to fetch');
     } finally {
       setIsLoading(false);
     }
