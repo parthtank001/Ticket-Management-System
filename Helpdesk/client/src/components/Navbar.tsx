@@ -11,7 +11,7 @@ interface NavbarProps {
 
 export const Navbar: React.FC<NavbarProps> = ({ user, currentPath, onNavigate, onSignOut }) => {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
-  const isAdmin = user?.role?.toUpperCase() === 'ADMIN' || user?.email?.toLowerCase().includes('admin');
+  const isAdmin = user?.role?.toUpperCase() === 'ADMIN';
   const displayRole = isAdmin ? 'ADMIN' : 'AGENT';
 
   const handleSignOutClick = async () => {

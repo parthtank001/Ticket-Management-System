@@ -82,7 +82,8 @@ export default function App() {
   // Determine active view component based on route
   const renderMainContent = () => {
     if (currentPath === '/users') {
-      const isAdmin = user?.role?.toUpperCase() === 'ADMIN' || user?.email?.toLowerCase().includes('admin');
+
+      const isAdmin = user?.role?.toUpperCase() === 'ADMIN';
       if (!isAdmin) {
         return (
           <div className="max-w-4xl mx-auto py-16 px-4 text-center font-sans">

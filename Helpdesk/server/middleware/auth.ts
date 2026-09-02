@@ -2,11 +2,16 @@ import { Request, Response, NextFunction } from "express";
 import { fromNodeHeaders } from "better-auth/node";
 import { auth } from "../auth";
 
+import { Role } from "../types";
+
 // Extend Express Request interface to include authenticated user & session types
 declare global {
   namespace Express {
     interface Request {
-      user?: typeof auth.$Infer.Session.user;
+      user?: typeof auth.$Infer.Session.user & {
+        role?: Role;
+        isActive?: boolean;
+      };
       session?: typeof auth.$Infer.Session.session;
     }
   }
@@ -29,7 +34,16 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
       });
     }
 
-    req.user = sessionData.user;
+    const user = sessionData.user as typeof sessionData.user & { role?: Role; isActive?: boolean };
+
+    if (user.isActive === false) {
+      return res.status(403).json({
+        error: "Forbidden",
+        message: "Account has been deactivated. Please contact an administrator.",
+      });
+    }
+
+    req.user = user;
     req.session = sessionData.session;
 
     return next();
@@ -41,8 +55,6 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     });
   }
 }
-
-import { Role } from "../types";
 
 /**
  * Express middleware to enforce role-based authorization.

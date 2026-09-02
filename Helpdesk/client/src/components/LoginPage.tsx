@@ -65,15 +65,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
       } else if (result.user) {
         onLoginSuccess(result.user);
       } else {
-        onLoginSuccess({
-          id: 'user-id',
-          name: data.email.split('@')[0],
-          email: data.email,
-          role: 'ADMIN',
-          isActive: true,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        });
+        setErrorMessage('Failed to establish authenticated session. Please try signing in again.');
       }
     } catch (err: any) {
       setErrorMessage(err.message || 'failed to fetch');

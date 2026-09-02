@@ -3,7 +3,8 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import { toNodeHandler } from 'better-auth/node';
 import { auth } from './auth';
-import { requireAuth } from './middleware/auth';
+import { requireAuth, requireRole } from './middleware/auth';
+import { Role } from './types';
 import { prisma, checkDatabaseConnection } from './db';
 
 dotenv.config();
@@ -44,8 +45,8 @@ app.get('/api/me', requireAuth, (req: Request, res: Response) => {
   });
 });
 
-// List all users for Admin directory
-app.get('/api/users', async (req: Request, res: Response) => {
+// List all users for Admin directory (Admin only)
+app.get('/api/users', requireAuth, requireRole(Role.ADMIN), async (req: Request, res: Response) => {
   try {
     const users = await prisma.user.findMany({
       select: {
@@ -66,10 +67,13 @@ app.get('/api/users', async (req: Request, res: Response) => {
   }
 });
 
-// List Agents for ticket assignment
-app.get('/api/agents', async (req: Request, res: Response) => {
+// List Active Agents for ticket assignment (Authenticated agents & admins)
+app.get('/api/agents', requireAuth, async (req: Request, res: Response) => {
   try {
     const agents = await prisma.user.findMany({
+      where: {
+        isActive: true,
+      },
       select: {
         id: true,
         name: true,
@@ -84,8 +88,8 @@ app.get('/api/agents', async (req: Request, res: Response) => {
   }
 });
 
-// Get all tickets
-app.get('/api/tickets', async (req: Request, res: Response) => {
+// Get all tickets (Authenticated support staff only)
+app.get('/api/tickets', requireAuth, async (req: Request, res: Response) => {
   try {
     const tickets = await prisma.ticket.findMany({
       include: {
@@ -110,30 +114,38 @@ app.get('/api/tickets', async (req: Request, res: Response) => {
   }
 });
 
-// Create a new ticket
+// Create a new ticket (Inbound student inquiry)
 app.post('/api/tickets', async (req: Request, res: Response) => {
   try {
     const { studentName, studentEmail, subject, category, priority, message } = req.body;
 
-    if (!studentEmail || !subject || !message) {
-      return res.status(400).json({ error: 'Student email, subject, and initial message are required.' });
+    if (!studentEmail || typeof studentEmail !== 'string' || !subject || typeof subject !== 'string' || !message || typeof message !== 'string') {
+      return res.status(400).json({ error: 'Student email, subject, and message are required strings.' });
+    }
+
+    const trimmedEmail = studentEmail.trim().toLowerCase();
+    const trimmedSubject = subject.trim();
+    const trimmedMessage = message.trim();
+
+    if (!trimmedEmail || !trimmedSubject || !trimmedMessage) {
+      return res.status(400).json({ error: 'Student email, subject, and message cannot be empty.' });
     }
 
     // Generate AI draft response based on category & subject
-    let aiDraftResponse = `Hello ${studentName || 'Student'},\n\nThank you for reaching out to Helpdesk Support. We have received your inquiry regarding "${subject}". An agent will review your request shortly.\n\nBest regards,\nHelpdesk AI Support`;
+    let aiDraftResponse = `Hello ${studentName?.trim() || 'Student'},\n\nThank you for reaching out to Helpdesk Support. We have received your inquiry regarding "${trimmedSubject}". An agent will review your request shortly.\n\nBest regards,\nHelpdesk AI Support`;
 
     if (category === 'TECHNICAL_QUESTION') {
-      aiDraftResponse = `Hello ${studentName || 'Student'},\n\nRegarding your technical issue "${subject}": Please try clearing your browser cache, re-authenticating, or verifying your system configuration. Our technical support team is inspecting the logs for your account.\n\nBest regards,\nHelpdesk Technical Team`;
+      aiDraftResponse = `Hello ${studentName?.trim() || 'Student'},\n\nRegarding your technical issue "${trimmedSubject}": Please try clearing your browser cache, re-authenticating, or verifying your system configuration. Our technical support team is inspecting the logs for your account.\n\nBest regards,\nHelpdesk Technical Team`;
     } else if (category === 'REFUND_REQUEST') {
-      aiDraftResponse = `Hello ${studentName || 'Student'},\n\nThank you for submitting a refund inquiry for "${subject}". Refund requests are processed within 3-5 business days. Please verify your invoice number for speedier processing.\n\nBest regards,\nBilling Support Team`;
+      aiDraftResponse = `Hello ${studentName?.trim() || 'Student'},\n\nThank you for submitting a refund inquiry for "${trimmedSubject}". Refund requests are processed within 3-5 business days. Please verify your invoice number for speedier processing.\n\nBest regards,\nBilling Support Team`;
     }
 
     // Create Ticket and initial TicketMessage transaction
     const ticket = await prisma.ticket.create({
       data: {
-        subject,
-        studentEmail,
-        studentName: studentName || studentEmail.split('@')[0],
+        subject: trimmedSubject,
+        studentEmail: trimmedEmail,
+        studentName: studentName ? String(studentName).trim() : trimmedEmail.split('@')[0],
         category: category || 'GENERAL_QUESTION',
         priority: priority || 'MEDIUM',
         status: 'NEW',
@@ -141,8 +153,8 @@ app.post('/api/tickets', async (req: Request, res: Response) => {
         messages: {
           create: {
             senderType: 'STUDENT',
-            senderEmail: studentEmail,
-            body: message,
+            senderEmail: trimmedEmail,
+            body: trimmedMessage,
           },
         },
       },
@@ -159,11 +171,16 @@ app.post('/api/tickets', async (req: Request, res: Response) => {
   }
 });
 
-// Update ticket status or assigned agent
-app.patch('/api/tickets/:id', async (req: Request, res: Response) => {
+// Update ticket status or assigned agent (Authenticated support staff only)
+app.patch('/api/tickets/:id', requireAuth, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const { status, assignedAgentId } = req.body;
+
+    const existingTicket = await prisma.ticket.findUnique({ where: { id } });
+    if (!existingTicket) {
+      return res.status(404).json({ error: 'Ticket not found' });
+    }
 
     const dataToUpdate: any = {};
     if (status) dataToUpdate.status = status;
@@ -187,29 +204,37 @@ app.patch('/api/tickets/:id', async (req: Request, res: Response) => {
   }
 });
 
-// Add message reply to ticket
-app.post('/api/tickets/:id/messages', async (req: Request, res: Response) => {
+// Add message reply to ticket (Authenticated support staff only - identity derived from session)
+app.post('/api/tickets/:id/messages', requireAuth, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { body, senderType, senderEmail, isInternalNote } = req.body;
+    const { body, isInternalNote } = req.body;
 
-    if (!body || !senderEmail) {
-      return res.status(400).json({ error: 'Message body and sender email are required.' });
+    if (!body || typeof body !== 'string' || !body.trim()) {
+      return res.status(400).json({ error: 'Message body is required.' });
     }
+
+    const existingTicket = await prisma.ticket.findUnique({ where: { id } });
+    if (!existingTicket) {
+      return res.status(404).json({ error: 'Ticket not found' });
+    }
+
+    // Securely derive sender email and role from verified authenticated session
+    const senderEmail = req.user?.email || 'agent@example.com';
+    const senderType = 'AGENT';
 
     const newMessage = await prisma.ticketMessage.create({
       data: {
         ticketId: id,
-        senderType: senderType || 'AGENT',
+        senderType,
         senderEmail,
-        body,
-        isInternalNote: !!isInternalNote,
+        body: body.trim(),
+        isInternalNote: Boolean(isInternalNote),
       },
     });
 
     // Optionally update ticket status to IN_PROGRESS or ASSIGNED if it was NEW
-    const currentTicket = await prisma.ticket.findUnique({ where: { id } });
-    if (currentTicket && currentTicket.status === 'NEW') {
+    if (existingTicket.status === 'NEW') {
       await prisma.ticket.update({
         where: { id },
         data: { status: 'IN_PROGRESS' },
