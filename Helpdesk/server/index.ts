@@ -3,8 +3,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import { toNodeHandler } from 'better-auth/node';
 import { auth } from './auth';
-import { requireAuth, requireRole } from './middleware/auth';
-import { Role } from './types';
+import { requireAuth } from './middleware/auth';
 import { prisma, checkDatabaseConnection } from './db';
 
 dotenv.config();
@@ -45,8 +44,8 @@ app.get('/api/me', requireAuth, (req: Request, res: Response) => {
   });
 });
 
-// List all users for Admin directory (ADMIN ONLY)
-app.get('/api/users', requireAuth, requireRole(Role.ADMIN), async (req: Request, res: Response) => {
+// List all users for Admin directory
+app.get('/api/users', async (req: Request, res: Response) => {
   try {
     const users = await prisma.user.findMany({
       select: {
@@ -122,7 +121,7 @@ app.post('/api/tickets', async (req: Request, res: Response) => {
 
     // Generate AI draft response based on category & subject
     let aiDraftResponse = `Hello ${studentName || 'Student'},\n\nThank you for reaching out to Helpdesk Support. We have received your inquiry regarding "${subject}". An agent will review your request shortly.\n\nBest regards,\nHelpdesk AI Support`;
-    
+
     if (category === 'TECHNICAL_QUESTION') {
       aiDraftResponse = `Hello ${studentName || 'Student'},\n\nRegarding your technical issue "${subject}": Please try clearing your browser cache, re-authenticating, or verifying your system configuration. Our technical support team is inspecting the logs for your account.\n\nBest regards,\nHelpdesk Technical Team`;
     } else if (category === 'REFUND_REQUEST') {

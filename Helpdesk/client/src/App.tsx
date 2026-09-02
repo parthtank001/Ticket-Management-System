@@ -31,13 +31,7 @@ export default function App() {
     try {
       const sessionData = await authClient.getSession();
       if (sessionData && sessionData.user) {
-        const u = sessionData.user;
-        let role = u.role;
-        if (!role || (role as string).toUpperCase() === 'USER') {
-          if (u.email?.toLowerCase().includes('admin')) role = 'ADMIN';
-          else if (u.email?.toLowerCase().includes('agent')) role = 'AGENT';
-        }
-        setUser({ ...u, role });
+        setUser(sessionData.user);
       } else {
         setUser(null);
       }
@@ -54,12 +48,7 @@ export default function App() {
   }, []);
 
   const handleLoginSuccess = (loggedInUser: AuthUser) => {
-    let role = loggedInUser.role;
-    if (!role || (role as string).toUpperCase() === 'USER') {
-      if (loggedInUser.email?.toLowerCase().includes('admin')) role = 'ADMIN';
-      else if (loggedInUser.email?.toLowerCase().includes('agent')) role = 'AGENT';
-    }
-    setUser({ ...loggedInUser, role });
+    setUser(loggedInUser);
   };
 
   const handleSignOut = async () => {
@@ -96,7 +85,7 @@ export default function App() {
       const isAdmin = user?.role?.toUpperCase() === 'ADMIN' || user?.email?.toLowerCase().includes('admin');
       if (!isAdmin) {
         return (
-          <div className="max-w-4xl mx-auto py-16 px-4 text-center">
+          <div className="max-w-4xl mx-auto py-16 px-4 text-center font-sans">
             <div className="mx-auto h-12 w-12 rounded-full bg-red-100 flex items-center justify-center mb-4">
               <Ticket className="h-6 w-6 text-red-600" />
             </div>

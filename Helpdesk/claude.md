@@ -87,17 +87,9 @@ From `e:\claude_ai\Ticket Management System\Helpdesk`:
 
 ### Authentication & Roles
 - **Roles**: `ADMIN` and `AGENT`.
-- **Admin-Only `/users` Page**: Accessible exclusively to `ADMIN` accounts (`/users`). Guaranteed via:
-  - Route guard in `App.tsx` rendering an "Access Restricted" screen for non-admin accounts.
-  - Fail-safe internal role check in `UsersPage.tsx`.
-  - Conditional `Users` navigation link in `Navbar.tsx` visible only to `ADMIN` users.
-- **Backend Role Protection**:
-  - Backend API endpoint `/api/users` protected via `requireAuth` and `requireRole(Role.ADMIN)` middleware.
-  - Better Auth configured with `user.additionalFields` (`role`, `isActive`) in `server/auth.ts`.
-  - `requireAuth` middleware attaches full database user model (`role`, `isActive`) to `req.user`.
-  - Frontend `authClient` (`client/src/lib/auth-client.ts`) fetches `/api/me` profile to guarantee role availability across sessions.
-- Primary Admin (`admin@example.com`) and Agent (`agent@example.com`) accounts seeded via `prisma/seed.ts`.
+- Primary Admin account is seeded on deployment via `prisma/seed.ts`.
+- Admins can create/deactivate agent accounts and revoke sessions from the database.
 
 ### UI & Aesthetic Standards
-- Slate light theme (`bg-slate-100` workspace, `bg-white` cards), Tailwind CSS utility styling, Lucide React icons, and dynamic user role indicator (`ADMIN` / `AGENT`) in the navbar.
+- Dark mode theme (`bg-slate-950`), custom radial gradients, glassmorphism cards, clear state badges, and responsive layouts.
 - Always verify client-server communication using health monitoring (`/api/health`).

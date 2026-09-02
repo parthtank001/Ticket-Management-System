@@ -43,23 +43,6 @@ export const authClient = {
 
       const data = await response.json();
       if (data && data.user) {
-        // Fetch full profile via /api/me to guarantee `role` field is retrieved
-        const meRes = await fetch('/api/me', {
-          method: 'GET',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-        }).catch(() => null);
-
-        if (meRes && meRes.ok) {
-          const meData = await meRes.json();
-          if (meData?.user) {
-            return {
-              user: meData.user,
-              session: meData.session || data.session || null,
-            };
-          }
-        }
-
         return {
           user: data.user,
           session: data.session || null,
@@ -95,11 +78,9 @@ export const authClient = {
         return { success: false, error: errorMsg };
       }
 
-      const session = await this.getSession();
-
       return {
         success: true,
-        user: session.user || data.user,
+        user: data.user,
       };
     } catch (err: any) {
       return {

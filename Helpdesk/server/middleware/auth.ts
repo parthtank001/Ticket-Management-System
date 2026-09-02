@@ -16,8 +16,6 @@ declare global {
  * Reusable Express middleware to enforce authentication.
  * Verifies the database session via Better Auth and attaches `user` & `session` to `req`.
  */
-import { prisma } from "../db";
-
 export async function requireAuth(req: Request, res: Response, next: NextFunction): Promise<void | Response> {
   try {
     const sessionData = await auth.api.getSession({
@@ -31,12 +29,7 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
       });
     }
 
-    const dbUser = await prisma.user.findUnique({
-      where: { id: sessionData.user.id },
-      select: { id: true, name: true, email: true, role: true, isActive: true, createdAt: true, updatedAt: true }
-    });
-
-    req.user = dbUser ? { ...sessionData.user, ...dbUser } : sessionData.user;
+    req.user = sessionData.user;
     req.session = sessionData.session;
 
     return next();
