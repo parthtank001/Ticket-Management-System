@@ -58,6 +58,7 @@ The **AI-Powered Ticket Management System (Helpdesk)** automates and streamlines
 
 ```
 e:\claude_ai\Ticket Management System\
+├── .gitignore                  # Git ignore rules for node_modules, environments & test reports
 ├── claude.md                   # Global workspace memory file & guidelines
 └── Helpdesk/
     ├── client/                 # React 18 + Vite frontend
@@ -66,7 +67,8 @@ e:\claude_ai\Ticket Management System\
     │   │   │   ├── ui/         # shadcn/ui primitives (badge, button, card, input, label, alert)
     │   │   │   ├── HomePage.tsx  # Main agent ticket workspace dashboard
     │   │   │   ├── LoginPage.tsx # Modernized login screen with role credentials hint
-    │   │   │   └── Navbar.tsx    # App navigation header with session user details & sign-out
+    │   │   │   ├── Navbar.tsx    # App navigation header with session user details & sign-out
+    │   │   │   └── UsersPage.tsx # Admin user management directory
     │   │   ├── lib/
     │   │   │   ├── auth-client.ts # Client authentication helper (Better Auth client wrapper)
     │   │   │   └── utils.ts    # Class merging utilities (clsx + tailwind-merge)
@@ -80,7 +82,8 @@ e:\claude_ai\Ticket Management System\
     │   └── vite.config.ts      # Vite dev server setup & path alias resolver
     ├── server/                 # Express backend API
     │   ├── middleware/
-    │   │   └── auth.ts         # Session verification (requireAuth) & RBAC (requireRole)
+    │   │   ├── auth.ts         # Session verification (requireAuth) & RBAC (requireRole)
+    │   │   └── rate-limiter.ts # Production-only rate limiting middleware (express-rate-limit)
     │   ├── auth.ts             # Better Auth server configuration with Prisma adapter
     │   ├── db.ts               # Prisma client instance & PostgreSQL health check
     │   ├── index.ts            # Express server entry point & API route handlers
@@ -88,7 +91,16 @@ e:\claude_ai\Ticket Management System\
     ├── prisma/
     │   ├── schema.prisma       # Database schema models (User, Session, Account, Verification, Ticket, etc.)
     │   └── seed.ts             # Database seeder for default Admin and Agent accounts
+    ├── scripts/
+    │   ├── create-user.ts      # CLI utility to provision new system users
+    │   ├── setup-test-db.ts    # Automated test database synchronization & seeding script
+    │   └── verify-rate-limiting.ts # Verification suite for production rate limiting
+    ├── e2e/
+    │   ├── auth.spec.ts        # End-to-end authentication tests
+    │   └── setup/
+    │       └── global-setup.ts # Playwright global database provisioning setup
     ├── package.json            # Root dependencies & execution scripts
+    ├── playwright.config.ts    # Playwright E2E configuration with isolated test server
     ├── tsconfig.json           # Shared TypeScript configuration
     ├── project-scope.md        # Comprehensive functional scope specification
     └── tech-stack.md           # Technical architecture specification
@@ -144,6 +156,15 @@ Authentication in the Helpdesk application is powered by **Better Auth** (`bette
   - **Admin**: `admin@example.com` (Password: `password123`, Role: `ADMIN`)
   - **Agent**: `agent@example.com` (Password: `password123`, Role: `AGENT`)
 
+### 5.6 Rate Limiting Architecture (`server/middleware/rate-limiter.ts`)
+- **Production-Only Enforcement**: Rate limiters strictly enforce request ceilings when `NODE_ENV === 'production'`. In `development` and `test` environments, all rate limit checks are completely bypassed (`skip` returning `true`).
+- **Reverse Proxy Trust**: When running in production, Express sets `trust proxy: 1` to resolve client IPs behind load balancers/proxies.
+- **Limiters Configured**:
+  - `apiLimiter`: Standard 100 req/15 min on `/api/` (configurable via `RATE_LIMIT_MAX`). Health endpoint (`/api/health`) is exempted from rate limiting to prevent uptime monitoring interference.
+  - `authLimiter`: 20 req/15 min on `/api/auth/*` (configurable via `AUTH_RATE_LIMIT_MAX`) to mitigate brute-force credential attacks.
+  - `ticketCreationLimiter`: 10 req/min on `POST /api/tickets` (configurable via `TICKET_RATE_LIMIT_MAX`) to prevent spam submissions.
+- **Headers**: Conforms to IETF `draft-7` standards (`RateLimit-*` headers) and disables legacy `X-RateLimit-*` headers.
+
 ---
 
 ## 6. Key Conventions & API Summary
@@ -164,3 +185,26 @@ Authentication in the Helpdesk application is powered by **Better Auth** (`bette
 - **Design System**: Built on shadcn/ui primitives (`@/components/ui/`) with Tailwind CSS.
 - **Theme & Styling**: Default Slate theme palette, clean card borders (`border-slate-200`), accessible color contrast, and responsive layout.
 - **State Handling**: Interactive loading states (`Loader2` spinners), badge indicators for ticket status/priority, and notification alerts.
+
+---
+
+## 7. Playwright E2E Testing & Test Database Configuration
+
+### 7.1 Architecture & Isolation
+- **Separate Database**: Tests execute against an isolated PostgreSQL database (`helpdesk_test`) specified in `.env.test` (`DATABASE_URL="postgresql://postgres:...@localhost:5432/helpdesk_test?schema=public"`).
+- **Test Server Port**: The test backend server runs on `PORT=5001` (to avoid conflicting with the development server on port 5000).
+- **Global Setup (`e2e/setup/global-setup.ts`)**:
+  - Automatically provisions the `helpdesk_test` database if not present.
+  - Pushes the Prisma schema to `helpdesk_test` (`npx prisma db push`).
+  - Seeds default test accounts (`admin@example.com` / `password123` and `agent@example.com` / `password123`).
+- **WebServers (`playwright.config.ts`)**:
+  - Playwright coordinates starting both the isolated Express test server (`PORT=5001`) and Vite client (`http://localhost:5173`) with proxy routing to the test server.
+
+### 7.2 Testing Commands
+From `Helpdesk/`:
+- `npm run test:e2e`: Runs all Playwright E2E tests in headless mode.
+- `npm run test:e2e:ui`: Launches interactive Playwright UI Test Runner.
+- `npm run test:e2e:headed`: Runs tests with visible browser window.
+- `npm run db:test:setup`: Manually syncs and seeds the `helpdesk_test` database.
+- `npm run db:test:reset`: Resets the test database schema using Prisma migrate.
+

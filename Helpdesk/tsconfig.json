@@ -9,5 +9,5 @@
     "skipLibCheck": true,
     "outDir": "./dist"
   },
-  "include": ["server/**/*", "prisma/**/*", "scripts/**/*"]
+  "include": ["server/**/*", "prisma/**/*", "scripts/**/*", "playwright.config.ts", "tests/**/*"]
 }

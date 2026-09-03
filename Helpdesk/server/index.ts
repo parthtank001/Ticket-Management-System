@@ -6,16 +6,25 @@ import { auth } from './auth';
 import { requireAuth, requireRole } from './middleware/auth';
 import { Role } from './types';
 import { prisma, checkDatabaseConnection } from './db';
+import { apiLimiter, authLimiter, ticketCreationLimiter, isProductionEnvironment } from './middleware/rate-limiter';
 
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+// Trust reverse proxy in production (e.g. Nginx, Load Balancers) for accurate client IP identification
+if (isProductionEnvironment()) {
+  app.set('trust proxy', 1);
+}
+
 app.use(cors({ origin: 'http://localhost:5173', credentials: true }));
 
-// Mount Better Auth router before standard body parsing middleware
-app.all('/api/auth/*', toNodeHandler(auth));
+// Apply rate limiting (enforced only in production environment)
+app.use('/api/', apiLimiter);
+
+// Mount Better Auth router before standard body parsing middleware (with auth rate limiting)
+app.all('/api/auth/*', authLimiter, toNodeHandler(auth));
 
 app.use(express.json());
 
@@ -115,7 +124,7 @@ app.get('/api/tickets', requireAuth, async (req: Request, res: Response) => {
 });
 
 // Create a new ticket (Inbound student inquiry)
-app.post('/api/tickets', async (req: Request, res: Response) => {
+app.post('/api/tickets', ticketCreationLimiter, async (req: Request, res: Response) => {
   try {
     const { studentName, studentEmail, subject, category, priority, message } = req.body;
 

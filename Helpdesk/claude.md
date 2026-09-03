@@ -49,22 +49,53 @@ Every ticket must belong to **exactly one** category:
 
 ---
 
-## 4. Project Structure & Development Workflow
+## 4. Project Structure & Directory Layout
 
 ```
 e:\claude_ai\Ticket Management System\
+├── .gitignore                  # Git ignore rules for node_modules, environments & test reports
 ├── claude.md                   # Global workspace memory file & guidelines
 └── Helpdesk/
     ├── client/                 # React 18 + Vite frontend
     │   ├── src/
-    │   │   ├── App.tsx         # Main application UI container
-    │   │   ├── main.tsx        # React entry point
-    │   │   └── index.css       # Tailwind CSS & global styles
+    │   │   ├── components/     # Application components & views
+    │   │   │   ├── ui/         # shadcn/ui primitives (badge, button, card, input, label, alert)
+    │   │   │   ├── HomePage.tsx  # Main agent ticket workspace dashboard
+    │   │   │   ├── LoginPage.tsx # Modernized login screen with role credentials hint
+    │   │   │   ├── Navbar.tsx    # App navigation header with session user details & sign-out
+    │   │   │   └── UsersPage.tsx # Admin user management directory
+    │   │   ├── lib/
+    │   │   │   ├── auth-client.ts # Client authentication helper (Better Auth client wrapper)
+    │   │   │   └── utils.ts    # Class merging utilities (clsx + tailwind-merge)
+    │   │   ├── App.tsx         # Main application root & session router
+    │   │   ├── main.tsx        # React DOM entry point
+    │   │   └── index.css       # Tailwind directives & global font styles
+    │   ├── components.json     # shadcn/ui configuration file
     │   ├── package.json        # Client dependencies & Vite scripts
-    │   └── vite.config.ts      # Vite dev server configuration
+    │   ├── tailwind.config.js  # Tailwind CSS configuration with Slate theme & UI colors
+    │   ├── tsconfig.json       # Client TypeScript configuration with @/* path alias
+    │   └── vite.config.ts      # Vite dev server setup & path alias resolver
     ├── server/                 # Express backend API
-    │   └── index.ts            # Express server entry point & /api/health endpoint
+    │   ├── middleware/
+    │   │   ├── auth.ts         # Session verification (requireAuth) & RBAC (requireRole)
+    │   │   └── rate-limiter.ts # Production-only rate limiting middleware (express-rate-limit)
+    │   ├── auth.ts             # Better Auth server configuration with Prisma adapter
+    │   ├── db.ts               # Prisma client instance & PostgreSQL health check
+    │   ├── index.ts            # Express server entry point & API route handlers
+    │   └── types.ts            # Server-side TypeScript type definitions
+    ├── prisma/
+    │   ├── schema.prisma       # Database schema models (User, Session, Account, Verification, Ticket, etc.)
+    │   └── seed.ts             # Database seeder for default Admin and Agent accounts
+    ├── scripts/
+    │   ├── create-user.ts      # CLI utility to provision new system users
+    │   ├── setup-test-db.ts    # Automated test database synchronization & seeding script
+    │   └── verify-rate-limiting.ts # Verification suite for production rate limiting
+    ├── e2e/
+    │   ├── auth.spec.ts        # End-to-end authentication tests
+    │   └── setup/
+    │       └── global-setup.ts # Playwright global database provisioning setup
     ├── package.json            # Root dependencies & execution scripts
+    ├── playwright.config.ts    # Playwright E2E configuration with isolated test server
     ├── tsconfig.json           # Shared TypeScript configuration
     ├── project-scope.md        # Comprehensive functional scope specification
     └── tech-stack.md           # Technical architecture specification
@@ -74,22 +105,43 @@ e:\claude_ai\Ticket Management System\
 From `e:\claude_ai\Ticket Management System\Helpdesk`:
 - **Backend API**: `npm run dev:server` (Express server running at `http://localhost:5000`)
 - **Frontend Client**: `npm run dev:client` (Vite dev server running at `http://localhost:5173`)
-- **Root Dev Script**: `npm run dev`
+- **Root Dev Script**: `npm run dev` (Runs client & server concurrently)
+- **Database Seeding**: `npx prisma db seed` (Seeds default Admin `admin@example.com` and Agent `agent@example.com`)
+- **Playwright E2E Tests**: `npm run test:e2e` (Runs automated browser test suite)
 
 ---
 
 ## 5. Key Conventions & Architecture Rules
 
-### Email Ingestion & Threading
+### 5.1 Email Ingestion & Threading
 - Extract `From`, `Subject`, `Body`, `Message-ID`, and `In-Reply-To` headers from inbound webhooks.
 - Match existing ticket threads using `[Ticket #XXXX]` subject tags or `In-Reply-To` / `References` headers.
 - **Anti-Loop Protection**: Always inspect `Auto-Submitted` headers (`auto-generated`, `auto-replied`) and ignore automated emails to prevent infinite loops.
 
-### Authentication & Roles
+### 5.2 Authentication & Roles
 - **Roles**: `ADMIN` and `AGENT`.
-- Primary Admin account is seeded on deployment via `prisma/seed.ts`.
-- Admins can create/deactivate agent accounts and revoke sessions from the database.
+- **Database Sessions**: Managed by Better Auth via PostgreSQL `session` table; supports instant session revocation.
+- Primary Admin (`admin@example.com` / `password123`) and Agent (`agent@example.com` / `password123`) seeded on deployment.
+- Admins have exclusive access to `/api/users` and the Users directory in the UI.
 
-### UI & Aesthetic Standards
+### 5.3 Rate Limiting & Production Security (`server/middleware/rate-limiter.ts`)
+- **Production-Only Enforcement**: Rate limiters strictly enforce request ceilings when `NODE_ENV === 'production'`. In `development` and `test` environments, all rate limit checks are completely bypassed (`skip` returning `true`).
+- **Reverse Proxy Trust**: When running in production, Express sets `trust proxy: 1` to resolve client IPs behind load balancers/proxies.
+- **Limiters Configured**:
+  - `apiLimiter`: Standard 100 req/15 min on `/api/` (configurable via `RATE_LIMIT_MAX`). Health endpoint (`/api/health`) is exempted from rate limiting to prevent uptime monitoring interference.
+  - `authLimiter`: 20 req/15 min on `/api/auth/*` (configurable via `AUTH_RATE_LIMIT_MAX`) to mitigate brute-force credential attacks.
+  - `ticketCreationLimiter`: 10 req/min on `POST /api/tickets` (configurable via `TICKET_RATE_LIMIT_MAX`) to prevent spam submissions.
+- **Headers**: Conforms to IETF `draft-7` standards (`RateLimit-*` headers) and disables legacy `X-RateLimit-*` headers.
+
+### 5.4 UI & Aesthetic Standards
 - Dark mode theme (`bg-slate-950`), custom radial gradients, glassmorphism cards, clear state badges, and responsive layouts.
 - Always verify client-server communication using health monitoring (`/api/health`).
+
+---
+
+## 6. Testing Architecture (Playwright E2E)
+
+- **Isolated Test Database**: Tests execute against an isolated database (`helpdesk_test`) specified in `.env.test`.
+- **Dedicated Test Server Port**: Backend test server runs on `PORT=5001` via Playwright `webServer` config.
+- **Global Test Setup**: `e2e/setup/global-setup.ts` creates the test database, pushes Prisma migrations, and seeds test accounts before test execution.
+
