@@ -91,7 +91,9 @@ e:\claude_ai\Ticket Management System\
     │   ├── setup-test-db.ts    # Automated test database synchronization & seeding script
     │   └── verify-rate-limiting.ts # Verification suite for production rate limiting
     ├── e2e/
-    │   ├── auth.spec.ts        # End-to-end authentication tests
+    │   ├── api.spec.ts         # REST API & protected route authorization tests
+    │   ├── auth.spec.ts        # End-to-end authentication & session lifecycle tests
+    │   ├── rbac-navigation.spec.ts # Role-based access control and UI navigation tests
     │   └── setup/
     │       └── global-setup.ts # Playwright global database provisioning setup
     ├── package.json            # Root dependencies & execution scripts
@@ -144,4 +146,19 @@ From `e:\claude_ai\Ticket Management System\Helpdesk`:
 - **Isolated Test Database**: Tests execute against an isolated database (`helpdesk_test`) specified in `.env.test`.
 - **Dedicated Test Server Port**: Backend test server runs on `PORT=5001` via Playwright `webServer` config.
 - **Global Test Setup**: `e2e/setup/global-setup.ts` creates the test database, pushes Prisma migrations, and seeds test accounts before test execution.
+- **Test Specs**:
+  - `e2e/auth.spec.ts`: Sign-in, sign-out, session lifecycle, invalid credentials alerts, and client Zod validation.
+  - `e2e/rbac-navigation.spec.ts`: Admin directory access vs. Agent restricted access views and return navigation.
+  - `e2e/api.spec.ts`: Health check, 401 unauthenticated security, 403 Agent forbidden checks, inbound ticket creation with AI draft response, and message replies.
+
+### 6.1 Instructions for Using `e2e-test-writer` Subagent
+When creating, maintaining, or refactoring Playwright E2E tests:
+1. **Delegate to Subagent**: Invoke `playwright-e2e-tester` / `e2e-test-writer` via `invoke_subagent`.
+2. **Directory Standard**: All test specs must be authored in `Helpdesk/e2e/*.spec.ts`.
+3. **Best Practices**:
+   - Use semantic selectors (`page.getByRole`, `page.getByText`, `page.locator`).
+   - Use web-first assertions with auto-waiting (`expect(locator).toBeVisible({ timeout: ... })`) without manual sleeps.
+   - Clean state and cookies before each test case (`test.beforeEach`).
+   - Use default seeded accounts (`admin@example.com` / `password123` and `agent@example.com` / `password123`).
+
 

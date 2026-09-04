@@ -96,7 +96,9 @@ e:\claude_ai\Ticket Management System\
     │   ├── setup-test-db.ts    # Automated test database synchronization & seeding script
     │   └── verify-rate-limiting.ts # Verification suite for production rate limiting
     ├── e2e/
-    │   ├── auth.spec.ts        # End-to-end authentication tests
+    │   ├── api.spec.ts         # REST API & protected route authorization tests
+    │   ├── auth.spec.ts        # End-to-end authentication & session lifecycle tests
+    │   ├── rbac-navigation.spec.ts # Role-based access control and UI navigation tests
     │   └── setup/
     │       └── global-setup.ts # Playwright global database provisioning setup
     ├── package.json            # Root dependencies & execution scripts
@@ -207,4 +209,23 @@ From `Helpdesk/`:
 - `npm run test:e2e:headed`: Runs tests with visible browser window.
 - `npm run db:test:setup`: Manually syncs and seeds the `helpdesk_test` database.
 - `npm run db:test:reset`: Resets the test database schema using Prisma migrate.
+
+### 7.3 Instructions for Using `e2e-test-writer` Subagent
+When writing, updating, or maintaining Playwright E2E tests, delegate the task to the specialized **`e2e-test-writer`** (or `playwright-e2e-tester`) subagent.
+
+- **Role & Capabilities**:
+  - Authored for Playwright + TypeScript test automation across frontend UI and backend REST API endpoints.
+  - Generates resilient tests using semantic locators (`page.getByRole`, `page.getByText`, `page.locator`).
+  - Implements auto-waiting assertions (`expect(locator).toBeVisible({ timeout: ... })`) without arbitrary sleep calls.
+  - Implements multi-role context tests (Admin vs. Agent) with session isolation (`test.beforeEach`).
+- **Invocation Guidelines**:
+  - Invoke the subagent using `invoke_subagent` with `TypeName: "playwright-e2e-tester"` or `"e2e-test-writer"`.
+  - Provide a clear prompt detailing the feature to test (e.g., UI forms, API routes, RBAC boundaries, state transitions).
+  - Target all new test specs to the [`Helpdesk/e2e/`](file:///E:/claude_ai/Ticket%20Management%20System/Helpdesk/e2e) directory.
+- **Key Test Standards for the Subagent**:
+  - Test specs must be saved inside `Helpdesk/e2e/*.spec.ts`.
+  - Rely on the isolated test environment (`.env.test`, test server on `PORT=5001`, client on `PORT=5173`).
+  - Use seeded test accounts (`admin@example.com` / `password123` and `agent@example.com` / `password123`).
+  - Keep test cases atomic and parallel-safe.
+
 
