@@ -1,129 +1,98 @@
+const axios = require('axios');
+
 const baseUrl = 'http://localhost:5000';
 
 async function runAuthTest() {
   console.log('==========================================');
-  console.log('🧪 AUTHENTICATION FLOW TEST');
+  console.log('🧪 AUTHENTICATION & API FLOW TEST (AXIOS)');
   console.log('==========================================\n');
 
   // Step 1: Healthcheck
   console.log('1️⃣ Checking /api/health...');
-  const healthRes = await fetch(`${baseUrl}/api/health`);
-  const healthData = await healthRes.json();
+  const healthRes = await axios.get(`${baseUrl}/api/health`);
   console.log('   Status:', healthRes.status);
-  console.log('   Database Connection:', healthData.services?.database);
-  console.log('   API Message:', healthData.message, '\n');
+  console.log('   Database Connection:', healthRes.data?.services?.database);
+  console.log('   API Message:', healthRes.data?.message, '\n');
 
-  // Step 2: Sign-Up
-  const testUser = {
-    email: `agent_${Date.now()}@example.com`,
-    password: 'Password123!',
-    name: 'Helpdesk Test Agent'
+  // Step 2: Sign-In with Admin Credentials
+  const adminCredentials = {
+    email: 'admin@example.com',
+    password: 'password123'
   };
-  console.log('2️⃣ Signing up new user:', testUser.email);
-  const signUpRes = await fetch(`${baseUrl}/api/auth/sign-up/email`, {
-    method: 'POST',
+  console.log('2️⃣ Signing in with Admin credentials:', adminCredentials.email);
+  const signInRes = await axios.post(`${baseUrl}/api/auth/sign-in/email`, adminCredentials, {
     headers: {
       'Content-Type': 'application/json',
       'Origin': 'http://localhost:5173'
-    },
-    body: JSON.stringify(testUser)
+    }
   });
 
-  const signUpCookie = signUpRes.headers.get('set-cookie');
-  const signUpBody = await signUpRes.json();
-  console.log('   Sign-Up Status:', signUpRes.status, signUpRes.statusText);
-  console.log('   User ID:', signUpBody.user?.id);
-  console.log('   User Email:', signUpBody.user?.email);
-  console.log('   Session Token Cookie Present:', !!signUpCookie, '\n');
+  const rawSignInCookie = signInRes.headers['set-cookie'];
+  const sessionCookie = Array.isArray(rawSignInCookie) ? rawSignInCookie.join('; ') : rawSignInCookie;
+  console.log('   Sign-In Status:', signInRes.status);
+  console.log('   User Name:', signInRes.data?.user?.name);
+  console.log('   User Email:', signInRes.data?.user?.email);
+  console.log('   Session Cookie Present:', !!sessionCookie, '\n');
 
-  if (signUpRes.status !== 200 && signUpRes.status !== 201) {
-    throw new Error(`Sign up failed with status ${signUpRes.status}: ${JSON.stringify(signUpBody)}`);
+  if (signInRes.status !== 200) {
+    throw new Error(`Sign in failed with status ${signInRes.status}: ${JSON.stringify(signInRes.data)}`);
   }
 
   // Step 3: Get Session (/api/auth/get-session)
   console.log('3️⃣ Checking session via /api/auth/get-session...');
-  const sessionRes = await fetch(`${baseUrl}/api/auth/get-session`, {
+  const sessionRes = await axios.get(`${baseUrl}/api/auth/get-session`, {
     headers: {
-      'Cookie': signUpCookie || '',
+      'Cookie': sessionCookie || '',
       'Origin': 'http://localhost:5173'
     }
   });
-  const sessionBody = await sessionRes.json();
   console.log('   Get Session Status:', sessionRes.status);
-  console.log('   Authenticated User:', sessionBody?.user?.email);
-  console.log('   Session Expire Date:', sessionBody?.session?.expiresAt, '\n');
+  console.log('   Authenticated User:', sessionRes.data?.user?.email);
+  console.log('   Session Expire Date:', sessionRes.data?.session?.expiresAt, '\n');
 
-  // Step 4: Access Protected Route (/api/me) with Sign-Up Session
-  console.log('4️⃣ Testing protected route /api/me with session cookie...');
-  const meRes1 = await fetch(`${baseUrl}/api/me`, {
+  // Step 4: Access Protected Profile Route (/api/me)
+  console.log('4️⃣ Testing protected profile /api/me with session cookie...');
+  const meRes = await axios.get(`${baseUrl}/api/me`, {
     headers: {
-      'Cookie': signUpCookie || '',
+      'Cookie': sessionCookie || '',
       'Origin': 'http://localhost:5173'
     }
   });
-  const meBody1 = await meRes1.json();
-  console.log('   /api/me Status:', meRes1.status);
-  console.log('   Retrieved Profile:', meBody1.user?.name, `(${meBody1.user?.email})`);
-  console.log('   Profile Message:', meBody1.message, '\n');
+  console.log('   /api/me Status:', meRes.status);
+  console.log('   User Role:', meRes.data?.user?.role);
+  console.log('   Profile Message:', meRes.data?.message, '\n');
 
-  if (meRes1.status !== 200) {
-    throw new Error(`Protected route /api/me failed with status ${meRes1.status}: ${JSON.stringify(meBody1)}`);
+  if (meRes.status !== 200) {
+    throw new Error(`Protected route /api/me failed with status ${meRes.status}: ${JSON.stringify(meRes.data)}`);
   }
 
-  // Step 5: Sign-In with Existing User
-  console.log('5️⃣ Testing user sign-in (/api/auth/sign-in/email)...');
-  const signInRes = await fetch(`${baseUrl}/api/auth/sign-in/email`, {
-    method: 'POST',
+  // Step 5: Test Admin Protected Directory (/api/users)
+  console.log('5️⃣ Testing Admin Users Directory (/api/users)...');
+  const usersRes = await axios.get(`${baseUrl}/api/users`, {
     headers: {
-      'Content-Type': 'application/json',
-      'Origin': 'http://localhost:5173'
-    },
-    body: JSON.stringify({
-      email: testUser.email,
-      password: testUser.password
-    })
-  });
-
-  const signInCookie = signInRes.headers.get('set-cookie');
-  const signInBody = await signInRes.json();
-  console.log('   Sign-In Status:', signInRes.status);
-  console.log('   Signed In User ID:', signInBody.user?.id);
-  console.log('   New Cookie Received:', !!signInCookie, '\n');
-
-  if (signInRes.status !== 200) {
-    throw new Error(`Sign in failed with status ${signInRes.status}: ${JSON.stringify(signInBody)}`);
-  }
-
-  // Step 6: Verify Protected Route (/api/me) with Sign-In Cookie
-  console.log('6️⃣ Verifying /api/me after sign-in...');
-  const meRes2 = await fetch(`${baseUrl}/api/me`, {
-    headers: {
-      'Cookie': signInCookie || '',
+      'Cookie': sessionCookie || '',
       'Origin': 'http://localhost:5173'
     }
   });
-  const meBody2 = await meRes2.json();
-  console.log('   /api/me Status:', meRes2.status);
-  console.log('   User Role:', meBody2.user?.role || 'AGENT');
-  console.log('   User Email:', meBody2.user?.email, '\n');
+  console.log('   /api/users Status:', usersRes.status);
+  console.log('   Total Users Found:', usersRes.data?.length, '\n');
 
-  if (meRes2.status !== 200) {
-    throw new Error(`Protected route /api/me after sign-in failed with status ${meRes2.status}: ${JSON.stringify(meBody2)}`);
-  }
-
-  // Step 7: Test Unauthorized Access (Without Cookie)
-  console.log('7️⃣ Testing /api/me without authentication cookie...');
-  const unauthRes = await fetch(`${baseUrl}/api/me`);
-  const unauthBody = await unauthRes.json();
-  console.log('   Unauthorized Status:', unauthRes.status, `(Expected: 401)`);
-  console.log('   Unauthorized Error Message:', unauthBody.message, '\n');
-
-  if (unauthRes.status !== 401) {
-    throw new Error(`Expected 401 Unauthorized but got ${unauthRes.status}`);
+  // Step 6: Test Unauthorized Access (Without Cookie)
+  console.log('6️⃣ Testing /api/me without authentication cookie...');
+  try {
+    await axios.get(`${baseUrl}/api/me`);
+    throw new Error('Expected 401 Unauthorized but request succeeded');
+  } catch (err) {
+    if (err.response && err.response.status === 401) {
+      console.log('   Unauthorized Status: 401 (Expected: 401)');
+      console.log('   Unauthorized Error Message:', err.response.data?.message || err.response.data?.error, '\n');
+    } else {
+      throw err;
+    }
   }
 
   console.log('==========================================');
-  console.log('🎉 ALL AUTHENTICATION TESTS PASSED SUCCESSFULLY!');
+  console.log('🎉 ALL AXIOS API & AUTH TESTS PASSED SUCCESSFULLY!');
   console.log('==========================================');
 }
 

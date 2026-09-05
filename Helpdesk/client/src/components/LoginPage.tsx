@@ -3,7 +3,8 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Mail, Lock, Eye, EyeOff, LogIn, Loader2, Ticket, AlertCircle, ShieldCheck, UserCheck } from 'lucide-react';
-import { authClient, AuthUser } from '../lib/auth-client';
+import { AuthUser } from '../lib/auth-client';
+import { useSignIn } from '../lib/hooks/useAuth';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -25,13 +26,13 @@ const loginSchema = z.object({
 type LoginFormData = z.infer<typeof loginSchema>;
 
 interface LoginPageProps {
-  onLoginSuccess: (user: AuthUser) => void;
+  onLoginSuccess: (user?: AuthUser) => void;
 }
 
 export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
   const [showPassword, setShowPassword] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const signInMutation = useSignIn();
 
   const {
     register,
@@ -49,30 +50,25 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
 
   const onSubmit = async (data: LoginFormData) => {
     setErrorMessage(null);
-    setIsLoading(true);
 
     try {
-      const result = await authClient.signIn(data.email.trim(), data.password);
+      const result = await signInMutation.mutateAsync({
+        email: data.email.trim(),
+        password: data.password,
+      });
 
       if (!result.success) {
-        setErrorMessage(result.error || 'failed to fetch');
+        setErrorMessage(result.error || 'Invalid credentials or network error.');
         return;
       }
 
-      const sessionData = await authClient.getSession();
-      if (sessionData.user) {
-        onLoginSuccess(sessionData.user);
-      } else if (result.user) {
-        onLoginSuccess(result.user);
-      } else {
-        setErrorMessage('Failed to establish authenticated session. Please try signing in again.');
-      }
+      onLoginSuccess(result.user);
     } catch (err: any) {
-      setErrorMessage(err.message || 'failed to fetch');
-    } finally {
-      setIsLoading(false);
+      setErrorMessage(err.message || 'Unable to connect to the authentication service.');
     }
   };
+
+  const isLoading = signInMutation.isPending;
 
   const handleQuickFill = (fillEmail: string, fillPass: string) => {
     setValue('email', fillEmail, { shouldValidate: true });

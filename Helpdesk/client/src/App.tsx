@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { authClient, AuthUser } from './lib/auth-client';
+import { useSession, useSignOut } from './lib/hooks/useAuth';
+import { AuthUser } from './lib/auth-client';
 import { Navbar } from './components/Navbar';
 import { LoginPage } from './components/LoginPage';
 import { HomePage } from './components/HomePage';
@@ -7,9 +8,11 @@ import { UsersPage } from './components/UsersPage';
 import { Ticket, Loader2 } from 'lucide-react';
 
 export default function App() {
-  const [user, setUser] = useState<AuthUser | null>(null);
-  const [isLoadingSession, setIsLoadingSession] = useState<boolean>(true);
+  const { data: sessionData, isLoading: isLoadingSession } = useSession();
+  const signOutMutation = useSignOut();
   const [currentPath, setCurrentPath] = useState<string>(window.location.pathname);
+
+  const user: AuthUser | null = sessionData?.user || null;
 
   // Sync state on browser back/forward buttons
   useEffect(() => {
@@ -25,35 +28,8 @@ export default function App() {
     setCurrentPath(path);
   };
 
-  // Check active authentication session on initial load
-  const checkSession = async () => {
-    setIsLoadingSession(true);
-    try {
-      const sessionData = await authClient.getSession();
-      if (sessionData && sessionData.user) {
-        setUser(sessionData.user);
-      } else {
-        setUser(null);
-      }
-    } catch (err) {
-      console.error('Session check failed:', err);
-      setUser(null);
-    } finally {
-      setIsLoadingSession(false);
-    }
-  };
-
-  useEffect(() => {
-    checkSession();
-  }, []);
-
-  const handleLoginSuccess = (loggedInUser: AuthUser) => {
-    setUser(loggedInUser);
-  };
-
   const handleSignOut = async () => {
-    await authClient.signOut();
-    setUser(null);
+    await signOutMutation.mutateAsync();
     navigateTo('/');
   };
 
@@ -76,13 +52,12 @@ export default function App() {
 
   // If user is not logged in, show Login Page
   if (!user) {
-    return <LoginPage onLoginSuccess={handleLoginSuccess} />;
+    return <LoginPage onLoginSuccess={() => navigateTo('/')} />;
   }
 
   // Determine active view component based on route
   const renderMainContent = () => {
     if (currentPath === '/users') {
-
       const isAdmin = user?.role?.toUpperCase() === 'ADMIN';
       if (!isAdmin) {
         return (

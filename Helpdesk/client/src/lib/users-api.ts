@@ -1,3 +1,5 @@
+import { apiClient } from './api-client';
+
 export interface ManagedUser {
   id: string;
   name: string;
@@ -31,87 +33,58 @@ export const usersApi = {
    * Fetch users list with optional search, role, and status filters
    */
   async listUsers(params?: { search?: string; role?: string; status?: string }): Promise<ManagedUser[]> {
-    const queryParams = new URLSearchParams();
-    if (params?.search) queryParams.set('search', params.search);
-    if (params?.role && params.role !== 'ALL') queryParams.set('role', params.role);
-    if (params?.status && params.status !== 'ALL') queryParams.set('status', params.status);
+    const queryParams: Record<string, string> = {};
+    if (params?.search) queryParams.search = params.search;
+    if (params?.role && params.role !== 'ALL') queryParams.role = params.role;
+    if (params?.status && params.status !== 'ALL') queryParams.status = params.status;
 
-    const url = `/api/users${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      credentials: 'include',
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData?.message || errorData?.error || `Failed to fetch users (${response.status})`);
+    try {
+      const response = await apiClient.get<ManagedUser[]>('/api/users', {
+        params: queryParams,
+      });
+      return response.data;
+    } catch (error: any) {
+      const message = error.response?.data?.error || error.response?.data?.message || error.message || 'Failed to fetch users';
+      throw new Error(message);
     }
-
-    return response.json();
   },
 
   /**
    * Create a new user account (Admin only)
    */
   async createUser(payload: CreateUserPayload): Promise<ManagedUser> {
-    const response = await fetch('/api/users', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      credentials: 'include',
-      body: JSON.stringify(payload),
-    });
-
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      throw new Error(data?.message || data?.error || `Failed to create user (${response.status})`);
+    try {
+      const response = await apiClient.post<ManagedUser>('/api/users', payload);
+      return response.data;
+    } catch (error: any) {
+      const message = error.response?.data?.error || error.response?.data?.message || error.message || 'Failed to create user';
+      throw new Error(message);
     }
-
-    return data;
   },
 
   /**
    * Update an existing user account (Admin only)
    */
   async updateUser(id: string, payload: UpdateUserPayload): Promise<ManagedUser> {
-    const response = await fetch(`/api/users/${id}`, {
-      method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      credentials: 'include',
-      body: JSON.stringify(payload),
-    });
-
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      throw new Error(data?.message || data?.error || `Failed to update user (${response.status})`);
+    try {
+      const response = await apiClient.patch<ManagedUser>(`/api/users/${id}`, payload);
+      return response.data;
+    } catch (error: any) {
+      const message = error.response?.data?.error || error.response?.data?.message || error.message || 'Failed to update user';
+      throw new Error(message);
     }
-
-    return data;
   },
 
   /**
    * Delete a user account (Admin only)
    */
   async deleteUser(id: string): Promise<{ message: string; id: string }> {
-    const response = await fetch(`/api/users/${id}`, {
-      method: 'DELETE',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      credentials: 'include',
-    });
-
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      throw new Error(data?.message || data?.error || `Failed to delete user (${response.status})`);
+    try {
+      const response = await apiClient.delete<{ message: string; id: string }>(`/api/users/${id}`);
+      return response.data;
+    } catch (error: any) {
+      const message = error.response?.data?.error || error.response?.data?.message || error.message || 'Failed to delete user';
+      throw new Error(message);
     }
-
-    return data;
   },
 };

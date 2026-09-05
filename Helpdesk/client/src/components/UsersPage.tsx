@@ -1,7 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { AuthUser } from '../lib/auth-client';
-import { usersApi, ManagedUser } from '../lib/users-api';
-import {Shield,UserCheck,Mail,Calendar,AlertCircle,Loader2,Users,
+import { useUsers } from '../lib/hooks/useUsers';
+import {
+  Shield,
+  UserCheck,
+  Mail,
+  Calendar,
+  AlertCircle,
+  Loader2,
+  Users,
 } from 'lucide-react';
 
 interface UsersPageProps {
@@ -9,28 +16,7 @@ interface UsersPageProps {
 }
 
 export const UsersPage: React.FC<UsersPageProps> = ({ user: currentUser }) => {
-  const [users, setUsers] = useState<ManagedUser[]>([]);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
-
-  // Fetch users from API
-  const loadUsers = async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const data = await usersApi.listUsers();
-      setUsers(data);
-    } catch (err: any) {
-      console.error('Failed to load users:', err);
-      setError(err?.message || 'Failed to load users directory. Please check backend connection.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadUsers();
-  }, []);
+  const { data: users = [], isLoading, error } = useUsers();
 
   // Get User Initials for Avatar
   const getInitials = (name: string) => {
@@ -65,7 +51,7 @@ export const UsersPage: React.FC<UsersPageProps> = ({ user: currentUser }) => {
         <div className="mb-6 flex items-center justify-between bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-xl shadow-xs">
           <div className="flex items-center space-x-3">
             <AlertCircle className="h-5 w-5 text-red-600 shrink-0" />
-            <span className="text-sm font-medium">{error}</span>
+            <span className="text-sm font-medium">{error instanceof Error ? error.message : 'Failed to load users directory.'}</span>
           </div>
         </div>
       )}

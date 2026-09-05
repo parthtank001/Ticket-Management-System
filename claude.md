@@ -44,6 +44,7 @@ The **AI-Powered Ticket Management System (Helpdesk)** automates and streamlines
 | :--- | :--- | :--- |
 | **Frontend Framework** | **React 18 + Vite** | Responsive client dashboard, TypeScript, component architecture |
 | **UI Components & Styling** | **shadcn/ui + Tailwind CSS** | Custom UI primitives (Button, Card, Input, Label, Badge, Alert) with Slate theme & `@/*` path alias |
+| **Data Fetching & State** | **Axios + TanStack React Query** | Centralized HTTP client (`apiClient`) and declarative server-state management (`useQuery`, `useMutation`) with caching |
 | **Icons** | **Lucide React** | Clean, modern iconography across client dashboard and authentication pages |
 | **Backend API** | **Express.js + Node.js (TypeScript)** | RESTful API server, webhooks, auth middleware, ticket workflow management |
 | **Database & ORM** | **PostgreSQL + Prisma ORM + `pgvector`** | Relational data (`User`, `Session`, `Account`, `Verification`, `Ticket`, `TicketMessage`, `KnowledgeBaseDocument`) + vector embeddings |
@@ -70,10 +71,16 @@ e:\claude_ai\Ticket Management System\
     │   │   │   ├── Navbar.tsx    # App navigation header with session user details & sign-out
     │   │   │   └── UsersPage.tsx # Admin user management directory
     │   │   ├── lib/
+    │   │   │   ├── hooks/
+    │   │   │   │   ├── useAuth.ts # React Query hooks for session & auth lifecycle
+    │   │   │   │   └── useUsers.ts # React Query hooks for user CRUD management
+    │   │   │   ├── api-client.ts  # Centralized Axios client instance with credentials
     │   │   │   ├── auth-client.ts # Client authentication helper (Better Auth client wrapper)
-    │   │   │   └── utils.ts    # Class merging utilities (clsx + tailwind-merge)
+    │   │   │   ├── query-client.ts # TanStack React Query client instance & default cache policies
+    │   │   │   ├── users-api.ts   # Typed API service for user endpoints using axios
+    │   │   │   └── utils.ts       # Class merging utilities (clsx + tailwind-merge)
     │   │   ├── App.tsx         # Main application root & session router
-    │   │   ├── main.tsx        # React DOM entry point
+    │   │   ├── main.tsx        # React DOM entry point with QueryClientProvider
     │   │   └── index.css       # Tailwind directives & global font styles
     │   ├── components.json     # shadcn/ui configuration file
     │   ├── package.json        # Client dependencies & Vite scripts
@@ -169,7 +176,64 @@ Authentication in the Helpdesk application is powered by **Better Auth** (`bette
 
 ---
 
-## 6. Key Conventions & API Summary
+## 6. Client Data Fetching & Server-State Architecture (Axios + React Query)
+
+All frontend network communication and server-state caching must strictly adhere to the following conventions:
+
+### 6.1 Centralized Axios Client (`client/src/lib/api-client.ts`)
+- **HTTP Client**: Always import and use the centralized `apiClient` instance from `src/lib/api-client`. Do **NOT** use native `fetch()` or construct ad-hoc `axios.create()` instances across components.
+- **Session Credentials**: The `apiClient` is preconfigured with `withCredentials: true` and default JSON headers to ensure Better Auth session cookies are sent on every request.
+- **API Services Layer**: All API endpoint interactions must be organized into typed service objects in `client/src/lib/*-api.ts` (e.g., `usersApi` in `client/src/lib/users-api.ts`, `authClient` in `client/src/lib/auth-client.ts`). Keep UI components decoupled from HTTP transport details.
+- **Standardized Error Handling**: Extract backend error messages uniformly in API service methods:
+  ```ts
+  const message = error.response?.data?.error || error.response?.data?.message || error.message || 'An unexpected error occurred';
+  throw new Error(message);
+  ```
+
+### 6.2 TanStack React Query (`@tanstack/react-query`)
+- **Custom Hooks Pattern**: Always encapsulate queries and mutations into dedicated custom hooks under `client/src/lib/hooks/` (e.g., `useUsers.ts`, `useAuth.ts`, `useTickets.ts`). Do **NOT** call `useQuery` / `useMutation` directly inside raw view components without dedicated hook abstractions.
+- **Query Key Conventions**:
+  - Define query keys as typed `const` arrays:
+    ```ts
+    export const USERS_QUERY_KEY = ['users'] as const;
+    export const TICKETS_QUERY_KEY = ['tickets'] as const;
+    ```
+  - For parameterized queries (filters, search, pagination), append the parameter object to the key array to ensure automatic cache segregation and reactive re-fetching:
+    ```ts
+    export function useUsers(params?: { search?: string; role?: string; status?: string }) {
+      return useQuery({
+        queryKey: [...USERS_QUERY_KEY, params],
+        queryFn: () => usersApi.listUsers(params),
+      });
+    }
+    ```
+- **Mutations & Cache Invalidation**:
+  - Perform all write/update/delete operations via `useMutation`.
+  - Invalidate affected query keys in `onSuccess` using `queryClient.invalidateQueries({ queryKey: ... })` to keep client UI synchronized with the database:
+    ```ts
+    export function useCreateUser() {
+      const queryClient = useQueryClient();
+      return useMutation({
+        mutationFn: (payload: CreateUserPayload) => usersApi.createUser(payload),
+        onSuccess: () => {
+          queryClient.invalidateQueries({ queryKey: USERS_QUERY_KEY });
+        },
+      });
+    }
+    ```
+  - For immediate state updates (e.g., login/logout session transitions), use `queryClient.setQueryData` to optimistically update the cache.
+- **Global QueryClient Defaults (`client/src/lib/query-client.ts`)**:
+  - `staleTime: 1000 * 60 * 2` (2 minutes): Avoids unnecessary duplicate network requests while navigating.
+  - `gcTime: 1000 * 60 * 10` (10 minutes): Keeps inactive data cached in memory.
+  - `retry: 1`: Single retry for network failures.
+  - `refetchOnWindowFocus: false`: Prevents jarring re-renders when switching browser tabs.
+- **UI State Handling**:
+  - Always handle `isLoading` / `isPending` states with visual feedback (`Loader2` spinner, skeleton loaders).
+  - Handle `isError` / `error` states gracefully with user-friendly alerts.
+
+---
+
+## 7. Key Conventions & API Summary
 
 ### API Endpoints Summary
 - **Health & Auth**:
@@ -190,9 +254,9 @@ Authentication in the Helpdesk application is powered by **Better Auth** (`bette
 
 ---
 
-## 7. Playwright E2E Testing & Test Database Configuration
+## 8. Playwright E2E Testing & Test Database Configuration
 
-### 7.1 Architecture & Isolation
+### 8.1 Architecture & Isolation
 - **Separate Database**: Tests execute against an isolated PostgreSQL database (`helpdesk_test`) specified in `.env.test` (`DATABASE_URL="postgresql://postgres:...@localhost:5432/helpdesk_test?schema=public"`).
 - **Test Server Port**: The test backend server runs on `PORT=5001` (to avoid conflicting with the development server on port 5000).
 - **Global Setup (`e2e/setup/global-setup.ts`)**:

@@ -39,6 +39,7 @@ Every ticket must belong to **exactly one** category:
 | Layer | Technology | Key Purpose |
 | :--- | :--- | :--- |
 | **Frontend Framework** | **React 18 + Vite** | Responsive client dashboard, TypeScript, component architecture |
+| **Data Fetching & State** | **Axios + TanStack React Query** | Centralized HTTP client (`apiClient`) and declarative server-state management (`useQuery`, `useMutation`) with caching |
 | **Styling & Icons** | **Tailwind CSS + Lucide React** | Modern dark-mode UI with sleek glassmorphism aesthetic |
 | **Backend API** | **Express.js + Node.js (TypeScript)** | RESTful API server, webhooks, auth middleware, AI services |
 | **Database & ORM** | **PostgreSQL + Prisma ORM + `pgvector`** | Relational data (`User`, `Session`, `Ticket`, `Message`) + vector embeddings search |
@@ -65,10 +66,16 @@ e:\claude_ai\Ticket Management System\
     │   │   │   ├── Navbar.tsx    # App navigation header with session user details & sign-out
     │   │   │   └── UsersPage.tsx # Admin user management directory
     │   │   ├── lib/
+    │   │   │   ├── hooks/
+    │   │   │   │   ├── useAuth.ts # React Query hooks for session & auth lifecycle
+    │   │   │   │   └── useUsers.ts # React Query hooks for user CRUD management
+    │   │   │   ├── api-client.ts  # Centralized Axios client instance with credentials
     │   │   │   ├── auth-client.ts # Client authentication helper (Better Auth client wrapper)
-    │   │   │   └── utils.ts    # Class merging utilities (clsx + tailwind-merge)
+    │   │   │   ├── query-client.ts # TanStack React Query client instance & default cache policies
+    │   │   │   ├── users-api.ts   # Typed API service for user endpoints using axios
+    │   │   │   └── utils.ts       # Class merging utilities (clsx + tailwind-merge)
     │   │   ├── App.tsx         # Main application root & session router
-    │   │   ├── main.tsx        # React DOM entry point
+    │   │   ├── main.tsx        # React DOM entry point with QueryClientProvider
     │   │   └── index.css       # Tailwind directives & global font styles
     │   ├── components.json     # shadcn/ui configuration file
     │   ├── package.json        # Client dependencies & Vite scripts
@@ -138,6 +145,19 @@ From `e:\claude_ai\Ticket Management System\Helpdesk`:
 ### 5.4 UI & Aesthetic Standards
 - Dark mode theme (`bg-slate-950`), custom radial gradients, glassmorphism cards, clear state badges, and responsive layouts.
 - Always verify client-server communication using health monitoring (`/api/health`).
+
+### 5.5 Client Data Fetching & Server-State Architecture (Axios + React Query)
+- **Centralized Axios Client (`client/src/lib/api-client.ts`)**:
+  - Always use the shared `apiClient` instance configured with `withCredentials: true` and JSON headers.
+  - Never use native `fetch()` or instantiate ad-hoc `axios` clients directly inside UI components.
+  - Structure all API endpoints as strongly-typed service objects in `client/src/lib/*-api.ts` (e.g., `usersApi` in `users-api.ts`).
+  - Standardize error extraction: parse `error.response?.data?.error || error.response?.data?.message || error.message` before throwing.
+- **TanStack React Query (`@tanstack/react-query`)**:
+  - Encapsulate server-state queries and mutations within dedicated custom hooks inside `client/src/lib/hooks/` (e.g., `useUsers.ts`, `useAuth.ts`).
+  - Query Keys: Define typed tuple constants (e.g., `export const USERS_QUERY_KEY = ['users'] as const;`). Append parameters (filters, pagination) to the query key array (`[...USERS_QUERY_KEY, params]`) to trigger automatic reactive re-fetching.
+  - Mutations (`useMutation`): Execute all write/update/delete operations with `useMutation` and invalidate corresponding query keys on success (`queryClient.invalidateQueries({ queryKey: ... })`).
+  - Cache Policies (`client/src/lib/query-client.ts`): Set to `staleTime: 2 minutes`, `gcTime: 10 minutes`, `retry: 1`, and `refetchOnWindowFocus: false`.
+  - UI States: Always handle `isLoading` / `isPending` and `isError` / `error` states gracefully with loaders and alert banners.
 
 ---
 
