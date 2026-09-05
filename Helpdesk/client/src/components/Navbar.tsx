@@ -37,12 +37,9 @@ export const Navbar: React.FC<NavbarProps> = ({ user, currentPath, onNavigate, o
             </div>
             <div className="flex items-center space-x-3">
               <div>
-                <h1 className="text-base font-bold text-slate-900 tracking-tight">
+                <h2 className="text-sm font-bold text-slate-900 tracking-tight">
                   Helpdesk AI
-                </h1>
-                <p className="text-[11px] text-slate-500 font-medium hidden sm:block">
-                  Ticket Management System
-                </p>
+                </h2>
               </div>
 
               {isAdmin && (
@@ -67,7 +64,7 @@ export const Navbar: React.FC<NavbarProps> = ({ user, currentPath, onNavigate, o
 
         {/* User Profile & Actions */}
         <div className="flex items-center space-x-3">
-          <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+          <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wider">
             {displayRole}
           </span>
 
@@ -75,13 +72,13 @@ export const Navbar: React.FC<NavbarProps> = ({ user, currentPath, onNavigate, o
           <button
             onClick={handleSignOutClick}
             disabled={isLoggingOut}
-            className="inline-flex items-center space-x-1.5 px-3 py-1.5 text-xs font-bold text-slate-600 hover:text-red-700 bg-slate-50 hover:bg-red-50 border border-slate-200 hover:border-red-200 rounded-lg transition-all focus:outline-none focus:ring-2 focus:ring-red-500/20 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed group"
+            className="inline-flex items-center space-x-1 px-2.5 py-1 text-[11px] font-semibold text-slate-600 hover:text-red-700 bg-slate-50 hover:bg-red-50 border border-slate-200 hover:border-red-200 rounded-md transition-all focus:outline-none focus:ring-2 focus:ring-red-500/20 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed group"
             title="Sign out of your account"
           >
             {isLoggingOut ? (
-              <Loader2 className="h-3.5 w-3.5 text-slate-400 animate-spin" />
+              <Loader2 className="h-3 w-3 text-slate-400 animate-spin" />
             ) : (
-              <LogOut className="h-3.5 w-3.5 text-slate-400 group-hover:text-red-600 transition-colors" />
+              <LogOut className="h-3 w-3 text-slate-400 group-hover:text-red-600 transition-colors" />
             )}
             <span>Sign Out</span>
           </button>

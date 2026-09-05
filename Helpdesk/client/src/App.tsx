@@ -5,7 +5,8 @@ import { Navbar } from './components/Navbar';
 import { LoginPage } from './components/LoginPage';
 import { HomePage } from './components/HomePage';
 import { UsersPage } from './components/UsersPage';
-import { Ticket, Loader2 } from 'lucide-react';
+import { Ticket } from 'lucide-react';
+import { Skeleton } from './components/ui/skeleton';
 
 export default function App() {
   const { data: sessionData, isLoading: isLoadingSession } = useSession();
@@ -33,19 +34,56 @@ export default function App() {
     navigateTo('/');
   };
 
-  // Fullscreen loading spinner while session status is verifying
+  // Skeleton placeholder while session status is verifying
   if (isLoadingSession) {
     return (
-      <div className="min-h-screen bg-slate-100 flex flex-col items-center justify-center p-6 text-slate-800 font-sans">
-        <div className="flex flex-col items-center space-y-4">
-          <div className="h-12 w-12 rounded-2xl bg-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-200 animate-pulse">
-            <Ticket className="h-6 w-6 text-white" />
+      <div className="min-h-screen bg-slate-100 flex flex-col font-sans">
+        {/* Navbar Skeleton */}
+        <header className="bg-white border-b border-slate-200/80 sticky top-0 z-50">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex justify-between h-16 items-center">
+              <div className="flex items-center space-x-3">
+                <Skeleton className="h-9 w-9 rounded-xl" />
+                <div className="space-y-1.5">
+                  <Skeleton className="h-3.5 w-28 rounded" />
+                  <Skeleton className="h-2.5 w-20 rounded" />
+                </div>
+              </div>
+              <div className="flex items-center space-x-3">
+                <Skeleton className="h-8 w-20 rounded-lg" />
+                <Skeleton className="h-8 w-8 rounded-full" />
+              </div>
+            </div>
           </div>
-          <div className="flex items-center space-x-2 text-slate-500 font-medium text-xs">
-            <Loader2 className="h-4 w-4 animate-spin text-indigo-600" />
-            <span>Verifying workspace session...</span>
+        </header>
+
+        {/* Workspace Body Skeleton */}
+        <main className="flex-1 max-w-6xl mx-auto py-5 px-4 sm:px-6 w-full space-y-4">
+          <div className="flex items-center justify-between mb-4">
+            <Skeleton className="h-5 w-24 rounded" />
+            <Skeleton className="h-3.5 w-12 rounded" />
           </div>
-        </div>
+          <div className="bg-white border border-slate-200/80 rounded-xl shadow-xs overflow-hidden">
+            <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
+              <Skeleton className="h-4 w-32 rounded" />
+              <Skeleton className="h-4 w-20 rounded" />
+            </div>
+            <div className="divide-y divide-slate-100">
+              {[1, 2, 3, 4].map((i) => (
+                <div key={i} className="py-3 px-4 flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <Skeleton className="h-7 w-7 rounded-lg" />
+                    <div className="space-y-1">
+                      <Skeleton className="h-3.5 w-28 rounded" />
+                      <Skeleton className="h-2.5 w-36 rounded" />
+                    </div>
+                  </div>
+                  <Skeleton className="h-5 w-16 rounded-md" />
+                </div>
+              ))}
+            </div>
+          </div>
+        </main>
       </div>
     );
   }

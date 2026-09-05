@@ -28,11 +28,11 @@ test.describe('Admin User Directory E2E Suite', () => {
       await expect(page.getByRole('columnheader', { name: 'Actions' })).not.toBeVisible();
 
       // 3. Verify seeded accounts are rendered
-      await expect(page.getByText('admin@example.com')).toBeVisible();
-      await expect(page.getByText('agent@example.com')).toBeVisible();
-      await expect(page.getByText('System Admin')).toBeVisible();
-      await expect(page.getByText('Helpdesk Agent')).toBeVisible();
-      await expect(page.getByText('You', { exact: true })).toBeVisible();
+      await expect(page.getByText('admin@example.com').first()).toBeVisible();
+      await expect(page.getByText('agent@example.com').first()).toBeVisible();
+      await expect(page.getByText('System Admin').first()).toBeVisible();
+      await expect(page.getByText('Helpdesk Agent').first()).toBeVisible();
+      await expect(page.getByText('You', { exact: true }).first()).toBeVisible();
     });
   });
 
