@@ -4,7 +4,24 @@ This memory file contains project architectural specifications, technical stack 
 
 ---
 
-## 1. Context7 Documentation Retrieval Rules
+## 1. Core Development Directives & Rules
+
+### 1.1 Mandatory Frontend Data Fetching: Axios + TanStack React Query
+> **CRITICAL INSTRUCTION**: All client-side HTTP communication, REST API requests, and server-state management **MUST** strictly use **Axios** and **TanStack React Query** (`@tanstack/react-query`).
+
+- **Strict Prohibitions**:
+  - ❌ **NO Native Fetch / XHR**: Never use native `fetch()`, `window.fetch`, or `XMLHttpRequest`.
+  - ❌ **NO Ad-hoc Axios Instances**: Never call `axios.create()`, `axios.get()`, or `axios.post()` directly inside React UI components.
+  - ❌ **NO Manual `useEffect` Data Fetching**: Never fetch server data inside `useEffect` or store asynchronous server response state in raw `useState` / `useReducer`.
+- **Mandatory Enforced Architecture**:
+  1. **Centralized HTTP Client**: Always use the preconfigured `apiClient` from [`client/src/lib/api-client.ts`](file:///E:/claude_ai/Ticket%20Management%20System/Helpdesk/client/src/lib/api-client.ts) (which includes `withCredentials: true` and standardized error handling).
+  2. **Dedicated API Service Layer**: Group all backend API endpoint calls into typed service objects inside `client/src/lib/*-api.ts` (e.g., `usersApi` in [`users-api.ts`](file:///E:/claude_ai/Ticket%20Management%20System/Helpdesk/client/src/lib/users-api.ts), `ticketsApi` in [`tickets-api.ts`](file:///E:/claude_ai/Ticket%20Management%20System/Helpdesk/client/src/lib/tickets-api.ts)).
+  3. **Custom React Query Hooks**: Always wrap queries (`useQuery`) and mutations (`useMutation`) into custom hook files inside `client/src/lib/hooks/` (e.g., `useUsers.ts`, `useTickets.ts`, `useAuth.ts`). Components must consume these custom hooks rather than calling React Query primitives directly.
+  4. **Query Keys & Invalidation**: Use strongly typed `const` arrays for query keys (e.g., `const USERS_QUERY_KEY = ['users'] as const;`). Invalidate affected query keys on successful mutations using `queryClient.invalidateQueries`.
+
+---
+
+## 2. Context7 Documentation Retrieval Rules
 
 Use Context7 MCP to fetch current, up-to-date documentation whenever asking or inquiring about any library, framework, SDK, API, CLI tool, or cloud service—even well-known ones like React, Next.js, Prisma, Express, Tailwind, Gemini API, or PostgreSQL. This includes API syntax, configuration, version migration, library-specific debugging, setup instructions, and CLI tool usage.
 
@@ -18,7 +35,7 @@ Use Context7 MCP to fetch current, up-to-date documentation whenever asking or i
 
 ---
 
-## 2. Project Overview
+## 3. Project Overview
 
 The **AI-Powered Ticket Management System (Helpdesk)** automates and streamlines inbound customer support email handling for student inquiries:
 
@@ -34,7 +51,7 @@ Every ticket must belong to **exactly one** category:
 
 ---
 
-## 3. Technical Stack
+## 4. Technical Stack
 
 | Layer | Technology | Key Purpose |
 | :--- | :--- | :--- |
@@ -50,7 +67,7 @@ Every ticket must belong to **exactly one** category:
 
 ---
 
-## 4. Project Structure & Directory Layout
+## 5. Project Structure & Directory Layout
 
 ```
 e:\claude_ai\Ticket Management System\
@@ -68,10 +85,12 @@ e:\claude_ai\Ticket Management System\
     │   │   ├── lib/
     │   │   │   ├── hooks/
     │   │   │   │   ├── useAuth.ts # React Query hooks for session & auth lifecycle
+    │   │   │   │   ├── useTickets.ts # React Query hooks for tickets, agents & messaging
     │   │   │   │   └── useUsers.ts # React Query hooks for user CRUD management
     │   │   │   ├── api-client.ts  # Centralized Axios client instance with credentials
     │   │   │   ├── auth-client.ts # Client authentication helper (Better Auth client wrapper)
     │   │   │   ├── query-client.ts # TanStack React Query client instance & default cache policies
+    │   │   │   ├── tickets-api.ts # Typed API service for tickets, agents & replies
     │   │   │   ├── users-api.ts   # Typed API service for user endpoints using axios
     │   │   │   └── utils.ts       # Class merging utilities (clsx + tailwind-merge)
     │   │   ├── App.tsx         # Main application root & session router
@@ -120,20 +139,20 @@ From `e:\claude_ai\Ticket Management System\Helpdesk`:
 
 ---
 
-## 5. Key Conventions & Architecture Rules
+## 6. Key Conventions & Architecture Rules
 
-### 5.1 Email Ingestion & Threading
+### 6.1 Email Ingestion & Threading
 - Extract `From`, `Subject`, `Body`, `Message-ID`, and `In-Reply-To` headers from inbound webhooks.
 - Match existing ticket threads using `[Ticket #XXXX]` subject tags or `In-Reply-To` / `References` headers.
 - **Anti-Loop Protection**: Always inspect `Auto-Submitted` headers (`auto-generated`, `auto-replied`) and ignore automated emails to prevent infinite loops.
 
-### 5.2 Authentication & Roles
+### 6.2 Authentication & Roles
 - **Roles**: `ADMIN` and `AGENT`.
 - **Database Sessions**: Managed by Better Auth via PostgreSQL `session` table; supports instant session revocation.
 - Primary Admin (`admin@example.com` / `password123`) and Agent (`agent@example.com` / `password123`) seeded on deployment.
 - Admins have exclusive access to `/api/users` and the Users directory in the UI.
 
-### 5.3 Rate Limiting & Production Security (`server/middleware/rate-limiter.ts`)
+### 6.3 Rate Limiting & Production Security (`server/middleware/rate-limiter.ts`)
 - **Production-Only Enforcement**: Rate limiters strictly enforce request ceilings when `NODE_ENV === 'production'`. In `development` and `test` environments, all rate limit checks are completely bypassed (`skip` returning `true`).
 - **Reverse Proxy Trust**: When running in production, Express sets `trust proxy: 1` to resolve client IPs behind load balancers/proxies.
 - **Limiters Configured**:
@@ -142,11 +161,11 @@ From `e:\claude_ai\Ticket Management System\Helpdesk`:
   - `ticketCreationLimiter`: 10 req/min on `POST /api/tickets` (configurable via `TICKET_RATE_LIMIT_MAX`) to prevent spam submissions.
 - **Headers**: Conforms to IETF `draft-7` standards (`RateLimit-*` headers) and disables legacy `X-RateLimit-*` headers.
 
-### 5.4 UI & Aesthetic Standards
+### 6.4 UI & Aesthetic Standards
 - Dark mode theme (`bg-slate-950`), custom radial gradients, glassmorphism cards, clear state badges, and responsive layouts.
 - Always verify client-server communication using health monitoring (`/api/health`).
 
-### 5.5 Client Data Fetching & Server-State Architecture (Axios + React Query)
+### 6.5 Client Data Fetching & Server-State Architecture (Axios + React Query)
 - **Centralized Axios Client (`client/src/lib/api-client.ts`)**:
   - Always use the shared `apiClient` instance configured with `withCredentials: true` and JSON headers.
   - Never use native `fetch()` or instantiate ad-hoc `axios` clients directly inside UI components.
@@ -161,8 +180,9 @@ From `e:\claude_ai\Ticket Management System\Helpdesk`:
 
 ---
 
-## 6. Testing Architecture (Playwright E2E)
+## 7. Testing Architecture (Playwright E2E & React Testing Library)
 
+- **Component Tests**: Authored using Vitest + React Testing Library under `client/src/**/__tests__/*.test.tsx`. Run with `npm run test:client` or watch mode `npm run test:client:watch` (UI mode: `npm run test:client:ui`).
 - **Isolated Test Database**: Tests execute against an isolated database (`helpdesk_test`) specified in `.env.test`.
 - **Dedicated Test Server Port**: Backend test server runs on `PORT=5001` via Playwright `webServer` config.
 - **Global Test Setup**: `e2e/setup/global-setup.ts` creates the test database, pushes Prisma migrations, and seeds test accounts before test execution.
@@ -171,7 +191,7 @@ From `e:\claude_ai\Ticket Management System\Helpdesk`:
   - `e2e/rbac-navigation.spec.ts`: Admin directory access vs. Agent restricted access views and return navigation.
   - `e2e/api.spec.ts`: Health check, 401 unauthenticated security, 403 Agent forbidden checks, inbound ticket creation with AI draft response, and message replies.
 
-### 6.1 Instructions for Using `e2e-test-writer` Subagent
+### 7.1 Instructions for Using `e2e-test-writer` Subagent
 When creating, maintaining, or refactoring Playwright E2E tests:
 1. **Delegate to Subagent**: Invoke `playwright-e2e-tester` / `e2e-test-writer` via `invoke_subagent`.
 2. **Directory Standard**: All test specs must be authored in `Helpdesk/e2e/*.spec.ts`.

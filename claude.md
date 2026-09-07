@@ -4,7 +4,24 @@ This memory file contains project architectural specifications, technical stack 
 
 ---
 
-## 1. Context7 Documentation Retrieval Rules
+## 1. Core Development Directives & Rules
+
+### 1.1 Mandatory Frontend Data Fetching: Axios + TanStack React Query
+> **CRITICAL INSTRUCTION**: All client-side HTTP communication, REST API requests, and server-state management **MUST** strictly use **Axios** and **TanStack React Query** (`@tanstack/react-query`).
+
+- **Strict Prohibitions**:
+  - ❌ **NO Native Fetch / XHR**: Never use native `fetch()`, `window.fetch`, or `XMLHttpRequest`.
+  - ❌ **NO Ad-hoc Axios Instances**: Never call `axios.create()`, `axios.get()`, or `axios.post()` directly inside React UI components.
+  - ❌ **NO Manual `useEffect` Data Fetching**: Never fetch server data inside `useEffect` or store asynchronous server response state in raw `useState` / `useReducer`.
+- **Mandatory Enforced Architecture**:
+  1. **Centralized HTTP Client**: Always use the preconfigured `apiClient` from [`client/src/lib/api-client.ts`](file:///E:/claude_ai/Ticket%20Management%20System/Helpdesk/client/src/lib/api-client.ts) (which includes `withCredentials: true` and standardized error handling).
+  2. **Dedicated API Service Layer**: Group all backend API endpoint calls into typed service objects inside `client/src/lib/*-api.ts` (e.g., `usersApi` in [`users-api.ts`](file:///E:/claude_ai/Ticket%20Management%20System/Helpdesk/client/src/lib/users-api.ts), `ticketsApi` in [`tickets-api.ts`](file:///E:/claude_ai/Ticket%20Management%20System/Helpdesk/client/src/lib/tickets-api.ts)).
+  3. **Custom React Query Hooks**: Always wrap queries (`useQuery`) and mutations (`useMutation`) into custom hook files inside `client/src/lib/hooks/` (e.g., `useUsers.ts`, `useTickets.ts`, `useAuth.ts`). Components must consume these custom hooks rather than calling React Query primitives directly.
+  4. **Query Keys & Invalidation**: Use strongly typed `const` arrays for query keys (e.g., `const USERS_QUERY_KEY = ['users'] as const;`). Invalidate affected query keys on successful mutations using `queryClient.invalidateQueries`.
+
+---
+
+## 2. Context7 Documentation Retrieval Rules
 
 Use Context7 MCP to fetch current, up-to-date documentation whenever asking or inquiring about any library, framework, SDK, API, CLI tool, or cloud service—even well-known ones like React, Next.js, Prisma, Express, Tailwind, Gemini API, or PostgreSQL. This includes API syntax, configuration, version migration, library-specific debugging, setup instructions, and CLI tool usage.
 
@@ -18,7 +35,7 @@ Use Context7 MCP to fetch current, up-to-date documentation whenever asking or i
 
 ---
 
-## 2. Project Overview
+## 3. Project Overview
 
 The **AI-Powered Ticket Management System (Helpdesk)** automates and streamlines inbound customer support email handling for student inquiries:
 
@@ -38,7 +55,7 @@ The **AI-Powered Ticket Management System (Helpdesk)** automates and streamlines
 
 ---
 
-## 3. Technical Stack
+## 4. Technical Stack
 
 | Layer | Technology | Key Purpose |
 | :--- | :--- | :--- |
@@ -55,7 +72,7 @@ The **AI-Powered Ticket Management System (Helpdesk)** automates and streamlines
 
 ---
 
-## 4. Project Structure & Directory Layout
+## 5. Project Structure & Directory Layout
 
 ```
 e:\claude_ai\Ticket Management System\
@@ -124,12 +141,12 @@ From `e:\claude_ai\Ticket Management System\Helpdesk`:
 
 ---
 
-## 5. Authentication Architecture & Specifications
+## 6. Authentication Architecture & Specifications
 
-### 5.1 System Overview
+### 6.1 System Overview
 Authentication in the Helpdesk application is powered by **Better Auth** (`better-auth`) integrated with **Prisma ORM** (`better-auth/adapters/prisma`) over a PostgreSQL database. It utilizes **server-managed database sessions** stored in the `session` table to enable instant session revocation and full administrative session control.
 
-### 5.2 Backend Configuration (`server/auth.ts` & `server/index.ts`)
+### 6.2 Backend Configuration (`server/auth.ts` & `server/index.ts`)
 - **Library Adapter**: Prisma adapter (`prismaAdapter(prisma, { provider: "postgresql" })`).
 - **Security Policy**:
   - `disableSignUp: true`: Public signups are explicitly disabled to prevent unauthorized user registrations.
@@ -138,7 +155,7 @@ Authentication in the Helpdesk application is powered by **Better Auth** (`bette
   - Router mounted at `app.all('/api/auth/*', toNodeHandler(auth))` **before** standard Express JSON body parsers (`express.json()`).
   - CORS middleware configured with `origin: 'http://localhost:5173'` and `credentials: true`.
 
-### 5.3 Authentication & RBAC Middleware (`server/middleware/auth.ts`)
+### 6.3 Authentication & RBAC Middleware (`server/middleware/auth.ts`)
 - **Session Verification (`requireAuth`)**:
   - Extracts request headers using `fromNodeHeaders(req.headers)`.
   - Verifies session validity against database using `auth.api.getSession()`.
@@ -148,7 +165,7 @@ Authentication in the Helpdesk application is powered by **Better Auth** (`bette
   - Verifies `req.user.role` against required roles (`Role.ADMIN`, `Role.AGENT`).
   - Returns HTTP 403 Forbidden if user lacks required role permissions.
 
-### 5.4 Client Authentication Integration (`client/src/lib/auth-client.ts` & `App.tsx`)
+### 6.4 Client Authentication Integration (`client/src/lib/auth-client.ts` & `App.tsx`)
 - **`authClient` Helper**:
   - `getSession()`: Queries `/api/auth/get-session` with `credentials: 'include'` to restore user session state.
   - `signIn(email, password)`: Posts to `/api/auth/sign-in/email` with user credentials.
@@ -158,14 +175,14 @@ Authentication in the Helpdesk application is powered by **Better Auth** (`bette
   - Unauthenticated users are routed to `LoginPage`.
   - Authenticated users are routed to `Navbar` + `HomePage` dashboard.
 
-### 5.5 Database Seeding & Credential Hashing (`prisma/seed.ts`)
+### 6.5 Database Seeding & Credential Hashing (`prisma/seed.ts`)
 - **Credential Storage**: Account credentials are stored in the `account` table with `providerId: 'credential'` and `issuer: 'local:credential'`.
 - **Password Security**: Passwords are hashed using Better Auth's native `hashPassword` function from `better-auth/crypto`.
 - **Default Seed Accounts**:
   - **Admin**: `admin@example.com` (Password: `password123`, Role: `ADMIN`)
   - **Agent**: `agent@example.com` (Password: `password123`, Role: `AGENT`)
 
-### 5.6 Rate Limiting Architecture (`server/middleware/rate-limiter.ts`)
+### 6.6 Rate Limiting Architecture (`server/middleware/rate-limiter.ts`)
 - **Production-Only Enforcement**: Rate limiters strictly enforce request ceilings when `NODE_ENV === 'production'`. In `development` and `test` environments, all rate limit checks are completely bypassed (`skip` returning `true`).
 - **Reverse Proxy Trust**: When running in production, Express sets `trust proxy: 1` to resolve client IPs behind load balancers/proxies.
 - **Limiters Configured**:
@@ -176,11 +193,11 @@ Authentication in the Helpdesk application is powered by **Better Auth** (`bette
 
 ---
 
-## 6. Client Data Fetching & Server-State Architecture (Axios + React Query)
+## 7. Client Data Fetching & Server-State Architecture (Axios + React Query)
 
 All frontend network communication and server-state caching must strictly adhere to the following conventions:
 
-### 6.1 Centralized Axios Client (`client/src/lib/api-client.ts`)
+### 7.1 Centralized Axios Client (`client/src/lib/api-client.ts`)
 - **HTTP Client**: Always import and use the centralized `apiClient` instance from `src/lib/api-client`. Do **NOT** use native `fetch()` or construct ad-hoc `axios.create()` instances across components.
 - **Session Credentials**: The `apiClient` is preconfigured with `withCredentials: true` and default JSON headers to ensure Better Auth session cookies are sent on every request.
 - **API Services Layer**: All API endpoint interactions must be organized into typed service objects in `client/src/lib/*-api.ts` (e.g., `usersApi` in `client/src/lib/users-api.ts`, `authClient` in `client/src/lib/auth-client.ts`). Keep UI components decoupled from HTTP transport details.
@@ -190,7 +207,7 @@ All frontend network communication and server-state caching must strictly adhere
   throw new Error(message);
   ```
 
-### 6.2 TanStack React Query (`@tanstack/react-query`)
+### 7.2 TanStack React Query (`@tanstack/react-query`)
 - **Custom Hooks Pattern**: Always encapsulate queries and mutations into dedicated custom hooks under `client/src/lib/hooks/` (e.g., `useUsers.ts`, `useAuth.ts`, `useTickets.ts`). Do **NOT** call `useQuery` / `useMutation` directly inside raw view components without dedicated hook abstractions.
 - **Query Key Conventions**:
   - Define query keys as typed `const` arrays:
@@ -233,7 +250,7 @@ All frontend network communication and server-state caching must strictly adhere
 
 ---
 
-## 7. Key Conventions & API Summary
+## 8. Key Conventions & API Summary
 
 ### API Endpoints Summary
 - **Health & Auth**:
@@ -254,9 +271,9 @@ All frontend network communication and server-state caching must strictly adhere
 
 ---
 
-## 8. Playwright E2E Testing & Test Database Configuration
+## 9. Playwright E2E Testing & Test Database Configuration
 
-### 8.1 Architecture & Isolation
+### 9.1 Architecture & Isolation
 - **Separate Database**: Tests execute against an isolated PostgreSQL database (`helpdesk_test`) specified in `.env.test` (`DATABASE_URL="postgresql://postgres:...@localhost:5432/helpdesk_test?schema=public"`).
 - **Test Server Port**: The test backend server runs on `PORT=5001` (to avoid conflicting with the development server on port 5000).
 - **Global Setup (`e2e/setup/global-setup.ts`)**:
@@ -266,15 +283,18 @@ All frontend network communication and server-state caching must strictly adhere
 - **WebServers (`playwright.config.ts`)**:
   - Playwright coordinates starting both the isolated Express test server (`PORT=5001`) and Vite client (`http://localhost:5173`) with proxy routing to the test server.
 
-### 7.2 Testing Commands
+### 9.2 Testing Commands
 From `Helpdesk/`:
+- `npm run test:client`: Runs all Vitest + React Testing Library frontend component tests.
+- `npm run test:client:watch`: Runs Vitest in interactive watch mode for component test writing / TDD.
+- `npm run test:client:ui`: Opens interactive visual Vitest UI in browser.
 - `npm run test:e2e`: Runs all Playwright E2E tests in headless mode.
 - `npm run test:e2e:ui`: Launches interactive Playwright UI Test Runner.
 - `npm run test:e2e:headed`: Runs tests with visible browser window.
 - `npm run db:test:setup`: Manually syncs and seeds the `helpdesk_test` database.
 - `npm run db:test:reset`: Resets the test database schema using Prisma migrate.
 
-### 7.3 Instructions for Using `e2e-test-writer` Subagent
+### 9.3 Instructions for Using `e2e-test-writer` Subagent
 When writing, updating, or maintaining Playwright E2E tests, delegate the task to the specialized **`e2e-test-writer`** (or `playwright-e2e-tester`) subagent.
 
 - **Role & Capabilities**:
