@@ -1,4 +1,5 @@
 import { apiClient } from './api-client';
+import { Role } from './types';
 
 export type TicketCategory = 'GENERAL_QUESTION' | 'TECHNICAL_QUESTION' | 'REFUND_REQUEST';
 export type TicketPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
@@ -8,7 +9,7 @@ export interface TicketAgent {
   id: string;
   name: string;
   email: string;
-  role: 'ADMIN' | 'AGENT';
+  role: Role;
 }
 
 export interface TicketMessage {

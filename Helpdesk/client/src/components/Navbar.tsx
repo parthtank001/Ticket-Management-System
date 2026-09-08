@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { LogOut, Ticket, User as UserIcon, Shield, Loader2, Users } from 'lucide-react';
 import { AuthUser } from '../lib/auth-client';
+import { Role } from '../lib/types';
 
 interface NavbarProps {
   user: AuthUser;
@@ -11,8 +12,8 @@ interface NavbarProps {
 
 export const Navbar: React.FC<NavbarProps> = ({ user, currentPath, onNavigate, onSignOut }) => {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
-  const isAdmin = user?.role?.toUpperCase() === 'ADMIN';
-  const displayRole = isAdmin ? 'ADMIN' : 'AGENT';
+  const isAdmin = user?.role === Role.ADMIN;
+  const displayRole = isAdmin ? Role.ADMIN : Role.AGENT;
 
   const handleSignOutClick = async () => {
     setIsLoggingOut(true);

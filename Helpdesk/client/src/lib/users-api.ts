@@ -1,10 +1,11 @@
 import { apiClient } from './api-client';
+import { Role } from './types';
 
 export interface ManagedUser {
   id: string;
   name: string;
   email: string;
-  role: 'ADMIN' | 'AGENT';
+  role: Role;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -17,13 +18,13 @@ export interface CreateUserPayload {
   name: string;
   email: string;
   password: string;
-  role?: 'ADMIN' | 'AGENT';
+  role?: Role;
   isActive?: boolean;
 }
 
 export interface UpdateUserPayload {
   name?: string;
-  role?: 'ADMIN' | 'AGENT';
+  role?: Role;
   isActive?: boolean;
   password?: string;
 }

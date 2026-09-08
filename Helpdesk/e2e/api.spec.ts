@@ -148,6 +148,20 @@ test.describe('Backend REST API & Authorization Suite', () => {
       expect(body.message).toMatch(/access denied|insufficient role permissions/i);
     });
 
+    test('Agent role receives 403 Forbidden on POST /api/users', async () => {
+      const response = await agentContext.post('/api/users', {
+        data: {
+          name: 'Forbidden User',
+          email: 'forbidden@example.com',
+          password: 'password123',
+          role: 'AGENT',
+        },
+      });
+      expect(response.status()).toBe(403);
+      const body = await response.json();
+      expect(body.error).toBe('Forbidden');
+    });
+
     test('Admin role receives 200 OK on GET /api/users with directory list', async () => {
       const response = await adminContext.get('/api/users');
       expect(response.status()).toBe(200);
@@ -163,6 +177,75 @@ test.describe('Backend REST API & Authorization Suite', () => {
       const agentUser = users.find((u) => u.email === 'agent@example.com');
       expect(agentUser).toBeDefined();
       expect(agentUser?.role).toBe('AGENT');
+    });
+
+    test('Admin role successfully creates new user via POST /api/users', async () => {
+      const timestamp = Date.now();
+      const payload = {
+        name: `API Created Agent ${timestamp}`,
+        email: `api.agent.${timestamp}@example.com`,
+        password: 'password12345',
+        role: 'AGENT',
+      };
+
+      const response = await adminContext.post('/api/users', {
+        data: payload,
+      });
+
+      expect(response.status()).toBe(201);
+      const createdUser: UserDirectoryItem = await response.json();
+      expect(createdUser.id).toBeDefined();
+      expect(createdUser.name).toBe(payload.name);
+      expect(createdUser.email).toBe(payload.email);
+      expect(createdUser.role).toBe('AGENT');
+      expect(createdUser.isActive).toBe(true);
+    });
+
+    test('POST /api/users returns 409 Conflict when attempting to create duplicate user', async () => {
+      const response = await adminContext.post('/api/users', {
+        data: {
+          name: 'Duplicate Admin',
+          email: 'admin@example.com',
+          password: 'password12345',
+          role: 'ADMIN',
+        },
+      });
+
+      expect(response.status()).toBe(409);
+      const body = await response.json();
+      expect(body.error).toMatch(/already exists/i);
+    });
+
+    test('POST /api/users returns 400 Bad Request on invalid payloads', async () => {
+      // 1. Password too short (< 8 chars)
+      const shortPassRes = await adminContext.post('/api/users', {
+        data: {
+          name: 'Valid Name',
+          email: 'valid@example.com',
+          password: 'short',
+        },
+      });
+      expect(shortPassRes.status()).toBe(400);
+
+      // 2. Invalid email format
+      const badEmailRes = await adminContext.post('/api/users', {
+        data: {
+          name: 'Valid Name',
+          email: 'not-an-email',
+          password: 'password123',
+        },
+      });
+      expect(badEmailRes.status()).toBe(400);
+
+      // 3. Name too short (< 3 chars)
+      const shortNameRes = await adminContext.post('/api/users', {
+        data: {
+          name: 'A',
+          email: 'valid2@example.com',
+          password: 'password123',
+        },
+      });
+      expect(shortNameRes.status()).toBe(400);
     });
 
     test('POST /api/tickets creates inbound ticket with AI auto-draft response', async ({ request }) => {

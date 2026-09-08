@@ -1,10 +1,11 @@
 import { apiClient } from './api-client';
+import { Role } from './types';
 
 export interface AuthUser {
   id: string;
   name: string;
   email: string;
-  role: 'ADMIN' | 'AGENT';
+  role: Role;
   image?: string | null;
   isActive: boolean;
   createdAt: string;

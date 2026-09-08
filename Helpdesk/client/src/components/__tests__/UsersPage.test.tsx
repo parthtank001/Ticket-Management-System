@@ -3,6 +3,7 @@ import { UsersPage } from '../UsersPage';
 import { renderWithQuery, screen, waitFor, userEvent } from '../../test/test-utils';
 import { usersApi, ManagedUser } from '../../lib/users-api';
 import { AuthUser } from '../../lib/auth-client';
+import { Role } from '../../lib/types';
 
 // Mock usersApi service
 vi.mock('../../lib/users-api', () => ({
@@ -19,7 +20,7 @@ describe('UsersPage Component', () => {
     id: 'admin-1',
     name: 'Alice Admin',
     email: 'alice.admin@example.com',
-    role: 'ADMIN',
+    role: Role.ADMIN,
     isActive: true,
     createdAt: '2026-01-15T10:00:00.000Z',
     updatedAt: '2026-01-15T10:00:00.000Z',
@@ -30,7 +31,7 @@ describe('UsersPage Component', () => {
       id: 'admin-1',
       name: 'Alice Admin',
       email: 'alice.admin@example.com',
-      role: 'ADMIN',
+      role: Role.ADMIN,
       isActive: true,
       createdAt: '2026-01-15T10:00:00.000Z',
       updatedAt: '2026-01-15T10:00:00.000Z',
@@ -39,7 +40,7 @@ describe('UsersPage Component', () => {
       id: 'agent-2',
       name: 'Bob Agent',
       email: 'bob.agent@example.com',
-      role: 'AGENT',
+      role: Role.AGENT,
       isActive: true,
       createdAt: '2026-02-10T14:30:00.000Z',
       updatedAt: '2026-02-10T14:30:00.000Z',
@@ -48,7 +49,7 @@ describe('UsersPage Component', () => {
       id: 'agent-3',
       name: 'Charlie Support',
       email: 'charlie@example.com',
-      role: 'AGENT',
+      role: Role.AGENT,
       isActive: true,
       createdAt: '2026-03-01T09:00:00.000Z',
       updatedAt: '2026-03-01T09:00:00.000Z',
@@ -60,19 +61,19 @@ describe('UsersPage Component', () => {
   });
 
   describe('Initial Loading & Rendering', () => {
-    it('renders the users header while fetching and ensures removed controls are absent', () => {
+    it('renders the users header while fetching and ensures "Add User" button is present', () => {
       vi.mocked(usersApi.listUsers).mockImplementation(() => new Promise(() => {}));
 
       renderWithQuery(<UsersPage user={mockCurrentUser} />);
 
       expect(screen.getByRole('heading', { name: /^users$/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /add user/i })).toBeInTheDocument();
 
       // Controls that should NOT be present
       expect(screen.queryByRole('button', { name: /^all$/i })).not.toBeInTheDocument();
       expect(screen.queryByRole('button', { name: /^admins$/i })).not.toBeInTheDocument();
       expect(screen.queryByRole('button', { name: /^agents$/i })).not.toBeInTheDocument();
       expect(screen.queryByRole('button', { name: /refresh/i })).not.toBeInTheDocument();
-      expect(screen.queryByRole('button', { name: /add user/i })).not.toBeInTheDocument();
       expect(screen.queryByPlaceholderText(/search by name or email/i)).not.toBeInTheDocument();
     });
 
@@ -125,6 +126,174 @@ describe('UsersPage Component', () => {
       await waitFor(() => {
         expect(screen.getByText('Network connection error')).toBeInTheDocument();
       });
+    });
+  });
+
+  describe('Create User Modal & Workflows', () => {
+    it('opens the create user modal when clicking "Add User"', async () => {
+      const user = userEvent.setup();
+      vi.mocked(usersApi.listUsers).mockResolvedValueOnce(mockUsersList);
+
+      renderWithQuery(<UsersPage user={mockCurrentUser} />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Alice Admin')).toBeInTheDocument();
+      });
+
+      const addUserBtn = screen.getByRole('button', { name: /add user/i });
+      await user.click(addUserBtn);
+
+      expect(screen.getByRole('heading', { name: /add new user/i })).toBeInTheDocument();
+      expect(screen.getByLabelText(/full name/i)).toBeInTheDocument();
+      expect(screen.getByLabelText(/email address/i)).toBeInTheDocument();
+      expect(screen.getByLabelText(/password/i)).toBeInTheDocument();
+    });
+
+    it('validates required fields on form submission and displays error messages', async () => {
+      const user = userEvent.setup();
+      vi.mocked(usersApi.listUsers).mockResolvedValueOnce(mockUsersList);
+
+      renderWithQuery(<UsersPage user={mockCurrentUser} />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Alice Admin')).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByRole('button', { name: /add user/i }));
+
+      // Submit empty form
+      const submitBtn = screen.getByRole('button', { name: /^create user$/i });
+      await user.click(submitBtn);
+
+      expect(screen.getByText('Name must be at least 3 characters long.')).toBeInTheDocument();
+      expect(screen.getByText('A valid email address is required.')).toBeInTheDocument();
+      expect(screen.getByText('Password must be at least 8 characters long.')).toBeInTheDocument();
+      expect(usersApi.createUser).not.toHaveBeenCalled();
+    });
+
+    it('toggles password visibility when clicking the eye icon', async () => {
+      const user = userEvent.setup();
+      vi.mocked(usersApi.listUsers).mockResolvedValueOnce(mockUsersList);
+
+      renderWithQuery(<UsersPage user={mockCurrentUser} />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Alice Admin')).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByRole('button', { name: /add user/i }));
+
+      const passwordInput = screen.getByLabelText(/password/i);
+      expect(passwordInput).toHaveAttribute('type', 'password');
+
+      const toggleBtn = screen.getByTitle('Show password');
+      await user.click(toggleBtn);
+
+      expect(passwordInput).toHaveAttribute('type', 'text');
+
+      const hideToggleBtn = screen.getByTitle('Hide password');
+      await user.click(hideToggleBtn);
+
+      expect(passwordInput).toHaveAttribute('type', 'password');
+    });
+
+    it('successfully creates a new agent user and closes the modal', async () => {
+      const user = userEvent.setup();
+      vi.mocked(usersApi.listUsers).mockResolvedValue(mockUsersList);
+      vi.mocked(usersApi.createUser).mockResolvedValueOnce({
+        id: 'new-user-1',
+        name: 'Diana Support',
+        email: 'diana@example.com',
+        role: Role.AGENT,
+        isActive: true,
+        createdAt: '2026-09-07T12:00:00.000Z',
+        updatedAt: '2026-09-07T12:00:00.000Z',
+      });
+
+      renderWithQuery(<UsersPage user={mockCurrentUser} />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Alice Admin')).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByRole('button', { name: /add user/i }));
+
+      // Fill in user details
+      await user.type(screen.getByLabelText(/full name/i), 'Diana Support');
+      await user.type(screen.getByLabelText(/email address/i), 'diana@example.com');
+      await user.type(screen.getByLabelText(/password/i), 'password123');
+
+      // Submit
+      const submitBtn = screen.getByRole('button', { name: /^create user$/i });
+      await user.click(submitBtn);
+
+      await waitFor(() => {
+        expect(usersApi.createUser).toHaveBeenCalledWith({
+          name: 'Diana Support',
+          email: 'diana@example.com',
+          password: 'password123',
+          role: Role.AGENT,
+          isActive: true,
+        });
+      });
+
+      // Modal closes
+      await waitFor(() => {
+        expect(screen.queryByRole('heading', { name: /add new user/i })).not.toBeInTheDocument();
+      });
+    });
+
+    it('displays error message if user creation API fails (e.g. duplicate email)', async () => {
+      const user = userEvent.setup();
+      vi.mocked(usersApi.listUsers).mockResolvedValue(mockUsersList);
+      vi.mocked(usersApi.createUser).mockRejectedValueOnce(
+        new Error('A user with this email address already exists.')
+      );
+
+      renderWithQuery(<UsersPage user={mockCurrentUser} />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Alice Admin')).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByRole('button', { name: /add user/i }));
+
+      await user.type(screen.getByLabelText(/full name/i), 'Duplicate User');
+      await user.type(screen.getByLabelText(/email address/i), 'alice.admin@example.com');
+      await user.type(screen.getByLabelText(/password/i), 'password123');
+
+      const submitBtn = screen.getByRole('button', { name: /^create user$/i });
+      await user.click(submitBtn);
+
+      await waitFor(() => {
+        expect(
+          screen.getByText('A user with this email address already exists.')
+        ).toBeInTheDocument();
+      });
+
+      // Modal stays open
+      expect(screen.getByRole('heading', { name: /add new user/i })).toBeInTheDocument();
+    });
+
+    it('closes the modal and resets when clicking Cancel', async () => {
+      const user = userEvent.setup();
+      vi.mocked(usersApi.listUsers).mockResolvedValueOnce(mockUsersList);
+
+      renderWithQuery(<UsersPage user={mockCurrentUser} />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Alice Admin')).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByRole('button', { name: /add user/i }));
+
+      expect(screen.getByRole('heading', { name: /add new user/i })).toBeInTheDocument();
+
+      const cancelBtn = screen.getByRole('button', { name: /^cancel$/i });
+      await user.click(cancelBtn);
+
+      expect(screen.queryByRole('heading', { name: /add new user/i })).not.toBeInTheDocument();
+      expect(usersApi.createUser).not.toHaveBeenCalled();
     });
   });
 
@@ -207,3 +376,4 @@ describe('UsersPage Component', () => {
     });
   });
 });
+

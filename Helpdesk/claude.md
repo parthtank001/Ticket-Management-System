@@ -14,10 +14,43 @@ This memory file contains project architectural specifications, technical stack 
   - ❌ **NO Ad-hoc Axios Instances**: Never call `axios.create()`, `axios.get()`, or `axios.post()` directly inside React UI components.
   - ❌ **NO Manual `useEffect` Data Fetching**: Never fetch server data inside `useEffect` or store asynchronous server response state in raw `useState` / `useReducer`.
 - **Mandatory Enforced Architecture**:
-  1. **Centralized HTTP Client**: Always use the preconfigured `apiClient` from [`client/src/lib/api-client.ts`](file:///E:/claude_ai/Ticket%20Management%20System/Helpdesk/client/src/lib/api-client.ts) (which includes `withCredentials: true` and standardized error handling).
+
+1. **Centralized HTTP Client**: Always use the preconfigured `apiClient` from [`client/src/lib/api-client.ts`](file:///E:/claude_ai/Ticket%20Management%20System/Helpdesk/client/src/lib/api-client.ts) (which includes `withCredentials: true` and standardized error handling).
   2. **Dedicated API Service Layer**: Group all backend API endpoint calls into typed service objects inside `client/src/lib/*-api.ts` (e.g., `usersApi` in [`users-api.ts`](file:///E:/claude_ai/Ticket%20Management%20System/Helpdesk/client/src/lib/users-api.ts), `ticketsApi` in [`tickets-api.ts`](file:///E:/claude_ai/Ticket%20Management%20System/Helpdesk/client/src/lib/tickets-api.ts)).
   3. **Custom React Query Hooks**: Always wrap queries (`useQuery`) and mutations (`useMutation`) into custom hook files inside `client/src/lib/hooks/` (e.g., `useUsers.ts`, `useTickets.ts`, `useAuth.ts`). Components must consume these custom hooks rather than calling React Query primitives directly.
   4. **Query Keys & Invalidation**: Use strongly typed `const` arrays for query keys (e.g., `const USERS_QUERY_KEY = ['users'] as const;`). Invalidate affected query keys on successful mutations using `queryClient.invalidateQueries`.
+
+### 1.2 Mandatory Data Validation: Zod
+> **CRITICAL INSTRUCTION**: All data validation across client-side UI forms and server-side REST API request bodies **MUST** strictly use **Zod** (`zod`).
+
+- **Frontend Form Validation**:
+  - Integrate Zod schemas with React Hook Form using `@hookform/resolvers/zod` (`useForm<T>({ resolver: zodResolver(schema) })`) or perform safe parsing via `schema.safeParse()`.
+  - Display immediate, user-friendly inline validation errors from Zod issues.
+- **Backend API Payload Validation**:
+  - Define and export centralized Zod schemas in [`server/schemas.ts`](file:///E:/claude_ai/Ticket%20Management%20System/Helpdesk/server/schemas.ts) for all endpoints (`POST /api/users`, `PATCH /api/users/:id`, `POST /api/tickets`, `PATCH /api/tickets/:id`, `POST /api/tickets/:id/messages`).
+  - Route handlers must validate inputs using `schema.safeParse(req.body)` and reject invalid payloads with HTTP 400 Bad Request: `return res.status(400).json({ error: result.error.issues[0].message });`.
+  - Infer and export TypeScript types directly from schemas using `z.infer<typeof schema>`.
+
+### 1.3 Mandatory Enum Usage: Role Enum Enforcement
+> **CRITICAL INSTRUCTION**: All references to user roles across frontend, backend, schemas, tests, and scripts **MUST** strictly use the strongly-typed **`Role` enum** (`Role.ADMIN`, `Role.AGENT`) rather than raw hardcoded string literals (`"ADMIN"`, `"AGENT"`).
+
+- **Strict Prohibitions**:
+  - ❌ **NO Raw Role Strings**: Never hardcode `"ADMIN"` or `"AGENT"` strings in form submissions, route handlers, schema defaults, or RBAC comparisons.
+- **Mandatory Enforced Architecture**:
+  1. **Frontend Types & Forms**: Always import `Role` from [`client/src/lib/types.ts`](file:///E:/claude_ai/Ticket%20Management%20System/Helpdesk/client/src/lib/types.ts) and reference `Role.AGENT` or `Role.ADMIN` in mutations, interfaces (`AuthUser`, `ManagedUser`, `CreateUserPayload`), and component logic.
+  2. **Backend Schemas & Validation**: In [`server/schemas.ts`](file:///E:/claude_ai/Ticket%20Management%20System/Helpdesk/server/schemas.ts), use `z.nativeEnum(Role)` with `.default(Role.AGENT)` to ensure type-safe validation.
+  3. **Route Handlers & Auth**: In [`server/index.ts`](file:///E:/claude_ai/Ticket%20Management%20System/Helpdesk/server/index.ts) and [`server/auth.ts`](file:///E:/claude_ai/Ticket%20Management%20System/Helpdesk/server/auth.ts), reference `Role.ADMIN` and `Role.AGENT` for role assignment, authorization checks, and default values.
+  4. **Scripts & Seeders**: In database seeds ([`prisma/seed.ts`](file:///E:/claude_ai/Ticket%20Management%20System/Helpdesk/prisma/seed.ts)) and user creation scripts ([`scripts/create-user.ts`](file:///E:/claude_ai/Ticket%20Management%20System/Helpdesk/scripts/create-user.ts)), always use `Role.AGENT` and `Role.ADMIN`.
+
+### 1.4 Mandatory Error Handling: Express 5 Automatic Async Promise Rejection
+> **CRITICAL INSTRUCTION**: In **Express 5**, route handlers and middleware that return a Promise **automatically forward rejected promises and unhandled exceptions** to the centralized error handling middleware (`next(err)`). Therefore, wrapping route handlers in manual `try { ... } catch (error) { ... }` blocks is **unnecessary and discouraged**.
+
+- **Strict Prohibitions**:
+  - ❌ **NO Boilerplate `try/catch` Blocks in Route Handlers**: Do not wrap standard async route logic in `try/catch` merely to call `res.status(500).json(...)` or `next(err)`.
+- **Mandatory Enforced Architecture**:
+  1. **Clean Route Handlers**: Write direct, declarative async route handlers without `try/catch` boilerplate. Handle known domain/validation errors explicitly (e.g., Zod safe parsing returning 400 Bad Request, or entity not found returning 404), and let unexpected errors reject naturally.
+  2. **Centralized Error Middleware**: Rely on the global Express 5 error handler (`app.use((err, req, res, next) => { ... })`) at the bottom of [`server/index.ts`](file:///E:/claude_ai/Ticket%20Management%20System/Helpdesk/server/index.ts) to log errors and format standardized 500 JSON error responses.
+  3. **Express 5 Route Wildcards**: Use named parameter wildcard syntax (`/*splat` e.g., `/api/auth/*splat`) instead of bare `*` for route matching.
 
 ---
 
@@ -56,6 +89,7 @@ Every ticket must belong to **exactly one** category:
 | Layer | Technology | Key Purpose |
 | :--- | :--- | :--- |
 | **Frontend Framework** | **React 18 + Vite** | Responsive client dashboard, TypeScript, component architecture |
+| **Data Validation** | **Zod** | TypeScript-first schema validation for client forms & backend API payloads with static type inference |
 | **Data Fetching & State** | **Axios + TanStack React Query** | Centralized HTTP client (`apiClient`) and declarative server-state management (`useQuery`, `useMutation`) with caching |
 | **Styling & Icons** | **Tailwind CSS + Lucide React** | Modern dark-mode UI with sleek glassmorphism aesthetic |
 | **Backend API** | **Express.js + Node.js (TypeScript)** | RESTful API server, webhooks, auth middleware, AI services |
@@ -79,9 +113,9 @@ e:\claude_ai\Ticket Management System\
     │   │   ├── components/     # Application components & views
     │   │   │   ├── ui/         # shadcn/ui primitives (badge, button, card, input, label, alert)
     │   │   │   ├── HomePage.tsx  # Main agent ticket workspace dashboard
-    │   │   │   ├── LoginPage.tsx # Modernized login screen with role credentials hint
+    │   │   │   ├── LoginPage.tsx # Modernized login screen with role credentials hint (Zod validation)
     │   │   │   ├── Navbar.tsx    # App navigation header with session user details & sign-out
-    │   │   │   └── UsersPage.tsx # Admin user management directory
+    │   │   │   └── UsersPage.tsx # Admin user management directory (Zod validation)
     │   │   ├── lib/
     │   │   │   ├── hooks/
     │   │   │   │   ├── useAuth.ts # React Query hooks for session & auth lifecycle
@@ -97,7 +131,7 @@ e:\claude_ai\Ticket Management System\
     │   │   ├── main.tsx        # React DOM entry point with QueryClientProvider
     │   │   └── index.css       # Tailwind directives & global font styles
     │   ├── components.json     # shadcn/ui configuration file
-    │   ├── package.json        # Client dependencies & Vite scripts
+    │   ├── package.json        # Client dependencies & Vite scripts (zod, @hookform/resolvers)
     │   ├── tailwind.config.js  # Tailwind CSS configuration with Slate theme & UI colors
     │   ├── tsconfig.json       # Client TypeScript configuration with @/* path alias
     │   └── vite.config.ts      # Vite dev server setup & path alias resolver
@@ -108,6 +142,7 @@ e:\claude_ai\Ticket Management System\
     │   ├── auth.ts             # Better Auth server configuration with Prisma adapter
     │   ├── db.ts               # Prisma client instance & PostgreSQL health check
     │   ├── index.ts            # Express server entry point & API route handlers
+    │   ├── schemas.ts          # Centralized Zod validation schemas for all API payloads
     │   └── types.ts            # Server-side TypeScript type definitions
     ├── prisma/
     │   ├── schema.prisma       # Database schema models (User, Session, Account, Verification, Ticket, etc.)
@@ -122,7 +157,7 @@ e:\claude_ai\Ticket Management System\
     │   ├── rbac-navigation.spec.ts # Role-based access control and UI navigation tests
     │   └── setup/
     │       └── global-setup.ts # Playwright global database provisioning setup
-    ├── package.json            # Root dependencies & execution scripts
+    ├── package.json            # Root dependencies & execution scripts (zod installed)
     ├── playwright.config.ts    # Playwright E2E configuration with isolated test server
     ├── tsconfig.json           # Shared TypeScript configuration
     ├── project-scope.md        # Comprehensive functional scope specification
@@ -176,7 +211,16 @@ From `e:\claude_ai\Ticket Management System\Helpdesk`:
   - Query Keys: Define typed tuple constants (e.g., `export const USERS_QUERY_KEY = ['users'] as const;`). Append parameters (filters, pagination) to the query key array (`[...USERS_QUERY_KEY, params]`) to trigger automatic reactive re-fetching.
   - Mutations (`useMutation`): Execute all write/update/delete operations with `useMutation` and invalidate corresponding query keys on success (`queryClient.invalidateQueries({ queryKey: ... })`).
   - Cache Policies (`client/src/lib/query-client.ts`): Set to `staleTime: 2 minutes`, `gcTime: 10 minutes`, `retry: 1`, and `refetchOnWindowFocus: false`.
-  - UI States: Always handle `isLoading` / `isPending` and `isError` / `error` states gracefully with loaders and alert banners.
+  - **UI States**: Always handle `isLoading` / `isPending` and `isError` / `error` states gracefully with loaders and alert banners.
+
+### 6.6 Data Validation Architecture (Zod)
+- **Centralized Backend Schemas (`server/schemas.ts`)**:
+  - Request validation across all Express routes (`POST /api/users`, `PATCH /api/users/:id`, `POST /api/tickets`, `PATCH /api/tickets/:id`, `POST /api/tickets/:id/messages`) is handled via `schema.safeParse(req.body)`.
+  - Schema errors return HTTP 400 Bad Request with the primary validation issue message (`res.status(400).json({ error: result.error.issues[0].message })`).
+  - Schemas provide inferred TypeScript types via `z.infer<typeof schema>`.
+- **Client-Side Form Validation (`zod` + `@hookform/resolvers/zod`)**:
+  - React Hook Form integrations bind schemas via `zodResolver(schema)`.
+  - Form validation errors are mapped directly to input field alerts without server roundtrips.
 
 ---
 
