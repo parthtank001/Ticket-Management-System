@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { cn } from '../lib/utils';
 
 const loginSchema = z.object({
   email: z
@@ -120,11 +121,15 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
                 <Input
                   id="email"
                   type="email"
+                  aria-invalid={errors.email ? 'true' : 'false'}
                   {...register('email')}
                   placeholder="admin@example.com"
-                  className={`pl-9 h-9 text-xs transition-colors ${
-                    errors.email ? 'border-red-500 focus-visible:ring-red-500 bg-red-50/20' : 'bg-slate-50/50'
-                  }`}
+                  className={cn(
+                    'pl-9 h-9 text-xs transition-colors',
+                    errors.email
+                      ? 'border-red-500 focus-visible:ring-red-500 focus-visible:border-red-500 bg-red-50/20'
+                      : 'bg-slate-50/50'
+                  )}
                 />
               </div>
               {errors.email && (
@@ -142,11 +147,15 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
                 <Input
                   id="password"
                   type={showPassword ? 'text' : 'password'}
+                  aria-invalid={errors.password ? 'true' : 'false'}
                   {...register('password')}
                   placeholder="••••••••••••"
-                  className={`pl-9 pr-9 h-9 text-xs transition-colors ${
-                    errors.password ? 'border-red-500 focus-visible:ring-red-500 bg-red-50/20' : 'bg-slate-50/50'
-                  }`}
+                  className={cn(
+                    'pl-9 pr-9 h-9 text-xs transition-colors',
+                    errors.password
+                      ? 'border-red-500 focus-visible:ring-red-500 focus-visible:border-red-500 bg-red-50/20'
+                      : 'bg-slate-50/50'
+                  )}
                 />
                 <button
                   type="button"

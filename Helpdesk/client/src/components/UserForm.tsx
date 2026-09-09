@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { createUserSchema, CreateUserInput, Role } from '@helpdesk/core';
 import { useCreateUser } from '../lib/hooks/useUsers';
+import { cn } from '../lib/utils';
 import {
   UserCheck,
   Mail,
@@ -54,6 +55,20 @@ export const UserForm: React.FC<UserFormProps> = ({ isOpen, onClose, onSuccess }
     onClose();
   };
 
+  // Close dialog on Escape key press
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        handleClose();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen]);
+
   const handleCreateUser = async (data: CreateUserInput) => {
     setGeneralError(null);
 
@@ -78,8 +93,17 @@ export const UserForm: React.FC<UserFormProps> = ({ isOpen, onClose, onSuccess }
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950/40 backdrop-blur-xs flex items-center justify-center p-4">
-      <div className="bg-white rounded-xl shadow-xl border border-slate-200 max-w-md w-full p-5 space-y-4 animate-in fade-in zoom-in-95 duration-150">
+    <div
+      data-testid="modal-backdrop"
+      role="dialog"
+      aria-modal="true"
+      onClick={handleClose}
+      className="fixed inset-0 z-50 bg-slate-950/40 backdrop-blur-xs flex items-center justify-center p-4"
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="bg-white rounded-xl shadow-xl border border-slate-200 max-w-md w-full p-5 space-y-4 animate-in fade-in zoom-in-95 duration-150"
+      >
         {/* Modal Header */}
         <div className="flex items-start justify-between">
           <div className="flex items-center space-x-2.5">
@@ -109,7 +133,7 @@ export const UserForm: React.FC<UserFormProps> = ({ isOpen, onClose, onSuccess }
         )}
 
         {/* Create User Form */}
-        <form onSubmit={handleSubmit(handleCreateUser)} className="space-y-3">
+        <form onSubmit={handleSubmit(handleCreateUser)} className="space-y-3" noValidate>
           {/* Full Name */}
           <div className="space-y-1">
             <div className="flex items-center justify-between">
@@ -118,13 +142,19 @@ export const UserForm: React.FC<UserFormProps> = ({ isOpen, onClose, onSuccess }
               </Label>
             </div>
             <div className="relative">
-              <UserIcon className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-slate-400" />
+              <UserIcon className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
               <Input
                 id="create-name"
                 type="text"
                 placeholder="Full Name"
+                aria-invalid={errors.name ? 'true' : 'false'}
                 {...register('name')}
-                className={`pl-8 text-xs h-8.5 ${errors.name ? 'border-red-400 focus-visible:ring-red-300' : ''}`}
+                className={cn(
+                  'pl-8 text-xs h-8.5 transition-colors',
+                  errors.name
+                    ? 'border-red-500 focus-visible:ring-red-500 focus-visible:border-red-500 bg-red-50/20'
+                    : 'border-slate-200 focus-visible:ring-indigo-500'
+                )}
               />
             </div>
             {errors.name && (
@@ -138,13 +168,19 @@ export const UserForm: React.FC<UserFormProps> = ({ isOpen, onClose, onSuccess }
               Email Address
             </Label>
             <div className="relative">
-              <Mail className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-slate-400" />
+              <Mail className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
               <Input
                 id="create-email"
                 type="email"
                 placeholder="abc.@example.com"
+                aria-invalid={errors.email ? 'true' : 'false'}
                 {...register('email')}
-                className={`pl-8 text-xs h-8.5 ${errors.email ? 'border-red-400 focus-visible:ring-red-300' : ''}`}
+                className={cn(
+                  'pl-8 text-xs h-8.5 transition-colors',
+                  errors.email
+                    ? 'border-red-500 focus-visible:ring-red-500 focus-visible:border-red-500 bg-red-50/20'
+                    : 'border-slate-200 focus-visible:ring-indigo-500'
+                )}
               />
             </div>
             {errors.email && (
@@ -161,13 +197,19 @@ export const UserForm: React.FC<UserFormProps> = ({ isOpen, onClose, onSuccess }
               <span className="text-[10px] text-slate-400">Min. 8 characters</span>
             </div>
             <div className="relative">
-              <Lock className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-slate-400" />
+              <Lock className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
               <Input
                 id="create-password"
                 type={showPassword ? 'text' : 'password'}
                 placeholder="••••••••"
+                aria-invalid={errors.password ? 'true' : 'false'}
                 {...register('password')}
-                className={`pl-8 pr-8 text-xs h-8.5 ${errors.password ? 'border-red-400 focus-visible:ring-red-300' : ''}`}
+                className={cn(
+                  'pl-8 pr-8 text-xs h-8.5 transition-colors',
+                  errors.password
+                    ? 'border-red-500 focus-visible:ring-red-500 focus-visible:border-red-500 bg-red-50/20'
+                    : 'border-slate-200 focus-visible:ring-indigo-500'
+                )}
               />
               <button
                 type="button"

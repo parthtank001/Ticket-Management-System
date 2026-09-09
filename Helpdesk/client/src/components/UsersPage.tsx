@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AuthUser } from '../lib/auth-client';
 import { useUsers, useDeleteUser } from '../lib/hooks/useUsers';
 import {
@@ -29,6 +29,20 @@ export const UsersPage: React.FC<UsersPageProps> = ({ user: currentUser }) => {
 
   // 2. TanStack Query Mutations
   const deleteUserMutation = useDeleteUser();
+
+  // Handle ESC key for delete modal
+  useEffect(() => {
+    if (!userToDelete) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setUserToDelete(null);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [userToDelete]);
 
   // Handle User Deletion Submit
   const handleConfirmDelete = async () => {
@@ -96,8 +110,17 @@ export const UsersPage: React.FC<UsersPageProps> = ({ user: currentUser }) => {
 
       {/* Delete Confirmation Modal */}
       {userToDelete && (
-        <div className="fixed inset-0 z-50 bg-slate-950/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl shadow-xl border border-slate-200 max-w-sm w-full p-5 space-y-3 animate-in fade-in zoom-in-95 duration-150">
+        <div
+          data-testid="delete-modal-backdrop"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setUserToDelete(null)}
+          className="fixed inset-0 z-50 bg-slate-950/40 backdrop-blur-xs flex items-center justify-center p-4"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-xl shadow-xl border border-slate-200 max-w-sm w-full p-5 space-y-3 animate-in fade-in zoom-in-95 duration-150"
+          >
             <div className="flex items-center space-x-3 text-red-600">
               <div className="h-9 w-9 rounded-full bg-red-100 flex items-center justify-center shrink-0">
                 <Trash2 className="h-4.5 w-4.5" />

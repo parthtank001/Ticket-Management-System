@@ -149,6 +149,72 @@ describe('UsersPage Component', () => {
       expect(screen.getByLabelText(/password/i)).toBeInTheDocument();
     });
 
+    it('hides the create user modal when clicking outside on the backdrop', async () => {
+      const user = userEvent.setup();
+      vi.mocked(usersApi.listUsers).mockResolvedValueOnce(mockUsersList);
+
+      renderWithQuery(<UsersPage user={mockCurrentUser} />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Alice Admin')).toBeInTheDocument();
+      });
+
+      // 1. Open modal
+      await user.click(screen.getByRole('button', { name: /add user/i }));
+      expect(screen.getByRole('heading', { name: /add new user/i })).toBeInTheDocument();
+
+      // 2. Click backdrop overlay outside dialog content
+      const backdrop = screen.getByTestId('modal-backdrop');
+      await user.click(backdrop);
+
+      // 3. Modal is hidden
+      expect(screen.queryByRole('heading', { name: /add new user/i })).not.toBeInTheDocument();
+    });
+
+    it('does not hide the create user modal when clicking inside the dialog content', async () => {
+      const user = userEvent.setup();
+      vi.mocked(usersApi.listUsers).mockResolvedValueOnce(mockUsersList);
+
+      renderWithQuery(<UsersPage user={mockCurrentUser} />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Alice Admin')).toBeInTheDocument();
+      });
+
+      // 1. Open modal
+      await user.click(screen.getByRole('button', { name: /add user/i }));
+      const heading = screen.getByRole('heading', { name: /add new user/i });
+      expect(heading).toBeInTheDocument();
+
+      // 2. Click inside modal content (e.g. heading or name input)
+      await user.click(heading);
+      await user.click(screen.getByLabelText(/full name/i));
+
+      // 3. Modal remains open
+      expect(screen.getByRole('heading', { name: /add new user/i })).toBeInTheDocument();
+    });
+
+    it('hides the create user modal when pressing the Escape (Esc) button', async () => {
+      const user = userEvent.setup();
+      vi.mocked(usersApi.listUsers).mockResolvedValueOnce(mockUsersList);
+
+      renderWithQuery(<UsersPage user={mockCurrentUser} />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Alice Admin')).toBeInTheDocument();
+      });
+
+      // 1. Open modal
+      await user.click(screen.getByRole('button', { name: /add user/i }));
+      expect(screen.getByRole('heading', { name: /add new user/i })).toBeInTheDocument();
+
+      // 2. Press Escape key
+      await user.keyboard('{Escape}');
+
+      // 3. Modal is hidden
+      expect(screen.queryByRole('heading', { name: /add new user/i })).not.toBeInTheDocument();
+    });
+
     it('validates required fields on form submission and displays error messages', async () => {
       const user = userEvent.setup();
       vi.mocked(usersApi.listUsers).mockResolvedValueOnce(mockUsersList);
@@ -342,6 +408,49 @@ describe('UsersPage Component', () => {
       expect(usersApi.deleteUser).not.toHaveBeenCalled();
     });
 
+    it('hides delete confirmation modal when clicking outside on the backdrop', async () => {
+      const user = userEvent.setup();
+      vi.mocked(usersApi.listUsers).mockResolvedValueOnce(mockUsersList);
+
+      renderWithQuery(<UsersPage user={mockCurrentUser} />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Bob Agent')).toBeInTheDocument();
+      });
+
+      const deleteButtons = screen.getAllByTitle('Delete user');
+      await user.click(deleteButtons[0]);
+
+      expect(screen.getByRole('heading', { name: /delete user account/i })).toBeInTheDocument();
+
+      // Click delete backdrop
+      const backdrop = screen.getByTestId('delete-modal-backdrop');
+      await user.click(backdrop);
+
+      expect(screen.queryByRole('heading', { name: /delete user account/i })).not.toBeInTheDocument();
+    });
+
+    it('hides delete confirmation modal when pressing Escape key', async () => {
+      const user = userEvent.setup();
+      vi.mocked(usersApi.listUsers).mockResolvedValueOnce(mockUsersList);
+
+      renderWithQuery(<UsersPage user={mockCurrentUser} />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Bob Agent')).toBeInTheDocument();
+      });
+
+      const deleteButtons = screen.getAllByTitle('Delete user');
+      await user.click(deleteButtons[0]);
+
+      expect(screen.getByRole('heading', { name: /delete user account/i })).toBeInTheDocument();
+
+      // Press Escape key
+      await user.keyboard('{Escape}');
+
+      expect(screen.queryByRole('heading', { name: /delete user account/i })).not.toBeInTheDocument();
+    });
+
     it('confirms deletion and calls deleteUser mutation', async () => {
       const user = userEvent.setup();
       vi.mocked(usersApi.listUsers).mockResolvedValue(mockUsersList);
@@ -376,4 +485,3 @@ describe('UsersPage Component', () => {
     });
   });
 });
-

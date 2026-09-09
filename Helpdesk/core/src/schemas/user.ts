@@ -15,7 +15,10 @@ export const createUserSchema = z.object({
     .email('A valid email address is required.'),
   password: z
     .string({ message: 'Password must be at least 8 characters long.' })
-    .min(8, 'Password must be at least 8 characters long.'),
+    .min(8, 'Password must be at least 8 characters long.')
+    .refine((val) => !/\s/.test(val), {
+      message: 'Password must not contain spaces.',
+    }),
   role: z.nativeEnum(Role).optional().default(Role.AGENT),
   isActive: z.boolean().optional().default(true),
 });
@@ -38,6 +41,9 @@ export const updateUserSchema = z.object({
   password: z
     .string()
     .min(8, 'Password must be at least 8 characters long.')
+    .refine((val) => !/\s/.test(val), {
+      message: 'Password must not contain spaces.',
+    })
     .optional(),
 });
 
