@@ -1,6 +1,2 @@
-export enum Role {
-  ADMIN = 'ADMIN',
-  AGENT = 'AGENT',
-}
+export { Role, type UserRole } from '@helpdesk/core';
 
-export type UserRole = keyof typeof Role;

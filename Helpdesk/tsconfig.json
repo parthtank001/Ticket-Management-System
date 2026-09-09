@@ -8,7 +8,11 @@
     "strict": true,
     "skipLibCheck": true,
     "outDir": "./dist",
-    "types": ["node"]
+    "types": ["node"],
+    "paths": {
+      "@helpdesk/core": ["./core/src/index.ts"],
+      "@helpdesk/core/*": ["./core/src/*"]
+    }
   },
-  "include": ["server/**/*", "prisma/**/*", "scripts/**/*", "playwright.config.ts", "e2e/**/*"]
+  "include": ["server/**/*", "prisma/**/*", "scripts/**/*", "playwright.config.ts", "e2e/**/*", "core/**/*"]
 }

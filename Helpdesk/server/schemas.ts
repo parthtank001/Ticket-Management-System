@@ -1,44 +1,25 @@
 import { z } from 'zod';
-import { Role } from './types';
+import {
+  createUserSchema,
+  updateUserSchema,
+  CreateUserInput,
+  CreateUserOutput,
+  UpdateUserInput,
+  UpdateUserOutput,
+} from '@helpdesk/core';
+
+export {
+  createUserSchema,
+  updateUserSchema,
+  CreateUserInput,
+  CreateUserOutput,
+  UpdateUserInput,
+  UpdateUserOutput,
+};
 
 /**
  * Zod validation schemas for Helpdesk REST API request payloads
  */
-
-// User Management Schemas
-export const createUserSchema = z.object({
-  name: z
-    .string({ message: 'Name must be at least 3 characters long.' })
-    .trim()
-    .min(3, 'Name must be at least 3 characters long.'),
-  email: z
-    .string({ message: 'A valid email address is required.' })
-    .trim()
-    .email('A valid email address is required.'),
-  password: z
-    .string({ message: 'Password must be at least 8 characters long.' })
-    .min(8, 'Password must be at least 8 characters long.'),
-  role: z.nativeEnum(Role).optional().default(Role.AGENT),
-  isActive: z.boolean().optional().default(true),
-});
-
-export const updateUserSchema = z.object({
-  name: z
-    .string()
-    .trim()
-    .min(3, 'Name must be at least 3 characters long.')
-    .optional(),
-  role: z
-    .nativeEnum(Role, {
-      message: 'Invalid role specified. Must be ADMIN or AGENT.',
-    })
-    .optional(),
-  isActive: z.boolean().optional(),
-  password: z
-    .string()
-    .min(8, 'Password must be at least 8 characters long.')
-    .optional(),
-});
 
 // Ticket Schemas
 export const createTicketSchema = z.object({
@@ -83,8 +64,6 @@ export const createTicketMessageSchema = z.object({
 });
 
 // Inferred TypeScript Types
-export type CreateUserInput = z.infer<typeof createUserSchema>;
-export type UpdateUserInput = z.infer<typeof updateUserSchema>;
 export type CreateTicketInput = z.infer<typeof createTicketSchema>;
 export type UpdateTicketInput = z.infer<typeof updateTicketSchema>;
 export type CreateTicketMessageInput = z.infer<typeof createTicketMessageSchema>;

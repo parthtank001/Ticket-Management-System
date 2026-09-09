@@ -19,12 +19,17 @@ This memory file contains project architectural specifications, technical stack 
   3. **Custom React Query Hooks**: Always wrap queries (`useQuery`) and mutations (`useMutation`) into custom hook files inside `client/src/lib/hooks/` (e.g., `useUsers.ts`, `useTickets.ts`, `useAuth.ts`). Components must consume these custom hooks rather than calling React Query primitives directly.
   4. **Query Keys & Invalidation**: Use strongly typed `const` arrays for query keys (e.g., `const USERS_QUERY_KEY = ['users'] as const;`). Invalidate affected query keys on successful mutations using `queryClient.invalidateQueries`.
 
-### 1.2 Mandatory Data Validation: Zod
-> **CRITICAL INSTRUCTION**: All client-side form validation and server-side request payload validation **MUST** strictly use **Zod** (`zod`).
+### 1.2 Mandatory Form Management & Data Validation: React Hook Form + Zod
+> **CRITICAL INSTRUCTION**: All client-side UI forms (e.g., user authentication in `LoginPage.tsx`, adding new users in `UsersPage.tsx`, ticket submission) **MUST** strictly use **React Hook Form** (`react-hook-form`) integrated with **Zod** (`zod`) schemas via `@hookform/resolvers/zod`. All backend REST API request bodies **MUST** strictly use **Zod** schemas for payload validation.
 
-- **Frontend Form Validation**:
-  - Use Zod schemas paired with React Hook Form via `@hookform/resolvers/zod` (`useForm<T>({ resolver: zodResolver(schema) })`) or perform safe parsing via `schema.safeParse()`.
-  - Ensure all form inputs (authentication, user creation, ticket submission) provide immediate, accessible inline error messages from Zod issue paths.
+- **Strict Prohibitions**:
+  - ❌ **NO Raw `useState` Form State**: Never manage multi-field form inputs or validation errors with ad-hoc `useState` object dictionaries.
+  - ❌ **NO Manual Field Parsing**: Always use `zodResolver(schema)` with `useForm<T>()` instead of ad-hoc event-handling state manipulation.
+- **Frontend Form Management Architecture**:
+  - Define declarative Zod schemas (e.g., `createUserFormSchema`, `loginSchema`) with specific validation constraints and messages.
+  - Initialize forms with `const { register, handleSubmit, reset, formState: { errors } } = useForm<T>({ resolver: zodResolver(schema), defaultValues: { ... } })`.
+  - Bind inputs using `{...register('fieldName')}` and surface field-specific error messages via `{errors.fieldName?.message}`.
+  - Handle form submissions through `handleSubmit(onSubmitHandler)` and reset modal forms on close with `reset()`.
 - **Backend API Payload Validation**:
   - Maintain centralized Zod schemas in [`server/schemas.ts`](file:///E:/claude_ai/Ticket%20Management%20System/Helpdesk/server/schemas.ts) for every mutable REST endpoint (`POST /api/users`, `PATCH /api/users/:id`, `POST /api/tickets`, `PATCH /api/tickets/:id`, `POST /api/tickets/:id/messages`).
   - Validate incoming payloads using `schema.safeParse(req.body)`.
@@ -51,6 +56,24 @@ This memory file contains project architectural specifications, technical stack 
   1. **Clean Route Handlers**: Write direct, declarative async route handlers without `try/catch` boilerplate. Handle known domain/validation errors explicitly (e.g., Zod safe parsing returning 400 Bad Request, or entity not found returning 404), and let unexpected errors reject naturally.
   2. **Centralized Error Middleware**: Rely on the global Express 5 error handler (`app.use((err, req, res, next) => { ... })`) at the bottom of [`server/index.ts`](file:///E:/claude_ai/Ticket%20Management%20System/Helpdesk/server/index.ts) to log errors and format standardized 500 JSON error responses.
   3. **Express 5 Route Wildcards**: Use named parameter wildcard syntax (`/*splat` e.g., `/api/auth/*splat`) instead of bare `*` for route matching.
+
+### 1.5 Mandatory Shared Schema Architecture: Core Package (`@helpdesk/core`)
+> **CRITICAL INSTRUCTION**: All shared data validation schemas (e.g., `createUserSchema`, `updateUserSchema`), domain enums (`Role`, `UserRole`), and their inferred TypeScript types **MUST** be defined in the dedicated **`@helpdesk/core`** package (`core/src/schemas/*`) and referenced by both the **client** and **server**. Never duplicate schema definitions across client and server.
+
+- **Strict Prohibitions**:
+  - ❌ **NO Duplicate Schema Definitions**: Never duplicate, recreate, or re-define Zod validation schemas across client UI components and backend server routes.
+  - ❌ **NO Direct Relative Cross-Package Imports**: Do not import across subproject boundaries using relative file paths (e.g., `../../server/...` or `../../client/...`). Always import shared schemas and types through the `@helpdesk/core` package.
+- **Mandatory Enforced Architecture**:
+  1. **Core Package Structure**:
+     - `core/src/enums.ts`: Domain enums (`Role`, `UserRole`).
+     - `core/src/schemas/user.ts`: Domain-specific Zod validation schemas (`createUserSchema`, `updateUserSchema`) and exported input/output types (`CreateUserInput = z.input<typeof createUserSchema>`, `CreateUserOutput = z.output<typeof createUserSchema>`).
+     - `core/src/index.ts`: Central barrel exporting all enums and schemas.
+  2. **Server-Side Consumption**:
+     - Route handlers and schemas (e.g., [`server/routes/users.ts`](file:///E:/claude_ai/Ticket%20Management%20System/Helpdesk/server/routes/users.ts), [`server/schemas.ts`](file:///E:/claude_ai/Ticket%20Management%20System/Helpdesk/server/schemas.ts)) import schemas directly from `@helpdesk/core`.
+     - Validate incoming request bodies using `createUserSchema.safeParse(req.body)` which returns the transformed `CreateUserOutput` data with defaults applied.
+  3. **Client-Side Consumption**:
+     - React forms (e.g., [`UsersPage.tsx`](file:///E:/claude_ai/Ticket%20Management%20System/Helpdesk/client/src/components/UsersPage.tsx)) import schemas and types directly from `@helpdesk/core` (`import { createUserSchema, CreateUserInput, Role } from '@helpdesk/core';`).
+     - Initialize forms using `useForm<CreateUserInput>({ resolver: zodResolver(createUserSchema) })` (using `z.input` to match the resolver's input schema signature and avoid type mismatches with default values) to guarantee 100% type safety and identical validation logic across frontend and backend.
 
 ---
 
@@ -113,6 +136,13 @@ e:\claude_ai\Ticket Management System\
 ├── .gitignore                  # Git ignore rules for node_modules, environments & test reports
 ├── claude.md                   # Global workspace memory file & guidelines
 └── Helpdesk/
+    ├── core/                   # Shared TypeScript package (@helpdesk/core)
+    │   ├── src/
+    │   │   ├── enums.ts        # Shared domain enums (Role, UserRole)
+    │   │   ├── schemas/        # Shared domain Zod validation schemas (user.ts, etc.)
+    │   │   └── index.ts        # Central export entrypoint
+    │   ├── package.json        # Core package definition (@helpdesk/core)
+    │   └── tsconfig.json       # Core TypeScript configuration
     ├── client/                 # React 18 + Vite frontend
     │   ├── src/
     │   │   ├── components/     # Application components & views
@@ -142,9 +172,11 @@ e:\claude_ai\Ticket Management System\
     │   ├── middleware/
     │   │   ├── auth.ts         # Session verification (requireAuth) & RBAC (requireRole)
     │   │   └── rate-limiter.ts # Production-only rate limiting middleware (express-rate-limit)
+    │   ├── routes/
+    │   │   └── users.ts        # Modular Express router for /api/users CRUD endpoints
     │   ├── auth.ts             # Better Auth server configuration with Prisma adapter
     │   ├── db.ts               # Prisma client instance & PostgreSQL health check
-    │   ├── index.ts            # Express server entry point & API route handlers
+    │   ├── index.ts            # Express server entry point, middleware & route mounting
     │   ├── schemas.ts          # Centralized Zod validation schemas for all API payloads
     │   └── types.ts            # Server-side TypeScript type definitions
     ├── prisma/
