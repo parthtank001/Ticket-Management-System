@@ -9,6 +9,7 @@ import {
   Calendar,
   Users,
   Trash2,
+  Pencil,
 } from 'lucide-react';
 import { Skeleton } from './ui/skeleton';
 
@@ -16,6 +17,7 @@ export interface UsersTableProps {
   users: ManagedUser[];
   currentUser: AuthUser;
   isLoading?: boolean;
+  onEditUser: (user: ManagedUser) => void;
   onDeleteUser: (user: { id: string; name: string }) => void;
 }
 
@@ -23,6 +25,7 @@ export const UsersTable: React.FC<UsersTableProps> = ({
   users,
   currentUser,
   isLoading = false,
+  onEditUser,
   onDeleteUser,
 }) => {
   // Avatar Initials
@@ -182,15 +185,27 @@ export const UsersTable: React.FC<UsersTableProps> = ({
                           <span>{formatDate(item.createdAt)}</span>
                         </div>
 
-                        {!isSelf && (
+                        <div className="flex items-center space-x-1 ml-2">
                           <button
-                            onClick={() => onDeleteUser({ id: item.id, name: item.name })}
-                            className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-all ml-2"
-                            title="Delete user"
+                            onClick={() => onEditUser(item)}
+                            className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-all"
+                            title="Edit user"
+                            aria-label={`Edit ${item.name}`}
                           >
-                            <Trash2 className="h-3 w-3" />
+                            <Pencil className="h-3 w-3" />
                           </button>
-                        )}
+
+                          {!isSelf && (
+                            <button
+                              onClick={() => onDeleteUser({ id: item.id, name: item.name })}
+                              className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-all"
+                              title="Delete user"
+                              aria-label={`Delete ${item.name}`}
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </td>
                   </tr>

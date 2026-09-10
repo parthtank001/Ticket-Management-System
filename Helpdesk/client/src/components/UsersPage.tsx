@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { AuthUser } from '../lib/auth-client';
+import { ManagedUser } from '../lib/users-api';
 import { useUsers, useDeleteUser } from '../lib/hooks/useUsers';
 import {
   AlertCircle,
@@ -16,9 +17,14 @@ interface UsersPageProps {
   user: AuthUser;
 }
 
+type DialogState =
+  | { type: 'create' }
+  | { type: 'edit'; user: ManagedUser }
+  | { type: 'delete'; user: { id: string; name: string } }
+  | null;
+
 export const UsersPage: React.FC<UsersPageProps> = ({ user: currentUser }) => {
-  const [userToDelete, setUserToDelete] = useState<{ id: string; name: string } | null>(null);
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [activeDialog, setActiveDialog] = useState<DialogState>(null);
 
   // 1. TanStack Query: Reactive user directory query
   const {
@@ -30,26 +36,40 @@ export const UsersPage: React.FC<UsersPageProps> = ({ user: currentUser }) => {
   // 2. TanStack Query Mutations
   const deleteUserMutation = useDeleteUser();
 
+  // Handle opening modal in Create mode
+  const handleOpenAddModal = () => {
+    setActiveDialog({ type: 'create' });
+  };
+
+  // Handle opening modal in Edit mode with selected user data
+  const handleEditUser = (user: ManagedUser) => {
+    setActiveDialog({ type: 'edit', user });
+  };
+
+  const handleCloseDialog = () => {
+    setActiveDialog(null);
+  };
+
   // Handle ESC key for delete modal
   useEffect(() => {
-    if (!userToDelete) return;
+    if (activeDialog?.type !== 'delete') return;
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
-        setUserToDelete(null);
+        setActiveDialog(null);
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [userToDelete]);
+  }, [activeDialog]);
 
   // Handle User Deletion Submit
   const handleConfirmDelete = async () => {
-    if (!userToDelete) return;
+    if (activeDialog?.type !== 'delete') return;
     try {
-      await deleteUserMutation.mutateAsync(userToDelete.id);
-      setUserToDelete(null);
+      await deleteUserMutation.mutateAsync(activeDialog.user.id);
+      setActiveDialog(null);
     } catch (err: any) {
       alert(err.message || 'Failed to delete user.');
     }
@@ -73,7 +93,7 @@ export const UsersPage: React.FC<UsersPageProps> = ({ user: currentUser }) => {
         </div>
 
         <Button
-          onClick={() => setIsAddModalOpen(true)}
+          onClick={handleOpenAddModal}
           size="sm"
           className="h-8 text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs flex items-center space-x-1.5"
         >
@@ -99,22 +119,24 @@ export const UsersPage: React.FC<UsersPageProps> = ({ user: currentUser }) => {
         users={users}
         currentUser={currentUser}
         isLoading={isLoading}
-        onDeleteUser={setUserToDelete}
+        onEditUser={handleEditUser}
+        onDeleteUser={(user) => setActiveDialog({ type: 'delete', user })}
       />
 
-      {/* Add New User Modal */}
+      {/* Add / Edit User Modal */}
       <UserForm
-        isOpen={isAddModalOpen}
-        onClose={() => setIsAddModalOpen(false)}
+        isOpen={activeDialog?.type === 'create' || activeDialog?.type === 'edit'}
+        userToEdit={activeDialog?.type === 'edit' ? activeDialog.user : null}
+        onClose={handleCloseDialog}
       />
 
       {/* Delete Confirmation Modal */}
-      {userToDelete && (
+      {activeDialog?.type === 'delete' && (
         <div
           data-testid="delete-modal-backdrop"
           role="dialog"
           aria-modal="true"
-          onClick={() => setUserToDelete(null)}
+          onClick={handleCloseDialog}
           className="fixed inset-0 z-50 bg-slate-950/40 backdrop-blur-xs flex items-center justify-center p-4"
         >
           <div
@@ -132,14 +154,14 @@ export const UsersPage: React.FC<UsersPageProps> = ({ user: currentUser }) => {
             </div>
 
             <p className="text-xs text-slate-600">
-              Are you sure you want to delete <span className="font-semibold text-slate-900">{userToDelete.name}</span>? Any assigned tickets will be unassigned automatically.
+              Are you sure you want to delete <span className="font-semibold text-slate-900">{activeDialog.user.name}</span>? Any assigned tickets will be unassigned automatically.
             </p>
 
             <div className="flex items-center justify-end space-x-2 pt-2">
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setUserToDelete(null)}
+                onClick={handleCloseDialog}
                 className="h-7 text-xs"
               >
                 Cancel

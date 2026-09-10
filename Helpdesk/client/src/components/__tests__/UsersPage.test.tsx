@@ -484,4 +484,147 @@ describe('UsersPage Component', () => {
       });
     });
   });
+
+  describe('Edit User Modal & Workflows', () => {
+    it('opens edit modal pre-populated with user details when edit button is clicked', async () => {
+      const user = userEvent.setup();
+      vi.mocked(usersApi.listUsers).mockResolvedValueOnce(mockUsersList);
+
+      renderWithQuery(<UsersPage user={mockCurrentUser} />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Bob Agent')).toBeInTheDocument();
+      });
+
+      const editButtons = screen.getAllByTitle('Edit user');
+      // Click edit on Bob Agent (second user in list)
+      await user.click(editButtons[1]);
+
+      expect(screen.getByRole('heading', { name: /^edit user$/i })).toBeInTheDocument();
+      expect(screen.getByLabelText(/full name/i)).toHaveValue('Bob Agent');
+      expect(screen.getByLabelText(/email address/i)).toHaveValue('bob.agent@example.com');
+      expect(screen.getByLabelText(/email address/i)).not.toBeDisabled();
+      expect(screen.queryByLabelText(/role/i)).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /^save changes$/i })).toBeInTheDocument();
+    });
+
+    it('updates user successfully including email without password when leaving password field blank', async () => {
+      const user = userEvent.setup();
+      vi.mocked(usersApi.listUsers).mockResolvedValue(mockUsersList);
+      vi.mocked(usersApi.updateUser).mockResolvedValueOnce({
+        id: 'agent-2',
+        name: 'Bob Agent Updated',
+        email: 'bob.agent.updated@example.com',
+        role: Role.AGENT,
+        isActive: true,
+        createdAt: '2026-02-10T14:30:00.000Z',
+        updatedAt: '2026-09-09T12:00:00.000Z',
+      });
+
+      renderWithQuery(<UsersPage user={mockCurrentUser} />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Bob Agent')).toBeInTheDocument();
+      });
+
+      const editButtons = screen.getAllByTitle('Edit user');
+      await user.click(editButtons[1]);
+
+      // Edit name & email
+      const nameInput = screen.getByLabelText(/full name/i);
+      await user.clear(nameInput);
+      await user.type(nameInput, 'Bob Agent Updated');
+
+      const emailInput = screen.getByLabelText(/email address/i);
+      await user.clear(emailInput);
+      await user.type(emailInput, 'bob.agent.updated@example.com');
+
+      const submitBtn = screen.getByRole('button', { name: /^save changes$/i });
+      await user.click(submitBtn);
+
+      await waitFor(() => {
+        expect(usersApi.updateUser).toHaveBeenCalledWith('agent-2', {
+          name: 'Bob Agent Updated',
+          email: 'bob.agent.updated@example.com',
+          role: Role.AGENT,
+          isActive: true,
+        });
+      });
+
+      // Payload must not have password
+      const updatePayload = vi.mocked(usersApi.updateUser).mock.calls[0];
+      expect(updatePayload[1].password).toBeUndefined();
+
+      // Modal closes
+      await waitFor(() => {
+        expect(screen.queryByRole('heading', { name: /^edit user$/i })).not.toBeInTheDocument();
+      });
+    });
+
+    it('updates user password when new password is provided in edit mode', async () => {
+      const user = userEvent.setup();
+      vi.mocked(usersApi.listUsers).mockResolvedValue(mockUsersList);
+      vi.mocked(usersApi.updateUser).mockResolvedValueOnce({
+        id: 'agent-2',
+        name: 'Bob Agent',
+        email: 'bob.agent@example.com',
+        role: Role.AGENT,
+        isActive: true,
+        createdAt: '2026-02-10T14:30:00.000Z',
+        updatedAt: '2026-09-09T12:00:00.000Z',
+      });
+
+      renderWithQuery(<UsersPage user={mockCurrentUser} />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Bob Agent')).toBeInTheDocument();
+      });
+
+      const editButtons = screen.getAllByTitle('Edit user');
+      await user.click(editButtons[1]);
+
+      // Enter new password
+      await user.type(screen.getByLabelText(/new password/i), 'newPassword123');
+
+      const submitBtn = screen.getByRole('button', { name: /^save changes$/i });
+      await user.click(submitBtn);
+
+      await waitFor(() => {
+        expect(usersApi.updateUser).toHaveBeenCalledWith('agent-2', {
+          name: 'Bob Agent',
+          email: 'bob.agent@example.com',
+          role: Role.AGENT,
+          isActive: true,
+          password: 'newPassword123',
+        });
+      });
+
+      // Modal closes
+      await waitFor(() => {
+        expect(screen.queryByRole('heading', { name: /^edit user$/i })).not.toBeInTheDocument();
+      });
+    });
+
+    it('cancels edit and closes modal when Cancel is clicked', async () => {
+      const user = userEvent.setup();
+      vi.mocked(usersApi.listUsers).mockResolvedValueOnce(mockUsersList);
+
+      renderWithQuery(<UsersPage user={mockCurrentUser} />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Bob Agent')).toBeInTheDocument();
+      });
+
+      const editButtons = screen.getAllByTitle('Edit user');
+      await user.click(editButtons[1]);
+
+      expect(screen.getByRole('heading', { name: /^edit user$/i })).toBeInTheDocument();
+
+      const cancelBtn = screen.getByRole('button', { name: /^cancel$/i });
+      await user.click(cancelBtn);
+
+      expect(screen.queryByRole('heading', { name: /^edit user$/i })).not.toBeInTheDocument();
+      expect(usersApi.updateUser).not.toHaveBeenCalled();
+    });
+  });
 });

@@ -1,15 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { createUserSchema, CreateUserInput, Role } from '@helpdesk/core';
-import { useCreateUser } from '../lib/hooks/useUsers';
+import { z } from 'zod';
+import { Role } from '@helpdesk/core';
+import { ManagedUser, UpdateUserPayload } from '../lib/users-api';
+import { useCreateUser, useUpdateUser } from '../lib/hooks/useUsers';
 import { cn } from '../lib/utils';
 import {
-  UserCheck,
   Mail,
   AlertCircle,
   Loader2,
   UserPlus,
+  Pencil,
   Eye,
   EyeOff,
   X,
@@ -24,29 +26,92 @@ export interface UserFormProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess?: () => void;
+  userToEdit?: ManagedUser | null;
 }
 
-export const UserForm: React.FC<UserFormProps> = ({ isOpen, onClose, onSuccess }) => {
+const createUserFormSchema = (isEdit: boolean) =>
+  z
+    .object({
+      name: z
+        .string({ message: 'Name must be at least 3 characters long.' })
+        .trim()
+        .min(3, 'Name must be at least 3 characters long.'),
+      email: z
+        .string({ message: 'A valid email address is required.' })
+        .trim()
+        .email('A valid email address is required.'),
+      password: z.string().optional(),
+    })
+    .superRefine((data, ctx) => {
+      const pwd = data.password ? data.password.trim() : '';
+      if (!isEdit || pwd.length > 0) {
+        if (pwd.length < 8) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: 'Password must be at least 8 characters long.',
+            path: ['password'],
+          });
+        } else if (/\s/.test(data.password || '')) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: 'Password must not contain spaces.',
+            path: ['password'],
+          });
+        }
+      }
+    });
+
+type UserFormData = z.infer<ReturnType<typeof createUserFormSchema>>;
+
+export const UserForm: React.FC<UserFormProps> = ({
+  isOpen,
+  onClose,
+  onSuccess,
+  userToEdit,
+}) => {
+  const isEdit = Boolean(userToEdit);
   const [generalError, setGeneralError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
 
   const createUserMutation = useCreateUser();
+  const updateUserMutation = useUpdateUser();
+
+  const isPending = createUserMutation.isPending || updateUserMutation.isPending;
 
   const {
     register,
     handleSubmit,
     reset,
     formState: { errors },
-  } = useForm<CreateUserInput>({
-    resolver: zodResolver(createUserSchema),
+  } = useForm<UserFormData>({
+    resolver: zodResolver(createUserFormSchema(isEdit)),
     defaultValues: {
       name: '',
       email: '',
       password: '',
-      role: Role.AGENT,
-      isActive: true,
     },
   });
+
+  // Populate or reset form values on modal open/user change
+  useEffect(() => {
+    if (isOpen) {
+      if (userToEdit) {
+        reset({
+          name: userToEdit.name,
+          email: userToEdit.email,
+          password: '',
+        });
+      } else {
+        reset({
+          name: '',
+          email: '',
+          password: '',
+        });
+      }
+      setGeneralError(null);
+      setShowPassword(false);
+    }
+  }, [isOpen, userToEdit, reset]);
 
   const handleClose = () => {
     reset();
@@ -69,24 +134,47 @@ export const UserForm: React.FC<UserFormProps> = ({ isOpen, onClose, onSuccess }
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen]);
 
-  const handleCreateUser = async (data: CreateUserInput) => {
+  const handleFormSubmit = async (data: UserFormData) => {
     setGeneralError(null);
 
     try {
-      await createUserMutation.mutateAsync({
-        name: data.name.trim(),
-        email: data.email.trim().toLowerCase(),
-        password: data.password,
-        role: data.role || Role.AGENT,
-        isActive: data.isActive !== undefined ? data.isActive : true,
-      });
+      if (isEdit && userToEdit) {
+        const payload: UpdateUserPayload = {
+          name: data.name.trim(),
+          email: data.email.trim().toLowerCase(),
+          role: userToEdit.role,
+          isActive: userToEdit.isActive,
+        };
+
+        if (data.password && data.password.trim().length > 0) {
+          payload.password = data.password;
+        }
+
+        await updateUserMutation.mutateAsync({
+          id: userToEdit.id,
+          payload,
+        });
+      } else {
+        await createUserMutation.mutateAsync({
+          name: data.name.trim(),
+          email: data.email.trim().toLowerCase(),
+          password: data.password!,
+          role: Role.AGENT,
+          isActive: true,
+        });
+      }
 
       handleClose();
       if (onSuccess) {
         onSuccess();
       }
     } catch (err: any) {
-      setGeneralError(err.message || 'Failed to create user account.');
+      setGeneralError(
+        err.message ||
+          (isEdit
+            ? 'Failed to update user account.'
+            : 'Failed to create user account.')
+      );
     }
   };
 
@@ -108,11 +196,17 @@ export const UserForm: React.FC<UserFormProps> = ({ isOpen, onClose, onSuccess }
         <div className="flex items-start justify-between">
           <div className="flex items-center space-x-2.5">
             <div className="h-8 w-8 rounded-lg bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 shrink-0">
-              <UserPlus className="h-4 w-4" />
+              {isEdit ? <Pencil className="h-4 w-4" /> : <UserPlus className="h-4 w-4" />}
             </div>
             <div>
-              <h3 className="text-sm font-bold text-slate-900">Add New User</h3>
-              <p className="text-[11px] text-slate-500">Create a new user account with role permissions.</p>
+              <h3 className="text-sm font-bold text-slate-900">
+                {isEdit ? 'Edit User' : 'Add New User'}
+              </h3>
+              <p className="text-[11px] text-slate-500">
+                {isEdit
+                  ? 'Update user account details and permissions.'
+                  : 'Create a new user account with role permissions.'}
+              </p>
             </div>
           </div>
           <button
@@ -132,8 +226,8 @@ export const UserForm: React.FC<UserFormProps> = ({ isOpen, onClose, onSuccess }
           </div>
         )}
 
-        {/* Create User Form */}
-        <form onSubmit={handleSubmit(handleCreateUser)} className="space-y-3" noValidate>
+        {/* User Form */}
+        <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-3" noValidate>
           {/* Full Name */}
           <div className="space-y-1">
             <div className="flex items-center justify-between">
@@ -164,9 +258,11 @@ export const UserForm: React.FC<UserFormProps> = ({ isOpen, onClose, onSuccess }
 
           {/* Email Address */}
           <div className="space-y-1">
-            <Label htmlFor="create-email" className="text-xs font-semibold text-slate-700">
-              Email Address
-            </Label>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="create-email" className="text-xs font-semibold text-slate-700">
+                Email Address
+              </Label>
+            </div>
             <div className="relative">
               <Mail className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
               <Input
@@ -192,16 +288,18 @@ export const UserForm: React.FC<UserFormProps> = ({ isOpen, onClose, onSuccess }
           <div className="space-y-1">
             <div className="flex items-center justify-between">
               <Label htmlFor="create-password" className="text-xs font-semibold text-slate-700">
-                Password
+                {isEdit ? 'New Password' : 'Password'}
               </Label>
-              <span className="text-[10px] text-slate-400">Min. 8 characters</span>
+              <span className="text-[10px] text-slate-400">
+                {isEdit ? 'Leave blank to keep current' : 'Min. 8 characters'}
+              </span>
             </div>
             <div className="relative">
               <Lock className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
               <Input
                 id="create-password"
                 type={showPassword ? 'text' : 'password'}
-                placeholder="••••••••"
+                placeholder={isEdit ? '•••••••• (leave blank to keep current)' : '••••••••'}
                 aria-invalid={errors.password ? 'true' : 'false'}
                 {...register('password')}
                 className={cn(
@@ -225,18 +323,6 @@ export const UserForm: React.FC<UserFormProps> = ({ isOpen, onClose, onSuccess }
             )}
           </div>
 
-          {/* Role */}
-          <div className="space-y-1">
-            <Label className="text-xs font-semibold text-slate-700">Role</Label>
-            <div className="flex items-center space-x-2 px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-700">
-              <span className="inline-flex items-center space-x-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-50 text-blue-700 border border-blue-200/60 shadow-2xs">
-                <UserCheck className="h-2.5 w-2.5 text-blue-600" />
-                <span>AGENT</span>
-              </span>
-              <span className="text-[11px] text-slate-500">Assigned default support agent role</span>
-            </div>
-          </div>
-
           {/* Form Actions */}
           <div className="flex items-center justify-end space-x-2 pt-3 border-t border-slate-100">
             <Button
@@ -244,7 +330,7 @@ export const UserForm: React.FC<UserFormProps> = ({ isOpen, onClose, onSuccess }
               variant="outline"
               size="sm"
               onClick={handleClose}
-              disabled={createUserMutation.isPending}
+              disabled={isPending}
               className="h-8 text-xs"
             >
               Cancel
@@ -252,16 +338,16 @@ export const UserForm: React.FC<UserFormProps> = ({ isOpen, onClose, onSuccess }
             <Button
               type="submit"
               size="sm"
-              disabled={createUserMutation.isPending}
+              disabled={isPending}
               className="h-8 text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white"
             >
-              {createUserMutation.isPending ? (
+              {isPending ? (
                 <>
                   <Loader2 className="h-3 w-3 animate-spin mr-1.5" />
-                  <span>Creating...</span>
+                  <span>{isEdit ? 'Saving...' : 'Creating...'}</span>
                 </>
               ) : (
-                <span>Create User</span>
+                <span>{isEdit ? 'Save Changes' : 'Create User'}</span>
               )}
             </Button>
           </div>

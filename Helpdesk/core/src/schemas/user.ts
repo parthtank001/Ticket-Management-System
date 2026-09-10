@@ -32,6 +32,11 @@ export const updateUserSchema = z.object({
     .trim()
     .min(3, 'Name must be at least 3 characters long.')
     .optional(),
+  email: z
+    .string({ message: 'A valid email address is required.' })
+    .trim()
+    .email('A valid email address is required.')
+    .optional(),
   role: z
     .nativeEnum(Role, {
       message: 'Invalid role specified. Must be ADMIN or AGENT.',

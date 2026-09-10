@@ -7,6 +7,21 @@ import { createUserSchema, updateUserSchema } from '../schemas';
 
 const router = Router();
 
+const userSelect = {
+  id: true,
+  name: true,
+  email: true,
+  role: true,
+  isActive: true,
+  createdAt: true,
+  updatedAt: true,
+  _count: {
+    select: {
+      tickets: true,
+    },
+  },
+} as const;
+
 /**
  * GET /api/users
  * List all users for Admin directory with optional search, role, and status filters (Admin only)
@@ -36,20 +51,7 @@ router.get('/', requireAuth, requireRole(Role.ADMIN), async (req: Request, res: 
 
   const users = await prisma.user.findMany({
     where,
-    select: {
-      id: true,
-      name: true,
-      email: true,
-      role: true,
-      isActive: true,
-      createdAt: true,
-      updatedAt: true,
-      _count: {
-        select: {
-          tickets: true,
-        },
-      },
-    },
+    select: userSelect,
     orderBy: { createdAt: 'desc' },
   });
   res.json(users);
@@ -67,8 +69,6 @@ router.post('/', requireAuth, requireRole(Role.ADMIN), async (req: Request, res:
 
   const { name, email, password, role, isActive } = validationResult.data;
   const normalizedEmail = email.toLowerCase();
-  const assignedRole = role === Role.ADMIN ? Role.ADMIN : Role.AGENT;
-  const accountActive = isActive !== undefined ? isActive : true;
 
   // Check if user already exists
   const existingUser = await prisma.user.findUnique({
@@ -86,24 +86,11 @@ router.post('/', requireAuth, requireRole(Role.ADMIN), async (req: Request, res:
       data: {
         name,
         email: normalizedEmail,
-        role: assignedRole,
+        role,
         emailVerified: true,
-        isActive: accountActive,
+        isActive,
       },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        role: true,
-        isActive: true,
-        createdAt: true,
-        updatedAt: true,
-        _count: {
-          select: {
-            tickets: true,
-          },
-        },
-      },
+      select: userSelect,
     });
 
     await tx.account.create({
@@ -134,7 +121,7 @@ router.patch('/:id', requireAuth, requireRole(Role.ADMIN), async (req: Request, 
     return res.status(400).json({ error: validationResult.error.issues[0].message });
   }
 
-  const { name, role, isActive, password } = validationResult.data;
+  const { name, email, role, isActive, password } = validationResult.data;
 
   const existingUser = await prisma.user.findUnique({
     where: { id },
@@ -142,6 +129,19 @@ router.patch('/:id', requireAuth, requireRole(Role.ADMIN), async (req: Request, 
 
   if (!existingUser) {
     return res.status(404).json({ error: 'User not found.' });
+  }
+
+  // Check email uniqueness if email is updated
+  if (email !== undefined) {
+    const normalizedEmail = email.toLowerCase();
+    if (normalizedEmail !== existingUser.email) {
+      const emailConflict = await prisma.user.findUnique({
+        where: { email: normalizedEmail },
+      });
+      if (emailConflict && emailConflict.id !== id) {
+        return res.status(409).json({ error: 'A user with this email address already exists.' });
+      }
+    }
   }
 
   // Safety checks: Prevent admin from deactivating or demoting themselves
@@ -189,23 +189,11 @@ router.patch('/:id', requireAuth, requireRole(Role.ADMIN), async (req: Request, 
     where: { id },
     data: {
       ...(name !== undefined ? { name } : {}),
+      ...(email !== undefined ? { email: email.toLowerCase() } : {}),
       ...(role !== undefined ? { role: role as Role } : {}),
       ...(isActive !== undefined ? { isActive } : {}),
     },
-    select: {
-      id: true,
-      name: true,
-      email: true,
-      role: true,
-      isActive: true,
-      createdAt: true,
-      updatedAt: true,
-      _count: {
-        select: {
-          tickets: true,
-        },
-      },
-    },
+    select: userSelect,
   });
 
   res.json(updatedUser);

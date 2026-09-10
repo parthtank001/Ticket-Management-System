@@ -38,12 +38,14 @@ describe('UsersTable Component', () => {
   ];
 
   it('renders loading skeletons when isLoading is true', () => {
+    const mockOnEdit = vi.fn();
     const mockOnDelete = vi.fn();
     renderWithQuery(
       <UsersTable
         users={[]}
         currentUser={mockCurrentUser}
         isLoading={true}
+        onEditUser={mockOnEdit}
         onDeleteUser={mockOnDelete}
       />
     );
@@ -55,12 +57,14 @@ describe('UsersTable Component', () => {
   });
 
   it('renders empty state when users list is empty and not loading', () => {
+    const mockOnEdit = vi.fn();
     const mockOnDelete = vi.fn();
     renderWithQuery(
       <UsersTable
         users={[]}
         currentUser={mockCurrentUser}
         isLoading={false}
+        onEditUser={mockOnEdit}
         onDeleteUser={mockOnDelete}
       />
     );
@@ -70,12 +74,14 @@ describe('UsersTable Component', () => {
   });
 
   it('renders users list with details, role badges, and "You" badge', () => {
+    const mockOnEdit = vi.fn();
     const mockOnDelete = vi.fn();
     renderWithQuery(
       <UsersTable
         users={mockUsersList}
         currentUser={mockCurrentUser}
         isLoading={false}
+        onEditUser={mockOnEdit}
         onDeleteUser={mockOnDelete}
       />
     );
@@ -93,14 +99,41 @@ describe('UsersTable Component', () => {
     expect(screen.getByText('AGENT')).toBeInTheDocument();
   });
 
-  it('calls onDeleteUser when delete button for other user is clicked', async () => {
+  it('calls onEditUser when edit button is clicked for any user row', async () => {
     const user = userEvent.setup();
+    const mockOnEdit = vi.fn();
     const mockOnDelete = vi.fn();
     renderWithQuery(
       <UsersTable
         users={mockUsersList}
         currentUser={mockCurrentUser}
         isLoading={false}
+        onEditUser={mockOnEdit}
+        onDeleteUser={mockOnDelete}
+      />
+    );
+
+    const editButtons = screen.getAllByTitle('Edit user');
+    // Edit button should be present for both users
+    expect(editButtons).toHaveLength(2);
+
+    await user.click(editButtons[0]);
+    expect(mockOnEdit).toHaveBeenCalledWith(mockUsersList[0]);
+
+    await user.click(editButtons[1]);
+    expect(mockOnEdit).toHaveBeenCalledWith(mockUsersList[1]);
+  });
+
+  it('calls onDeleteUser when delete button for other user is clicked', async () => {
+    const user = userEvent.setup();
+    const mockOnEdit = vi.fn();
+    const mockOnDelete = vi.fn();
+    renderWithQuery(
+      <UsersTable
+        users={mockUsersList}
+        currentUser={mockCurrentUser}
+        isLoading={false}
+        onEditUser={mockOnEdit}
         onDeleteUser={mockOnDelete}
       />
     );

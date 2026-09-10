@@ -32,7 +32,7 @@ describe('UserForm Component (Create User Form)', () => {
       expect(screen.queryByRole('heading', { name: /add new user/i })).not.toBeInTheDocument();
     });
 
-    it('renders modal dialog with header, instructions, and default Agent role badge when isOpen is true', () => {
+    it('renders modal dialog with header, instructions, and inputs when isOpen is true', () => {
       renderWithQuery(
         <UserForm isOpen={true} onClose={mockOnClose} onSuccess={mockOnSuccess} />
       );
@@ -50,9 +50,8 @@ describe('UserForm Component (Create User Form)', () => {
       expect(screen.getByLabelText(/^password$/i)).toBeInTheDocument();
       expect(screen.getByText(/min\. 8 characters/i)).toBeInTheDocument();
 
-      // Default Role badge
-      expect(screen.getByText('AGENT')).toBeInTheDocument();
-      expect(screen.getByText(/assigned default support agent role/i)).toBeInTheDocument();
+      // Role should not be present in form
+      expect(screen.queryByLabelText(/role/i)).not.toBeInTheDocument();
 
       // Form action buttons
       expect(screen.getByRole('button', { name: /^create user$/i })).toBeInTheDocument();
@@ -330,6 +329,219 @@ describe('UserForm Component (Create User Form)', () => {
       await user.keyboard('{Escape}');
 
       expect(mockOnClose).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('6. Edit User Mode & Password Handling', () => {
+    const existingUser = {
+      id: 'agent-123',
+      name: 'Bob Smith',
+      email: 'bob.smith@example.com',
+      role: Role.AGENT,
+      isActive: true,
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    };
+
+    it('renders edit modal with pre-populated user data, editable email, and "Save Changes" button', () => {
+      renderWithQuery(
+        <UserForm
+          isOpen={true}
+          userToEdit={existingUser}
+          onClose={mockOnClose}
+          onSuccess={mockOnSuccess}
+        />
+      );
+
+      expect(screen.getByRole('heading', { name: /^edit user$/i })).toBeInTheDocument();
+      expect(screen.getByText('Update user account details and permissions.')).toBeInTheDocument();
+
+      // Name pre-populated
+      expect(screen.getByLabelText(/full name/i)).toHaveValue('Bob Smith');
+
+      // Email pre-populated and editable (enabled)
+      const emailInput = screen.getByLabelText(/email address/i);
+      expect(emailInput).toHaveValue('bob.smith@example.com');
+      expect(emailInput).not.toBeDisabled();
+      expect(screen.queryByText('Cannot be changed')).not.toBeInTheDocument();
+
+      // Password empty with placeholder indicating optional
+      expect(screen.getByLabelText(/new password/i)).toHaveValue('');
+      expect(screen.getByText('Leave blank to keep current')).toBeInTheDocument();
+
+      // Role dropdown should not be present
+      expect(screen.queryByLabelText(/role/i)).not.toBeInTheDocument();
+
+      // Submit button text
+      expect(screen.getByRole('button', { name: /^save changes$/i })).toBeInTheDocument();
+    });
+
+    it('submits updated user data including modified email without password when password field is left empty', async () => {
+      const user = userEvent.setup();
+      vi.mocked(usersApi.updateUser).mockResolvedValueOnce({
+        ...existingUser,
+        name: 'Bob Updated',
+        email: 'bob.updated@example.com',
+      });
+
+      renderWithQuery(
+        <UserForm
+          isOpen={true}
+          userToEdit={existingUser}
+          onClose={mockOnClose}
+          onSuccess={mockOnSuccess}
+        />
+      );
+
+      const nameInput = screen.getByLabelText(/full name/i);
+      await user.clear(nameInput);
+      await user.type(nameInput, 'Bob Updated');
+
+      const emailInput = screen.getByLabelText(/email address/i);
+      await user.clear(emailInput);
+      await user.type(emailInput, 'bob.updated@example.com');
+
+      const submitBtn = screen.getByRole('button', { name: /^save changes$/i });
+      await user.click(submitBtn);
+
+      await waitFor(() => {
+        expect(usersApi.updateUser).toHaveBeenCalledWith('agent-123', {
+          name: 'Bob Updated',
+          email: 'bob.updated@example.com',
+          role: Role.AGENT,
+          isActive: true,
+        });
+      });
+
+      // Password should NOT be in the payload
+      const callArgs = vi.mocked(usersApi.updateUser).mock.calls[0];
+      expect(callArgs[1].password).toBeUndefined();
+
+      expect(mockOnClose).toHaveBeenCalledTimes(1);
+      expect(mockOnSuccess).toHaveBeenCalledTimes(1);
+    });
+
+    it('submits updated user data with new password when a valid password is provided', async () => {
+      const user = userEvent.setup();
+      vi.mocked(usersApi.updateUser).mockResolvedValueOnce({
+        ...existingUser,
+        name: 'Bob Smith',
+      });
+
+      renderWithQuery(
+        <UserForm
+          isOpen={true}
+          userToEdit={existingUser}
+          onClose={mockOnClose}
+          onSuccess={mockOnSuccess}
+        />
+      );
+
+      await user.type(screen.getByLabelText(/new password/i), 'NewSecretPassword123');
+
+      const submitBtn = screen.getByRole('button', { name: /^save changes$/i });
+      await user.click(submitBtn);
+
+      await waitFor(() => {
+        expect(usersApi.updateUser).toHaveBeenCalledWith('agent-123', {
+          name: 'Bob Smith',
+          email: 'bob.smith@example.com',
+          role: Role.AGENT,
+          isActive: true,
+          password: 'NewSecretPassword123',
+        });
+      });
+
+      expect(mockOnClose).toHaveBeenCalledTimes(1);
+      expect(mockOnSuccess).toHaveBeenCalledTimes(1);
+    });
+
+    it('rejects invalid email formats in edit mode', async () => {
+      const user = userEvent.setup();
+      renderWithQuery(
+        <UserForm
+          isOpen={true}
+          userToEdit={existingUser}
+          onClose={mockOnClose}
+          onSuccess={mockOnSuccess}
+        />
+      );
+
+      const emailInput = screen.getByLabelText(/email address/i);
+      await user.clear(emailInput);
+      await user.type(emailInput, 'invalid-email');
+
+      const submitBtn = screen.getByRole('button', { name: /^save changes$/i });
+      await user.click(submitBtn);
+
+      expect(screen.getByText('A valid email address is required.')).toBeInTheDocument();
+      expect(usersApi.updateUser).not.toHaveBeenCalled();
+    });
+
+    it('rejects passwords shorter than 8 characters in edit mode', async () => {
+      const user = userEvent.setup();
+      renderWithQuery(
+        <UserForm
+          isOpen={true}
+          userToEdit={existingUser}
+          onClose={mockOnClose}
+          onSuccess={mockOnSuccess}
+        />
+      );
+
+      await user.type(screen.getByLabelText(/new password/i), 'short7');
+
+      const submitBtn = screen.getByRole('button', { name: /^save changes$/i });
+      await user.click(submitBtn);
+
+      expect(screen.getByText('Password must be at least 8 characters long.')).toBeInTheDocument();
+      expect(usersApi.updateUser).not.toHaveBeenCalled();
+    });
+
+    it('rejects passwords containing spaces in edit mode', async () => {
+      const user = userEvent.setup();
+      renderWithQuery(
+        <UserForm
+          isOpen={true}
+          userToEdit={existingUser}
+          onClose={mockOnClose}
+          onSuccess={mockOnSuccess}
+        />
+      );
+
+      await user.type(screen.getByLabelText(/new password/i), 'pass word 123');
+
+      const submitBtn = screen.getByRole('button', { name: /^save changes$/i });
+      await user.click(submitBtn);
+
+      expect(screen.getByText('Password must not contain spaces.')).toBeInTheDocument();
+      expect(usersApi.updateUser).not.toHaveBeenCalled();
+    });
+
+    it('displays error banner when user update API fails', async () => {
+      const user = userEvent.setup();
+      vi.mocked(usersApi.updateUser).mockRejectedValueOnce(
+        new Error('Failed to update user in database.')
+      );
+
+      renderWithQuery(
+        <UserForm
+          isOpen={true}
+          userToEdit={existingUser}
+          onClose={mockOnClose}
+          onSuccess={mockOnSuccess}
+        />
+      );
+
+      const submitBtn = screen.getByRole('button', { name: /^save changes$/i });
+      await user.click(submitBtn);
+
+      await waitFor(() => {
+        expect(screen.getByText('Failed to update user in database.')).toBeInTheDocument();
+      });
+
+      expect(mockOnClose).not.toHaveBeenCalled();
+      expect(mockOnSuccess).not.toHaveBeenCalled();
     });
   });
 });
