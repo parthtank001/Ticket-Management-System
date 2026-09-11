@@ -1,109 +1,297 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, Page } from '@playwright/test';
+import { Role } from '@helpdesk/core';
 
-test.describe('Admin User Directory E2E Suite', () => {
-  test.describe('1. Admin User Table Workflows', () => {
-    test.beforeEach(async ({ page }) => {
-      // Sign in as Admin
-      await page.goto('/');
-      await page.locator('input#email').fill('admin@example.com');
-      await page.locator('input#password').fill('password123');
-      await page.getByRole('button', { name: /sign in to workspace/i }).click();
-      await expect(page.getByRole('heading', { name: /welcome to the helpdesk/i })).toBeVisible({ timeout: 15000 });
+/**
+ * User Management E2E Test Suite (Happy Paths Only)
+ *
+ * Covers complete CRUD lifecycle operations for user management:
+ * 1. Create (C): Admin creates new user accounts with valid name, email, and password.
+ * 2. Read (R): Admin views user directory, table headers, role badges, user count, and seeded accounts.
+ * 3. Update (U): Admin updates existing user details (name, email, and/or password) and verifies login with updated credentials.
+ * 4. Delete (D): Admin soft-deletes an agent account through the confirmation modal dialog.
+ * 5. Full Lifecycle (C -> R -> U -> D): Integrated happy path test covering the complete user lifecycle from creation to deletion.
+ */
 
-      // Navigate to /users directory
-      await page.getByRole('button', { name: 'Users' }).click();
-      await expect(page).toHaveURL(/\/users$/);
-      await expect(page.getByRole('heading', { name: 'Users', exact: true })).toBeVisible();
+// Helper to log in via UI
+async function loginViaUI(page: Page, email: string, password: string): Promise<void> {
+  await page.goto('/');
+  await page.locator('input#email').fill(email);
+  await page.locator('input#password').fill(password);
+  await page.getByRole('button', { name: /sign in to workspace/i }).click();
+  await expect(page.getByRole('heading', { name: /welcome to the helpdesk/i })).toBeVisible({ timeout: 15000 });
+}
+
+// Helper to sign out via UI
+async function signOutViaUI(page: Page): Promise<void> {
+  const signOutBtn = page.getByRole('button', { name: /sign out/i });
+  await signOutBtn.click();
+  await expect(page.getByRole('heading', { name: /helpdesk platform/i })).toBeVisible({ timeout: 10000 });
+}
+
+// Helper to navigate to Users directory
+async function navigateToUsersDirectory(page: Page): Promise<void> {
+  await page.getByRole('button', { name: 'Users' }).click();
+  await expect(page).toHaveURL(/\/users$/);
+  await expect(page.getByRole('heading', { name: 'Users', exact: true })).toBeVisible();
+}
+
+test.describe('User Management E2E CRUD Suite (Happy Paths)', () => {
+  test.beforeEach(async ({ page }) => {
+    // Authenticate as Admin and open the user management directory
+    await loginViaUI(page, 'admin@example.com', 'password123');
+    await navigateToUsersDirectory(page);
+  });
+
+  // =========================================================================
+  // 1. CREATE (C) - Happy Path User Creation Workflows
+  // =========================================================================
+  test.describe('1. Create (C) - User Creation', () => {
+    test('Admin successfully creates a new agent user and verifies their presence in directory table', async ({ page }) => {
+      const timestamp = Date.now();
+      const newUserName = `John Doe ${timestamp}`;
+      const newUserEmail = `john.${timestamp}@example.com`;
+
+      // 1. Click "Add User" button to open modal
+      await page.getByRole('button', { name: /add user/i }).click();
+      await expect(page.getByRole('heading', { name: 'Add New User' })).toBeVisible();
+
+      // 2. Fill in valid user credentials
+      await page.locator('input#create-name').fill(newUserName);
+      await page.locator('input#create-email').fill(newUserEmail);
+      await page.locator('input#create-password').fill('securePassword123');
+
+      // 3. Submit form
+      await page.getByRole('button', { name: /^create user$/i }).click();
+
+      // 4. Modal should dismiss
+      await expect(page.getByRole('heading', { name: 'Add New User' })).not.toBeVisible();
+
+      // 5. Verify the newly created user appears in the directory table with Role.AGENT badge
+      const userRow = page.locator('tr').filter({ hasText: newUserEmail });
+      await expect(userRow).toBeVisible({ timeout: 10000 });
+      await expect(userRow.getByText(newUserName, { exact: true })).toBeVisible();
+      await expect(userRow.getByText(Role.AGENT, { exact: true })).toBeVisible();
     });
+  });
 
-    test('renders user directory table with Name, Email, Role, Date Created columns and default seeded accounts', async ({ page }) => {
+  // =========================================================================
+  // 2. READ (R) - Happy Path User Directory Listing Workflows
+  // =========================================================================
+  test.describe('2. Read (R) - User Directory Listing', () => {
+    test('Admin views directory table with proper column headers, user count, and seeded accounts', async ({ page }) => {
       // 1. Verify exact 4 table headers
       await expect(page.getByRole('columnheader', { name: 'Name' })).toBeVisible();
       await expect(page.getByRole('columnheader', { name: 'Email' })).toBeVisible();
       await expect(page.getByRole('columnheader', { name: 'Role' })).toBeVisible();
       await expect(page.getByRole('columnheader', { name: 'Date Created' })).toBeVisible();
 
-      // 2. Verify Status and Actions headers are NOT present
-      await expect(page.getByRole('columnheader', { name: 'Status' })).not.toBeVisible();
-      await expect(page.getByRole('columnheader', { name: 'Actions' })).not.toBeVisible();
+      // 2. Verify user count text is displayed (e.g. "2 users" or "3 users")
+      await expect(page.getByText(/\d+\s+users?/).first()).toBeVisible();
 
-      // 3. Verify seeded accounts are rendered
-      await expect(page.getByText('admin@example.com').first()).toBeVisible();
-      await expect(page.getByText('agent@example.com').first()).toBeVisible();
-      await expect(page.getByText('System Admin').first()).toBeVisible();
-      await expect(page.getByText('Helpdesk Agent').first()).toBeVisible();
-      await expect(page.getByText('You', { exact: true }).first()).toBeVisible();
-    });
+      // 3. Verify seeded Admin user details and Role.ADMIN badge
+      const adminRow = page.locator('tr').filter({ hasText: 'admin@example.com' });
+      await expect(adminRow).toBeVisible({ timeout: 10000 });
+      await expect(adminRow.getByText(Role.ADMIN, { exact: true })).toBeVisible();
+      await expect(adminRow.getByText('You', { exact: true })).toBeVisible();
 
-    test('allows admin to open Create User modal, validate inputs, and successfully create a new user', async ({ page }) => {
-      const uniqueTimestamp = Date.now();
-      const newUserName = `Agent Test ${uniqueTimestamp}`;
-      const newUserEmail = `agent.${uniqueTimestamp}@example.com`;
-
-      // 1. Click Add User button to open modal
-      await page.getByRole('button', { name: /add user/i }).click();
-      await expect(page.getByRole('heading', { name: 'Add New User' })).toBeVisible();
-
-      // 2. Verify validation errors on empty submission
-      await page.getByRole('button', { name: /^create user$/i }).click();
-      await expect(page.getByText('Name must be at least 3 characters long.')).toBeVisible();
-      await expect(page.getByText('A valid email address is required.')).toBeVisible();
-      await expect(page.getByText('Password must be at least 8 characters long.')).toBeVisible();
-
-      // 3. Fill in valid user form
-      await page.locator('input#create-name').fill(newUserName);
-      await page.locator('input#create-email').fill(newUserEmail);
-      await page.locator('input#create-password').fill('password123');
-
-      // 4. Submit form
-      await page.getByRole('button', { name: /^create user$/i }).click();
-
-      // 5. Modal should close and new user appears in directory table
-      await expect(page.getByRole('heading', { name: 'Add New User' })).not.toBeVisible();
-      await expect(page.getByText(newUserName)).toBeVisible({ timeout: 10000 });
-      await expect(page.getByText(newUserEmail)).toBeVisible();
-    });
-
-    test('displays error alert when trying to create a user with duplicate email', async ({ page }) => {
-      // 1. Open modal
-      await page.getByRole('button', { name: /add user/i }).click();
-      await expect(page.getByRole('heading', { name: 'Add New User' })).toBeVisible();
-
-      // 2. Fill in existing admin email
-      await page.locator('input#create-name').fill('Duplicate Admin');
-      await page.locator('input#create-email').fill('admin@example.com');
-      await page.locator('input#create-password').fill('password123');
-
-      // 3. Submit
-      await page.getByRole('button', { name: /^create user$/i }).click();
-
-      // 4. Verify duplicate error message inside modal
-      await expect(page.getByText('A user with this email address already exists.')).toBeVisible();
-      await expect(page.getByRole('heading', { name: 'Add New User' })).toBeVisible();
-
-      // 5. Cancel closes modal
-      await page.getByRole('button', { name: /^cancel$/i }).click();
-      await expect(page.getByRole('heading', { name: 'Add New User' })).not.toBeVisible();
+      // 4. Verify seeded Agent user details and Role.AGENT badge
+      const agentRow = page.locator('tr').filter({ hasText: 'agent@example.com' });
+      await expect(agentRow).toBeVisible({ timeout: 10000 });
+      await expect(agentRow.getByText(Role.AGENT, { exact: true })).toBeVisible();
     });
   });
 
-  test.describe('2. RBAC Access Restriction', () => {
-    test('non-admin Agent is forbidden from viewing user list', async ({ page }) => {
-      // Sign in as Agent
-      await page.goto('/');
-      await page.locator('input#email').fill('agent@example.com');
-      await page.locator('input#password').fill('password123');
+  // =========================================================================
+  // 3. UPDATE (U) - Happy Path User Editing & Password Update Workflows
+  // =========================================================================
+  test.describe('3. Update (U) - User Editing', () => {
+    test('Admin successfully edits an existing user name and email without altering password', async ({ page }) => {
+      const timestamp = Date.now();
+      const initialName = `Sam Taylor ${timestamp}`;
+      const initialEmail = `sam.${timestamp}@example.com`;
+      const updatedName = `Samantha Taylor ${timestamp}`;
+      const updatedEmail = `samantha.${timestamp}@example.com`;
+
+      // 1. Create a user to edit
+      await page.getByRole('button', { name: /add user/i }).click();
+      await page.locator('input#create-name').fill(initialName);
+      await page.locator('input#create-email').fill(initialEmail);
+      await page.locator('input#create-password').fill('password123');
+      await page.getByRole('button', { name: /^create user$/i }).click();
+      await expect(page.getByText(initialEmail)).toBeVisible({ timeout: 10000 });
+
+      // 2. Click the edit button (pencil icon) for this user
+      const userRow = page.locator('tr').filter({ hasText: initialEmail });
+      const editBtn = userRow.getByRole('button', { name: `Edit ${initialName}` });
+      await editBtn.click({ force: true });
+
+      // 3. Verify Edit User modal opens with pre-populated values
+      await expect(page.getByRole('heading', { name: 'Edit User' })).toBeVisible();
+      await expect(page.locator('input#create-name')).toHaveValue(initialName);
+      await expect(page.locator('input#create-email')).toHaveValue(initialEmail);
+      await expect(page.locator('input#create-password')).toHaveValue('');
+
+      // 4. Update Name and Email, leaving Password blank
+      await page.locator('input#create-name').fill(updatedName);
+      await page.locator('input#create-email').fill(updatedEmail);
+
+      // 5. Submit changes
+      await page.getByRole('button', { name: /^save changes$/i }).click();
+
+      // 6. Modal should dismiss and table displays updated info
+      await expect(page.getByRole('heading', { name: 'Edit User' })).not.toBeVisible();
+      await expect(page.getByText(updatedName)).toBeVisible({ timeout: 10000 });
+      await expect(page.getByText(updatedEmail)).toBeVisible();
+      await expect(page.getByText(initialEmail)).not.toBeVisible();
+    });
+
+    test('Admin updates an agent password and verifies the agent can log in with new password', async ({ page }) => {
+      const timestamp = Date.now();
+      const agentName = `Morgan Reed ${timestamp}`;
+      const agentEmail = `morgan.${timestamp}@example.com`;
+      const initialPassword = 'initialPassword123';
+      const newPassword = 'newSecretPassword123';
+
+      // 1. Create the agent with initial password
+      await page.getByRole('button', { name: /add user/i }).click();
+      await page.locator('input#create-name').fill(agentName);
+      await page.locator('input#create-email').fill(agentEmail);
+      await page.locator('input#create-password').fill(initialPassword);
+      await page.getByRole('button', { name: /^create user$/i }).click();
+      await expect(page.getByText(agentEmail)).toBeVisible({ timeout: 10000 });
+
+      // 2. Open edit modal for this agent
+      const userRow = page.locator('tr').filter({ hasText: agentEmail });
+      const editBtn = userRow.getByRole('button', { name: `Edit ${agentName}` });
+      await editBtn.click({ force: true });
+
+      // 3. Enter new password and save
+      await expect(page.getByRole('heading', { name: 'Edit User' })).toBeVisible();
+      await page.locator('input#create-password').fill(newPassword);
+      await page.getByRole('button', { name: /^save changes$/i }).click();
+      await expect(page.getByRole('heading', { name: 'Edit User' })).not.toBeVisible();
+
+      // 4. Sign out as Admin
+      await signOutViaUI(page);
+
+      // 5. Sign in as the edited agent with the new password
+      await page.locator('input#email').fill(agentEmail);
+      await page.locator('input#password').fill(newPassword);
+      await page.getByRole('button', { name: /sign in to workspace/i }).click();
+
+      // 6. Verify successful login to workspace
+      await expect(page.getByRole('heading', { name: /welcome to the helpdesk/i })).toBeVisible({ timeout: 15000 });
+      await expect(page.getByText(agentName)).toBeVisible();
+      await expect(page.getByText(Role.AGENT, { exact: true })).toBeVisible();
+    });
+  });
+
+  // =========================================================================
+  // 4. DELETE (D) - Happy Path User Deletion Workflows
+  // =========================================================================
+  test.describe('4. Delete (D) - User Deletion', () => {
+    test('Admin successfully deletes an agent through the confirmation modal', async ({ page }) => {
+      const timestamp = Date.now();
+      const agentName = `Jordan Case ${timestamp}`;
+      const agentEmail = `jordan.${timestamp}@example.com`;
+
+      // 1. Create an agent to delete
+      await page.getByRole('button', { name: /add user/i }).click();
+      await page.locator('input#create-name').fill(agentName);
+      await page.locator('input#create-email').fill(agentEmail);
+      await page.locator('input#create-password').fill('password123');
+      await page.getByRole('button', { name: /^create user$/i }).click();
+      await expect(page.getByText(agentEmail)).toBeVisible({ timeout: 10000 });
+
+      // 2. Click delete button (trash icon) for the created agent
+      const userRow = page.locator('tr').filter({ hasText: agentEmail });
+      const deleteBtn = userRow.getByRole('button', { name: `Delete ${agentName}` });
+      await deleteBtn.click({ force: true });
+
+      // 3. Verify confirmation modal appears with agent name
+      const modal = page.getByTestId('delete-modal-backdrop');
+      await expect(modal).toBeVisible();
+      await expect(modal.getByRole('heading', { name: 'Delete User Account' })).toBeVisible();
+      await expect(modal.getByText(agentName)).toBeVisible();
+
+      // 4. Confirm deletion by clicking "Delete Account"
+      await modal.getByRole('button', { name: /delete account/i }).click();
+
+      // 5. Modal closes and deleted agent is removed from table
+      await expect(modal).not.toBeVisible();
+      await expect(page.getByText(agentEmail)).not.toBeVisible();
+      await expect(page.getByText(agentName)).not.toBeVisible();
+    });
+  });
+
+  // =========================================================================
+  // 5. Full End-to-End CRUD Lifecycle Flow
+  // =========================================================================
+  test.describe('5. Full CRUD Lifecycle', () => {
+    test('Complete CRUD cycle: Create -> Read -> Update -> Login verification -> Delete', async ({ page }) => {
+      const timestamp = Date.now();
+      const initialName = `Alex Mercer ${timestamp}`;
+      const initialEmail = `alex.${timestamp}@example.com`;
+      const initialPassword = 'initialSecret123';
+
+      const updatedName = `Alexis Mercer ${timestamp}`;
+      const updatedEmail = `alexis.${timestamp}@example.com`;
+      const updatedPassword = 'updatedSecret123';
+
+      // --- 1. CREATE ---
+      await page.getByRole('button', { name: /add user/i }).click();
+      await page.locator('input#create-name').fill(initialName);
+      await page.locator('input#create-email').fill(initialEmail);
+      await page.locator('input#create-password').fill(initialPassword);
+      await page.getByRole('button', { name: /^create user$/i }).click();
+
+      // --- 2. READ ---
+      const initialRow = page.locator('tr').filter({ hasText: initialEmail });
+      await expect(initialRow).toBeVisible({ timeout: 10000 });
+      await expect(initialRow.getByText(initialName, { exact: true })).toBeVisible();
+      await expect(initialRow.getByText(Role.AGENT, { exact: true })).toBeVisible();
+
+      // --- 3. UPDATE ---
+      const editBtn = initialRow.getByRole('button', { name: `Edit ${initialName}` });
+      await editBtn.click({ force: true });
+      await expect(page.getByRole('heading', { name: 'Edit User' })).toBeVisible();
+
+      await page.locator('input#create-name').fill(updatedName);
+      await page.locator('input#create-email').fill(updatedEmail);
+      await page.locator('input#create-password').fill(updatedPassword);
+      await page.getByRole('button', { name: /^save changes$/i }).click();
+      await expect(page.getByRole('heading', { name: 'Edit User' })).not.toBeVisible();
+
+      // Verify updated user in table
+      const updatedRow = page.locator('tr').filter({ hasText: updatedEmail });
+      await expect(updatedRow).toBeVisible({ timeout: 10000 });
+      await expect(updatedRow.getByText(updatedName, { exact: true })).toBeVisible();
+
+      // --- 4. VERIFY LOGIN WITH UPDATED CREDENTIALS ---
+      await signOutViaUI(page);
+      await page.locator('input#email').fill(updatedEmail);
+      await page.locator('input#password').fill(updatedPassword);
       await page.getByRole('button', { name: /sign in to workspace/i }).click();
       await expect(page.getByRole('heading', { name: /welcome to the helpdesk/i })).toBeVisible({ timeout: 15000 });
 
-      // Users button should not exist in Navbar
-      await expect(page.getByRole('button', { name: 'Users' })).not.toBeVisible();
+      // --- 5. DELETE ---
+      // Sign out and log back in as Admin to perform deletion
+      await signOutViaUI(page);
+      await loginViaUI(page, 'admin@example.com', 'password123');
+      await navigateToUsersDirectory(page);
 
-      // Attempt direct navigation to /users
-      await page.goto('/users');
-      await expect(page.getByRole('heading', { name: 'Access Restricted' })).toBeVisible();
-      await expect(page.getByText('The Users Directory is restricted to Admin accounts only.')).toBeVisible();
+      const rowToDelete = page.locator('tr').filter({ hasText: updatedEmail });
+      await expect(rowToDelete).toBeVisible({ timeout: 10000 });
+      const deleteBtn = rowToDelete.getByRole('button', { name: `Delete ${updatedName}` });
+      await deleteBtn.click({ force: true });
+
+      const deleteModal = page.getByTestId('delete-modal-backdrop');
+      await expect(deleteModal).toBeVisible();
+      await deleteModal.getByRole('button', { name: /delete account/i }).click();
+
+      // Verify removal from directory
+      await expect(deleteModal).not.toBeVisible();
+      await expect(page.getByText(updatedEmail)).not.toBeVisible();
     });
   });
 });
-

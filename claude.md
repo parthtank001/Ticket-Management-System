@@ -37,15 +37,21 @@ This memory file contains project architectural specifications, technical stack 
   - Infer and export TypeScript types directly from schemas using `z.infer<typeof schema>`.
 
 ### 1.3 Mandatory Enum Usage: Role Enum Enforcement
-> **CRITICAL INSTRUCTION**: All references to user roles across frontend, backend, schemas, tests, and scripts **MUST** strictly use the strongly-typed **`Role` enum** (`Role.ADMIN`, `Role.AGENT`) rather than raw hardcoded string literals (`"ADMIN"`, `"AGENT"`).
+> **CRITICAL INSTRUCTION**: All references to user roles across the frontend application, backend services, validation schemas, unit/integration tests, and database scripts **MUST** strictly use the strongly-typed **`Role` enum** (`Role.ADMIN`, `Role.AGENT`) rather than raw hardcoded magic strings (`"ADMIN"`, `"AGENT"`).
 
 - **Strict Prohibitions**:
-  - ❌ **NO Raw Role Strings**: Never hardcode `"ADMIN"` or `"AGENT"` strings in form submissions, route handlers, schema defaults, or RBAC comparisons.
+  - ❌ **NO Raw Role Strings**: Never hardcode `"ADMIN"` or `"AGENT"` strings in JSX badges, component comparisons, form payloads, query filters, API client signatures, custom hooks, route handlers, schema defaults, or test assertions.
 - **Mandatory Enforced Architecture**:
-  1. **Frontend Types & Forms**: Always import `Role` from [`client/src/lib/types.ts`](file:///E:/claude_ai/Ticket%20Management%20System/Helpdesk/client/src/lib/types.ts) and reference `Role.AGENT` or `Role.ADMIN` in mutations, interfaces (`AuthUser`, `ManagedUser`, `CreateUserPayload`), and component logic.
-  2. **Backend Schemas & Validation**: In [`server/schemas.ts`](file:///E:/claude_ai/Ticket%20Management%20System/Helpdesk/server/schemas.ts), use `z.nativeEnum(Role)` with `.default(Role.AGENT)` to ensure type-safe validation.
-  3. **Route Handlers & Auth**: In [`server/index.ts`](file:///E:/claude_ai/Ticket%20Management%20System/Helpdesk/server/index.ts) and [`server/auth.ts`](file:///E:/claude_ai/Ticket%20Management%20System/Helpdesk/server/auth.ts), reference `Role.ADMIN` and `Role.AGENT` for role assignment, authorization checks, and default values.
-  4. **Scripts & Seeders**: In database seeds ([`prisma/seed.ts`](file:///E:/claude_ai/Ticket%20Management%20System/Helpdesk/prisma/seed.ts)) and user creation scripts ([`scripts/create-user.ts`](file:///E:/claude_ai/Ticket%20Management%20System/Helpdesk/scripts/create-user.ts)), always use `Role.AGENT` and `Role.ADMIN`.
+  1. **Frontend App & Components**: Always import `Role` from [`client/src/lib/types.ts`](file:///E:/claude_ai/Ticket%20Management%20System/Helpdesk/client/src/lib/types.ts) (or `@helpdesk/core`). Use `Role.ADMIN` and `Role.AGENT` everywhere:
+     - **Component Role Checks & RBAC**: e.g., `user?.role === Role.ADMIN`, `item.role !== Role.ADMIN`.
+     - **JSX Text & Badge Rendering**: e.g., `<span>{Role.ADMIN}</span>`, `<span>{Role.AGENT}</span>`.
+     - **Form Payloads & Mutations**: e.g., `role: Role.AGENT`, `role: userToEdit.role`.
+     - **API Service & React Query Hook Parameters**: e.g., `role?: Role | 'ALL' | string` in `usersApi.listUsers` and `useUsers`.
+     - **Frontend Interfaces**: e.g., `AuthUser`, `ManagedUser`, `CreateUserPayload`, `UpdateUserPayload`, `TicketAgent`.
+     - **Unit & Component Tests**: Assert rendered role labels using `{Role.ADMIN}` and `{Role.AGENT}` (e.g., `expect(screen.getByText(Role.ADMIN)).toBeInTheDocument()`).
+  2. **Backend Schemas & Validation**: In [`server/schemas.ts`](file:///E:/claude_ai/Ticket%20Management%20System/Helpdesk/server/schemas.ts) and [`core/src/schemas/user.ts`](file:///E:/claude_ai/Ticket%20Management%20System/Helpdesk/core/src/schemas/user.ts), use `z.nativeEnum(Role)` with `.default(Role.AGENT)` to guarantee type-safe parsing.
+  3. **Route Handlers & Auth**: In [`server/index.ts`](file:///E:/claude_ai/Ticket%20Management%20System/Helpdesk/server/index.ts), [`server/routes/users.ts`](file:///E:/claude_ai/Ticket%20Management%20System/Helpdesk/server/routes/users.ts), and [`server/auth.ts`](file:///E:/claude_ai/Ticket%20Management%20System/Helpdesk/server/auth.ts), reference `Role.ADMIN` and `Role.AGENT` for permission enforcement (`requireRole(Role.ADMIN)`), session initialization, and database queries.
+  4. **Scripts & Seeders**: In database seeds ([`prisma/seed.ts`](file:///E:/claude_ai/Ticket%20Management%20System/Helpdesk/prisma/seed.ts)) and CLI management scripts ([`scripts/create-user.ts`](file:///E:/claude_ai/Ticket%20Management%20System/Helpdesk/scripts/create-user.ts)), always use `Role.AGENT` and `Role.ADMIN`.
 
 ### 1.4 Mandatory Error Handling: Express 5 Automatic Async Promise Rejection
 > **CRITICAL INSTRUCTION**: In **Express 5**, route handlers and middleware that return a Promise **automatically forward rejected promises and unhandled exceptions** to the centralized error handling middleware (`next(err)`). Therefore, wrapping route handlers in manual `try { ... } catch (error) { ... }` blocks is **unnecessary and discouraged**.
@@ -383,6 +389,11 @@ All runtime data validation across the Helpdesk application is centralized and e
   - Seeds default test accounts (`admin@example.com` / `password123` and `agent@example.com` / `password123`).
 - **WebServers (`playwright.config.ts`)**:
   - Playwright coordinates starting both the isolated Express test server (`PORT=5001`) and Vite client (`http://localhost:5173`) with proxy routing to the test server.
+- **Test Specs (`Helpdesk/e2e/*.spec.ts`)**:
+  - `e2e/auth.spec.ts`: Sign-in, sign-out, session lifecycle, invalid credentials alerts, and client Zod validation.
+  - `e2e/users.spec.ts`: Happy path CRUD operations for user management (Create user, Read directory, Update profile & password, Delete user, Full CRUD lifecycle).
+  - `e2e/rbac-navigation.spec.ts`: Admin directory access vs. Agent restricted access views and return navigation.
+  - `e2e/api.spec.ts`: Health check, 401 unauthenticated security, 403 Agent forbidden checks, inbound ticket creation with AI draft response, and message replies.
 
 ### 10.2 Testing Commands
 From `Helpdesk/`:

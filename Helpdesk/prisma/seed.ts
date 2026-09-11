@@ -48,6 +48,7 @@ async function main() {
         role: userData.role,
         emailVerified: true,
         isActive: true,
+        deletedAt: null,
       },
       create: {
         name: userData.name,
@@ -55,6 +56,7 @@ async function main() {
         role: userData.role,
         emailVerified: true,
         isActive: true,
+        deletedAt: null,
       },
     });
 

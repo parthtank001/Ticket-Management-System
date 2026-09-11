@@ -11,6 +11,7 @@ declare global {
       user?: typeof auth.$Infer.Session.user & {
         role?: Role;
         isActive?: boolean;
+        deletedAt?: Date | string | null;
       };
       session?: typeof auth.$Infer.Session.session;
     }
@@ -34,9 +35,13 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
       });
     }
 
-    const user = sessionData.user as typeof sessionData.user & { role?: Role; isActive?: boolean };
+    const user = sessionData.user as typeof sessionData.user & {
+      role?: Role;
+      isActive?: boolean;
+      deletedAt?: Date | string | null;
+    };
 
-    if (user.isActive === false) {
+    if (user.isActive === false || user.deletedAt) {
       return res.status(403).json({
         error: "Forbidden",
         message: "Account has been deactivated. Please contact an administrator.",

@@ -95,8 +95,8 @@ describe('UsersTable Component', () => {
     expect(screen.getByText('You')).toBeInTheDocument();
 
     // Roles
-    expect(screen.getByText('ADMIN')).toBeInTheDocument();
-    expect(screen.getByText('AGENT')).toBeInTheDocument();
+    expect(screen.getByText(Role.ADMIN)).toBeInTheDocument();
+    expect(screen.getByText(Role.AGENT)).toBeInTheDocument();
   });
 
   it('calls onEditUser when edit button is clicked for any user row', async () => {
@@ -144,5 +144,48 @@ describe('UsersTable Component', () => {
 
     await user.click(deleteButtons[0]);
     expect(mockOnDelete).toHaveBeenCalledWith({ id: 'agent-2', name: 'Bob Agent' });
+  });
+
+  it('does not display delete button for any admin accounts', () => {
+    const mockOnEdit = vi.fn();
+    const mockOnDelete = vi.fn();
+    const usersWithMultipleAdmins: ManagedUser[] = [
+      mockCurrentUser,
+      {
+        id: 'admin-2',
+        name: 'Second Admin',
+        email: 'admin2@example.com',
+        role: Role.ADMIN,
+        isActive: true,
+        createdAt: '2026-01-20T10:00:00.000Z',
+        updatedAt: '2026-01-20T10:00:00.000Z',
+      },
+      {
+        id: 'agent-1',
+        name: 'Agent User',
+        email: 'agent@example.com',
+        role: Role.AGENT,
+        isActive: true,
+        createdAt: '2026-02-01T10:00:00.000Z',
+        updatedAt: '2026-02-01T10:00:00.000Z',
+      },
+    ];
+
+    renderWithQuery(
+      <UsersTable
+        users={usersWithMultipleAdmins}
+        currentUser={mockCurrentUser}
+        isLoading={false}
+        onEditUser={mockOnEdit}
+        onDeleteUser={mockOnDelete}
+      />
+    );
+
+    // Only agent-1 should have a delete button; neither admin-1 nor admin-2 should have one
+    const deleteButtons = screen.getAllByTitle('Delete user');
+    expect(deleteButtons).toHaveLength(1);
+    expect(screen.queryByLabelText('Delete Alice Admin')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Delete Second Admin')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Delete Agent User')).toBeInTheDocument();
   });
 });

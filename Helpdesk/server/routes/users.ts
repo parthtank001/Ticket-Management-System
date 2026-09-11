@@ -29,7 +29,9 @@ const userSelect = {
 router.get('/', requireAuth, requireRole(Role.ADMIN), async (req: Request, res: Response) => {
   const { search, role, status } = req.query;
 
-  const where: any = {};
+  const where: any = {
+    deletedAt: null,
+  };
 
   if (search && typeof search === 'string' && search.trim()) {
     const query = search.trim();
@@ -123,8 +125,8 @@ router.patch('/:id', requireAuth, requireRole(Role.ADMIN), async (req: Request, 
 
   const { name, email, role, isActive, password } = validationResult.data;
 
-  const existingUser = await prisma.user.findUnique({
-    where: { id },
+  const existingUser = await prisma.user.findFirst({
+    where: { id, deletedAt: null },
   });
 
   if (!existingUser) {
@@ -201,7 +203,7 @@ router.patch('/:id', requireAuth, requireRole(Role.ADMIN), async (req: Request, 
 
 /**
  * DELETE /api/users/:id
- * Delete user account (Admin only)
+ * Delete user account with soft deletion (Admin only)
  */
 router.delete('/:id', requireAuth, requireRole(Role.ADMIN), async (req: Request, res: Response) => {
   const id = req.params.id as string;
@@ -210,12 +212,17 @@ router.delete('/:id', requireAuth, requireRole(Role.ADMIN), async (req: Request,
     return res.status(400).json({ error: 'You cannot delete your own administrator account.' });
   }
 
-  const existingUser = await prisma.user.findUnique({
-    where: { id },
+  const existingUser = await prisma.user.findFirst({
+    where: { id, deletedAt: null },
   });
 
   if (!existingUser) {
     return res.status(404).json({ error: 'User not found.' });
+  }
+
+  // Administrator accounts cannot be deleted
+  if (existingUser.role === Role.ADMIN) {
+    return res.status(400).json({ error: 'Administrator accounts cannot be deleted.' });
   }
 
   // Unassign tickets assigned to this agent before deletion
@@ -224,8 +231,18 @@ router.delete('/:id', requireAuth, requireRole(Role.ADMIN), async (req: Request,
     data: { assignedAgentId: null },
   });
 
-  await prisma.user.delete({
+  // Revoke all active sessions for this user immediately
+  await prisma.session.deleteMany({
+    where: { userId: id },
+  });
+
+  // Soft delete user record by updating deletedAt timestamp and setting isActive to false
+  await prisma.user.update({
     where: { id },
+    data: {
+      deletedAt: new Date(),
+      isActive: false,
+    },
   });
 
   res.json({ message: 'User deleted successfully', id });

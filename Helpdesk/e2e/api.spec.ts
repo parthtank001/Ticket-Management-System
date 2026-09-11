@@ -248,6 +248,54 @@ test.describe('Backend REST API & Authorization Suite', () => {
       expect(shortNameRes.status()).toBe(400);
     });
 
+    test('DELETE /api/users/:id on an Admin account returns 400 Bad Request', async () => {
+      // 1. Get current users to find Admin ID
+      const usersRes = await adminContext.get('/api/users');
+      const users: UserDirectoryItem[] = await usersRes.json();
+      const adminUser = users.find((u) => u.email === 'admin@example.com');
+      expect(adminUser).toBeDefined();
+
+      // 2. Attempt to delete Admin account
+      const deleteRes = await adminContext.delete(`/api/users/${adminUser!.id}`);
+      expect(deleteRes.status()).toBe(400);
+      const body = await deleteRes.json();
+      expect(body.error).toMatch(/cannot delete|administrator/i);
+    });
+
+    test('DELETE /api/users/:id on Agent account performs soft deletion', async () => {
+      // 1. Create an Agent user to delete
+      const timestamp = Date.now();
+      const createRes = await adminContext.post('/api/users', {
+        data: {
+          name: `Soft Delete Test Agent ${timestamp}`,
+          email: `soft.delete.${timestamp}@example.com`,
+          password: 'password12345',
+          role: 'AGENT',
+        },
+      });
+      expect(createRes.status()).toBe(201);
+      const createdAgent: UserDirectoryItem = await createRes.json();
+
+      // 2. Delete the created Agent
+      const deleteRes = await adminContext.delete(`/api/users/${createdAgent.id}`);
+      expect(deleteRes.status()).toBe(200);
+      const deleteBody = await deleteRes.json();
+      expect(deleteBody.message).toMatch(/user deleted successfully/i);
+
+      // 3. Soft-deleted user should not appear in GET /api/users directory
+      const listRes = await adminContext.get('/api/users');
+      const listUsers: UserDirectoryItem[] = await listRes.json();
+      const foundInList = listUsers.find((u) => u.id === createdAgent.id);
+      expect(foundInList).toBeUndefined();
+    });
+
+    test('Agent role receives 403 Forbidden on DELETE /api/users/:id', async () => {
+      const response = await agentContext.delete('/api/users/some-user-id');
+      expect(response.status()).toBe(403);
+      const body = await response.json();
+      expect(body.error).toBe('Forbidden');
+    });
+
     test('POST /api/tickets creates inbound ticket with AI auto-draft response', async ({ request }) => {
       const newTicketPayload = {
         studentName: 'Jordan Lee',

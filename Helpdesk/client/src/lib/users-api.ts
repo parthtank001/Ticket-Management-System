@@ -34,7 +34,7 @@ export const usersApi = {
   /**
    * Fetch users list with optional search, role, and status filters
    */
-  async listUsers(params?: { search?: string; role?: string; status?: string }): Promise<ManagedUser[]> {
+  async listUsers(params?: { search?: string; role?: Role | 'ALL' | string; status?: string }): Promise<ManagedUser[]> {
     const queryParams: Record<string, string> = {};
     if (params?.search) queryParams.search = params.search;
     if (params?.role && params.role !== 'ALL') queryParams.role = params.role;

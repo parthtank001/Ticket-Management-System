@@ -100,8 +100,8 @@ describe('UsersPage Component', () => {
       expect(screen.getByText('3 users')).toBeInTheDocument();
 
       // Role indicators
-      expect(screen.getByText('ADMIN')).toBeInTheDocument();
-      expect(screen.getAllByText('AGENT')).toHaveLength(2);
+      expect(screen.getByText(Role.ADMIN)).toBeInTheDocument();
+      expect(screen.getAllByText(Role.AGENT)).toHaveLength(2);
     });
 
     it('renders empty state when no users are returned', async () => {
@@ -376,6 +376,44 @@ describe('UsersPage Component', () => {
       const deleteButtons = screen.getAllByTitle('Delete user');
       // Should only have 2 delete buttons for Bob and Charlie (not Alice)
       expect(deleteButtons).toHaveLength(2);
+    });
+
+    it('does not render delete button for other admin accounts in the list', async () => {
+      const listWithOtherAdmin: ManagedUser[] = [
+        mockCurrentUser,
+        {
+          id: 'admin-2',
+          name: 'Another Admin',
+          email: 'admin2@example.com',
+          role: Role.ADMIN,
+          isActive: true,
+          createdAt: '2026-01-20T10:00:00.000Z',
+          updatedAt: '2026-01-20T10:00:00.000Z',
+        },
+        {
+          id: 'agent-2',
+          name: 'Bob Agent',
+          email: 'bob.agent@example.com',
+          role: Role.AGENT,
+          isActive: true,
+          createdAt: '2026-02-10T14:30:00.000Z',
+          updatedAt: '2026-02-10T14:30:00.000Z',
+        },
+      ];
+      vi.mocked(usersApi.listUsers).mockResolvedValueOnce(listWithOtherAdmin);
+
+      renderWithQuery(<UsersPage user={mockCurrentUser} />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Another Admin')).toBeInTheDocument();
+      });
+
+      const deleteButtons = screen.getAllByTitle('Delete user');
+      // Only 1 delete button for Bob Agent
+      expect(deleteButtons).toHaveLength(1);
+      expect(screen.queryByLabelText('Delete Alice Admin')).not.toBeInTheDocument();
+      expect(screen.queryByLabelText('Delete Another Admin')).not.toBeInTheDocument();
+      expect(screen.getByLabelText('Delete Bob Agent')).toBeInTheDocument();
     });
 
     it('opens confirmation modal and cancels deletion', async () => {

@@ -67,6 +67,7 @@ app.get('/api/agents', requireAuth, async (req: Request, res: Response) => {
   const agents = await prisma.user.findMany({
     where: {
       isActive: true,
+      deletedAt: null,
     },
     select: {
       id: true,

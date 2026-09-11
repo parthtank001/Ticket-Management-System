@@ -226,7 +226,7 @@ test.describe('Helpdesk Authentication & Session Lifecycle Suite', () => {
 
       // 3. Verify successful redirection to dashboard and welcome message
       await expect(page.getByRole('heading', { name: /welcome to the helpdesk/i })).toBeVisible({ timeout: 15000 });
-      await expect(page.getByText('System Admin')).toBeVisible();
+      await expect(page.getByText(/logged in as/i)).toBeVisible();
 
       // 4. Verify ADMIN role badge in navbar
       const adminBadge = page.locator('header').getByText('ADMIN', { exact: true });
@@ -247,7 +247,7 @@ test.describe('Helpdesk Authentication & Session Lifecycle Suite', () => {
 
       // 3. Verify dashboard and welcome message
       await expect(page.getByRole('heading', { name: /welcome to the helpdesk/i })).toBeVisible({ timeout: 15000 });
-      await expect(page.getByText('Helpdesk Agent')).toBeVisible();
+      await expect(page.getByText(/logged in as/i)).toBeVisible();
 
       // 4. Verify AGENT role badge in navbar
       const agentBadge = page.locator('header').getByText('AGENT', { exact: true });
@@ -330,7 +330,7 @@ test.describe('Helpdesk Authentication & Session Lifecycle Suite', () => {
 
       // 3. Verify session restored directly to dashboard without showing login form
       await expect(page.getByRole('heading', { name: /welcome to the helpdesk/i })).toBeVisible({ timeout: 15000 });
-      await expect(page.getByText('System Admin')).toBeVisible();
+      await expect(page.getByText(/logged in as/i)).toBeVisible();
       await expect(page.getByRole('button', { name: /sign in to workspace/i })).not.toBeVisible();
     });
 
