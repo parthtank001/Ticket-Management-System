@@ -100,7 +100,7 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
         </div>
 
         {/* Form Body */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto flex-1 font-sans">
+        <form onSubmit={handleSubmit} noValidate className="p-6 space-y-4 overflow-y-auto flex-1 font-sans">
           {error && (
             <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs flex items-center space-x-2">
               <AlertCircle className="h-4 w-4 shrink-0" />

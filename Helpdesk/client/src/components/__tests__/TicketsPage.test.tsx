@@ -12,7 +12,7 @@ vi.mock('../../lib/tickets-api', () => ({
     listAgents: vi.fn(),
     createTicket: vi.fn(),
     updateTicket: vi.fn(),
-    addMessage: vi.fn(),
+    addTicketMessage: vi.fn(),
   },
 }));
 
@@ -153,12 +153,13 @@ describe('TicketsPage Component', () => {
     it('renders the tickets dashboard with status count tabs', async () => {
       renderWithQuery(<TicketsPage user={mockUser} />);
 
-      // Wait for tickets to load and tabs to reflect counts
+      // Wait for tickets to load
       await waitFor(() => {
-        expect(screen.getByRole('button', { name: /all tickets \(4\)/i })).toBeInTheDocument();
+        expect(screen.getByText('Payment Issue with Stripe')).toBeInTheDocument();
       });
 
       // Verify status tabs and badge counts
+      expect(screen.getByRole('button', { name: /all tickets \(4\)/i })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /open \(2\)/i })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /resolved \(1\)/i })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /closed \(1\)/i })).toBeInTheDocument();

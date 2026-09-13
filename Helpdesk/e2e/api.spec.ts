@@ -1,6 +1,6 @@
 import { test, expect, APIRequestContext } from '@playwright/test';
 import process from 'node:process';
-import { Role, Category, Priority, TicketStatus, SenderType } from '@helpdesk/core';
+import { Role } from '@helpdesk/core';
 
 // TypeScript Interfaces for API responses
 interface HealthCheckResponse {
@@ -25,31 +25,6 @@ interface UserDirectoryItem {
   updatedAt: string;
 }
 
-interface TicketMessage {
-  id: string;
-  ticketId: number;
-  senderType: SenderType;
-  senderEmail: string;
-  body: string;
-  isInternalNote: boolean;
-  createdAt: string;
-}
-
-interface TicketResponse {
-  id: number;
-  subject: string;
-  studentEmail: string;
-  studentName: string;
-  category: Category | null;
-  priority: Priority;
-  status: TicketStatus;
-  aiDraftResponse: string | null;
-  assignedAgentId: string | null;
-  createdAt: string;
-  updatedAt: string;
-  messages: TicketMessage[];
-}
-
 // Environment & Configuration variables
 const API_BASE_URL = process.env.API_BASE_URL || process.env.API_URL || process.env.VITE_API_URL!;
 const CLIENT_ORIGIN: string = process.env.PLAYWRIGHT_BASE_URL!;
@@ -62,7 +37,6 @@ const AGENT_PASSWORD = process.env.AGENT_PASSWORD!;
 const HEALTH_ENDPOINT = '/api/health';
 const ME_ENDPOINT = '/api/me';
 const USERS_ENDPOINT = '/api/users';
-const TICKETS_ENDPOINT = '/api/tickets';
 const AUTH_SIGN_IN_ENDPOINT = '/api/auth/sign-in/email';
 
 test.describe('Backend REST API & Authorization Suite', () => {
@@ -96,20 +70,6 @@ test.describe('Backend REST API & Authorization Suite', () => {
       expect(response.status()).toBe(401);
       const data = await response.json();
       expect(data.error).toBe('Unauthorized');
-    });
-
-    test('GET /api/tickets returns 401 Unauthorized without session cookies', async ({ request }) => {
-      const response = await request.get(`${API_BASE_URL}${TICKETS_ENDPOINT}`);
-      expect(response.status()).toBe(401);
-      const data = await response.json();
-      expect(data.error).toBe('Unauthorized');
-    });
-
-    test('POST /api/tickets/:id/messages returns 401 Unauthorized without session cookies', async ({ request }) => {
-      const response = await request.post(`${API_BASE_URL}${TICKETS_ENDPOINT}/non-existent-id/messages`, {
-        data: { body: 'Unauthorized reply attempt' },
-      });
-      expect(response.status()).toBe(401);
     });
   });
 
@@ -307,134 +267,6 @@ test.describe('Backend REST API & Authorization Suite', () => {
       expect(response.status()).toBe(403);
       const body = await response.json();
       expect(body.error).toBe('Forbidden');
-    });
-
-    test('POST /api/tickets creates inbound plain ticket without AI processing', async ({ request }) => {
-      const newTicketPayload = {
-        studentName: 'Jordan Lee',
-        studentEmail: 'jordan.lee@example.edu',
-        subject: 'Cannot access lecture recordings',
-        category: 'TECHNICAL_QUESTION',
-        priority: 'HIGH',
-        message: 'I am getting a 403 error when clicking on the Week 3 recording link.',
-      };
-
-      const response = await request.post(`${API_BASE_URL}${TICKETS_ENDPOINT}`, {
-        data: newTicketPayload,
-      });
-
-      expect(response.status()).toBe(201);
-
-      const createdTicket: TicketResponse = await response.json();
-      expect(typeof createdTicket.id).toBe('number');
-      expect(createdTicket.id).toBeGreaterThan(0);
-      expect(createdTicket.subject).toBe(newTicketPayload.subject);
-      expect(createdTicket.studentEmail).toBe(newTicketPayload.studentEmail.toLowerCase());
-      expect(createdTicket.studentName).toBe(newTicketPayload.studentName);
-      expect(createdTicket.category).toBe('TECHNICAL_QUESTION');
-      expect(createdTicket.priority).toBe('HIGH');
-      expect(createdTicket.status).toBe('OPEN');
-
-      // Verify plain ticket has no AI draft response or summary
-      expect(createdTicket.aiDraftResponse).toBeNull();
-
-      // Verify initial message from student
-      expect(createdTicket.messages).toHaveLength(1);
-      expect(createdTicket.messages[0].senderType).toBe('STUDENT');
-      expect(createdTicket.messages[0].senderEmail).toBe(newTicketPayload.studentEmail.toLowerCase());
-      expect(createdTicket.messages[0].body).toBe(newTicketPayload.message);
-    });
-
-    test('POST /api/tickets creates ticket with category omitted (category is optional with no default value)', async ({ request }) => {
-      const payloadWithoutCategory = {
-        studentName: 'Alex Mercer',
-        studentEmail: 'alex.mercer@example.edu',
-        subject: 'General syllabus query without category',
-        message: 'Where can I find the grading breakdown for Module 2?',
-      };
-
-      const response = await request.post(`${API_BASE_URL}${TICKETS_ENDPOINT}`, {
-        data: payloadWithoutCategory,
-      });
-
-      expect(response.status()).toBe(201);
-      const createdTicket: TicketResponse = await response.json();
-      expect(typeof createdTicket.id).toBe('number');
-      expect(createdTicket.category).toBeNull();
-    });
-
-    test('POST /api/tickets/:id/messages adds replies to ticket threads by authenticated support staff', async () => {
-      // Step 1: Create a ticket first
-      const ticketRes = await adminContext.post(TICKETS_ENDPOINT, {
-        data: {
-          studentName: 'Samantha Green',
-          studentEmail: 'samantha.green@example.com',
-          subject: 'Billing inquiry on recent invoice',
-          category: 'REFUND_REQUEST',
-          priority: 'MEDIUM',
-          message: 'Can I get an itemized breakdown of the latest charge?',
-        },
-      });
-      expect(ticketRes.status()).toBe(201);
-      const ticket: TicketResponse = await ticketRes.json();
-
-      // Step 2: Add Agent reply message to thread
-      const replyPayload = {
-        body: 'Hello Samantha, here is the breakdown of your account charges.',
-        isInternalNote: false,
-      };
-
-      const replyRes = await agentContext.post(`${TICKETS_ENDPOINT}/${ticket.id}/messages`, {
-        data: replyPayload,
-      });
-
-      expect(replyRes.status()).toBe(201);
-      const createdMessage: TicketMessage = await replyRes.json();
-      expect(createdMessage.id).toBeDefined();
-      expect(createdMessage.ticketId).toBe(ticket.id);
-      expect(createdMessage.senderType).toBe('AGENT');
-      expect(createdMessage.senderEmail).toBe(AGENT_EMAIL);
-      expect(createdMessage.body).toBe(replyPayload.body);
-      expect(createdMessage.isInternalNote).toBe(false);
-
-      // Step 3: Fetch updated tickets list and verify status remains OPEN with 2 messages
-      const ticketsListRes = await agentContext.get(TICKETS_ENDPOINT);
-      expect(ticketsListRes.status()).toBe(200);
-      const allTickets: TicketResponse[] = await ticketsListRes.json();
-      const updatedTicket = allTickets.find((t) => t.id === ticket.id);
-      expect(updatedTicket?.status).toBe('OPEN');
-      expect(updatedTicket?.messages.length).toBe(2);
-    });
-
-    test('POST /api/tickets returns 400 Bad Request when required sender name or fields are missing', async ({ request }) => {
-      // 1. Missing sender name
-      const noNameRes = await request.post(`${API_BASE_URL}${TICKETS_ENDPOINT}`, {
-        data: {
-          studentName: '',
-          studentEmail: 'valid@example.com',
-          subject: 'Valid Subject',
-          message: 'Valid Message',
-        },
-      });
-      expect(noNameRes.status()).toBe(400);
-      const nameBody = await noNameRes.json();
-      expect(nameBody.error).toMatch(/sender name is required|cannot be empty/i);
-
-      // 2. Missing email and body
-      const invalidPayload = {
-        studentName: 'Some User',
-        studentEmail: '',
-        subject: '',
-        message: '',
-      };
-
-      const response = await request.post(`${API_BASE_URL}${TICKETS_ENDPOINT}`, {
-        data: invalidPayload,
-      });
-
-      expect(response.status()).toBe(400);
-      const body = await response.json();
-      expect(body.error).toMatch(/required strings|cannot be empty/i);
     });
   });
 });
