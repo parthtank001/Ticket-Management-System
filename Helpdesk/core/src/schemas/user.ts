@@ -19,7 +19,7 @@ export const createUserSchema = z.object({
     .refine((val) => !/\s/.test(val), {
       message: 'Password must not contain spaces.',
     }),
-  role: z.nativeEnum(Role).optional().default(Role.AGENT),
+  role: z.enum(['ADMIN', 'AGENT']).optional().default('AGENT'),
   isActive: z.boolean().optional().default(true),
 });
 
@@ -38,7 +38,7 @@ export const updateUserSchema = z.object({
     .email('A valid email address is required.')
     .optional(),
   role: z
-    .nativeEnum(Role, {
+    .enum(['ADMIN', 'AGENT'], {
       message: 'Invalid role specified. Must be ADMIN or AGENT.',
     })
     .optional(),

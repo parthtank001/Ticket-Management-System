@@ -50,7 +50,7 @@ export function useCreateTicket() {
 export function useUpdateTicket() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, payload }: { id: string; payload: UpdateTicketPayload }) =>
+    mutationFn: ({ id, payload }: { id: number; payload: UpdateTicketPayload }) =>
       ticketsApi.updateTicket(id, payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: TICKETS_QUERY_KEY });
@@ -68,7 +68,7 @@ export function useAddTicketMessage() {
       ticketId,
       payload,
     }: {
-      ticketId: string;
+      ticketId: number;
       payload: AddTicketMessagePayload;
     }) => ticketsApi.addTicketMessage(ticketId, payload),
     onSuccess: () => {

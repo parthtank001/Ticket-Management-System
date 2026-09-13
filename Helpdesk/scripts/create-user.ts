@@ -11,8 +11,8 @@ async function createUser() {
   const name = args[0] || 'Helpdesk Agent';
   const email = args[1] || 'agent@example.com';
   const password = args[2] || 'password123';
-  const roleInput = (args[3] || Role.AGENT).toUpperCase();
-  const role = roleInput === Role.ADMIN ? Role.ADMIN : Role.AGENT;
+  const roleInput = (args[3] || 'AGENT').toUpperCase();
+  const role = roleInput === 'ADMIN' ? 'ADMIN' : 'AGENT';
 
   console.log(`👤 Creating/updating user: ${email} (Name: "${name}", Role: ${role})...`);
 

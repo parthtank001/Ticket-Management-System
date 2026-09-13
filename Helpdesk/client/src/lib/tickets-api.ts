@@ -1,9 +1,11 @@
 import { apiClient } from './api-client';
-import { Role } from './types';
-
-export type TicketCategory = 'GENERAL_QUESTION' | 'TECHNICAL_QUESTION' | 'REFUND_REQUEST';
-export type TicketPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
-export type TicketStatus = 'NEW' | 'ASSIGNED' | 'IN_PROGRESS' | 'RESOLVED' | 'CLOSED';
+import type {
+  Role,
+  Category,
+  Priority,
+  TicketStatus,
+  SenderType,
+} from '@helpdesk/core';
 
 export interface TicketAgent {
   id: string;
@@ -14,22 +16,26 @@ export interface TicketAgent {
 
 export interface TicketMessage {
   id: string;
-  ticketId: string;
-  senderType: 'STUDENT' | 'AGENT' | 'SYSTEM';
+  ticketId: number;
+  senderType: SenderType;
   senderEmail: string;
   body: string;
   isInternalNote: boolean;
+  messageId?: string | null;
+  inReplyTo?: string | null;
   createdAt: string;
 }
 
 export interface Ticket {
-  id: string;
+  id: number;
+  ticketNumber?: number;
   subject: string;
   studentName: string;
   studentEmail: string;
-  category: TicketCategory;
-  priority: TicketPriority;
+  category: Category | null;
+  priority: Priority;
   status: TicketStatus;
+  summary: string | null;
   aiDraftResponse: string | null;
   assignedAgentId: string | null;
   assignedAgent?: TicketAgent | null;
@@ -39,16 +45,18 @@ export interface Ticket {
 }
 
 export interface CreateTicketPayload {
-  studentName?: string;
+  studentName: string;
   studentEmail: string;
   subject: string;
-  category?: TicketCategory;
-  priority?: TicketPriority;
+  category?: Category | null;
+  priority?: Priority;
   message: string;
 }
 
 export interface UpdateTicketPayload {
   status?: TicketStatus;
+  category?: Category | null;
+  priority?: Priority;
   assignedAgentId?: string | null;
 }
 
@@ -112,7 +120,7 @@ export const ticketsApi = {
   /**
    * Update ticket status or assign agent
    */
-  async updateTicket(id: string, payload: UpdateTicketPayload): Promise<Ticket> {
+  async updateTicket(id: number, payload: UpdateTicketPayload): Promise<Ticket> {
     try {
       const response = await apiClient.patch<Ticket>(`/api/tickets/${id}`, payload);
       return response.data;
@@ -130,7 +138,7 @@ export const ticketsApi = {
    * Add a reply or internal note to a ticket
    */
   async addTicketMessage(
-    ticketId: string,
+    ticketId: number,
     payload: AddTicketMessagePayload
   ): Promise<TicketMessage> {
     try {

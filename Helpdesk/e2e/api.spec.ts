@@ -1,5 +1,6 @@
 import { test, expect, APIRequestContext } from '@playwright/test';
 import process from 'node:process';
+import { Role, Category, Priority, TicketStatus, SenderType } from '@helpdesk/core';
 
 // TypeScript Interfaces for API responses
 interface HealthCheckResponse {
@@ -18,7 +19,7 @@ interface UserDirectoryItem {
   id: string;
   name: string;
   email: string;
-  role: 'ADMIN' | 'AGENT';
+  role: Role;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -26,8 +27,8 @@ interface UserDirectoryItem {
 
 interface TicketMessage {
   id: string;
-  ticketId: string;
-  senderType: 'STUDENT' | 'AGENT' | 'SYSTEM';
+  ticketId: number;
+  senderType: SenderType;
   senderEmail: string;
   body: string;
   isInternalNote: boolean;
@@ -35,13 +36,13 @@ interface TicketMessage {
 }
 
 interface TicketResponse {
-  id: string;
+  id: number;
   subject: string;
   studentEmail: string;
   studentName: string;
-  category: string;
-  priority: string;
-  status: 'NEW' | 'ASSIGNED' | 'IN_PROGRESS' | 'RESOLVED' | 'CLOSED';
+  category: Category | null;
+  priority: Priority;
+  status: TicketStatus;
   aiDraftResponse: string | null;
   assignedAgentId: string | null;
   createdAt: string;
@@ -49,14 +50,26 @@ interface TicketResponse {
   messages: TicketMessage[];
 }
 
-const API_BASE_URL = process.env.API_URL || process.env.VITE_API_URL || 'http://localhost:5001';
-const CLIENT_ORIGIN = process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:5173';
+// Environment & Configuration variables
+const API_BASE_URL = process.env.API_BASE_URL || process.env.API_URL || process.env.VITE_API_URL!;
+const CLIENT_ORIGIN: string = process.env.PLAYWRIGHT_BASE_URL!;
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL!;
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD!;
+const AGENT_EMAIL = process.env.AGENT_EMAIL!;
+const AGENT_PASSWORD = process.env.AGENT_PASSWORD!;
+
+// API Endpoints
+const HEALTH_ENDPOINT = '/api/health';
+const ME_ENDPOINT = '/api/me';
+const USERS_ENDPOINT = '/api/users';
+const TICKETS_ENDPOINT = '/api/tickets';
+const AUTH_SIGN_IN_ENDPOINT = '/api/auth/sign-in/email';
 
 test.describe('Backend REST API & Authorization Suite', () => {
 
   test.describe('1. Health Check Endpoint', () => {
     test('GET /api/health should return 200 OK with online status and database connectivity', async ({ request }) => {
-      const response = await request.get(`${API_BASE_URL}/api/health`);
+      const response = await request.get(`${API_BASE_URL}${HEALTH_ENDPOINT}`);
       expect(response.status()).toBe(200);
 
       const body: HealthCheckResponse = await response.json();
@@ -71,7 +84,7 @@ test.describe('Backend REST API & Authorization Suite', () => {
 
   test.describe('2. Protected Route Verification (401 Unauthorized)', () => {
     test('GET /api/me returns 401 Unauthorized without session cookies', async ({ request }) => {
-      const response = await request.get(`${API_BASE_URL}/api/me`);
+      const response = await request.get(`${API_BASE_URL}${ME_ENDPOINT}`);
       expect(response.status()).toBe(401);
       const data = await response.json();
       expect(data.error).toBe('Unauthorized');
@@ -79,21 +92,21 @@ test.describe('Backend REST API & Authorization Suite', () => {
     });
 
     test('GET /api/users returns 401 Unauthorized without session cookies', async ({ request }) => {
-      const response = await request.get(`${API_BASE_URL}/api/users`);
+      const response = await request.get(`${API_BASE_URL}${USERS_ENDPOINT}`);
       expect(response.status()).toBe(401);
       const data = await response.json();
       expect(data.error).toBe('Unauthorized');
     });
 
     test('GET /api/tickets returns 401 Unauthorized without session cookies', async ({ request }) => {
-      const response = await request.get(`${API_BASE_URL}/api/tickets`);
+      const response = await request.get(`${API_BASE_URL}${TICKETS_ENDPOINT}`);
       expect(response.status()).toBe(401);
       const data = await response.json();
       expect(data.error).toBe('Unauthorized');
     });
 
     test('POST /api/tickets/:id/messages returns 401 Unauthorized without session cookies', async ({ request }) => {
-      const response = await request.post(`${API_BASE_URL}/api/tickets/non-existent-id/messages`, {
+      const response = await request.post(`${API_BASE_URL}${TICKETS_ENDPOINT}/non-existent-id/messages`, {
         data: { body: 'Unauthorized reply attempt' },
       });
       expect(response.status()).toBe(401);
@@ -114,8 +127,8 @@ test.describe('Backend REST API & Authorization Suite', () => {
         },
       });
 
-      const adminSignIn = await adminContext.post('/api/auth/sign-in/email', {
-        data: { email: 'admin@example.com', password: 'password123' },
+      const adminSignIn = await adminContext.post(AUTH_SIGN_IN_ENDPOINT, {
+        data: { email: ADMIN_EMAIL, password: ADMIN_PASSWORD },
       });
       expect(adminSignIn.ok()).toBeTruthy();
 
@@ -128,8 +141,8 @@ test.describe('Backend REST API & Authorization Suite', () => {
         },
       });
 
-      const agentSignIn = await agentContext.post('/api/auth/sign-in/email', {
-        data: { email: 'agent@example.com', password: 'password123' },
+      const agentSignIn = await agentContext.post(AUTH_SIGN_IN_ENDPOINT, {
+        data: { email: AGENT_EMAIL, password: AGENT_PASSWORD },
       });
       expect(agentSignIn.ok()).toBeTruthy();
     });
@@ -140,7 +153,7 @@ test.describe('Backend REST API & Authorization Suite', () => {
     });
 
     test('Agent role receives 403 Forbidden on GET /api/users', async () => {
-      const response = await agentContext.get('/api/users');
+      const response = await agentContext.get(USERS_ENDPOINT);
       expect(response.status()).toBe(403);
 
       const body = await response.json();
@@ -149,7 +162,7 @@ test.describe('Backend REST API & Authorization Suite', () => {
     });
 
     test('Agent role receives 403 Forbidden on POST /api/users', async () => {
-      const response = await agentContext.post('/api/users', {
+      const response = await agentContext.post(USERS_ENDPOINT, {
         data: {
           name: 'Forbidden User',
           email: 'forbidden@example.com',
@@ -163,18 +176,18 @@ test.describe('Backend REST API & Authorization Suite', () => {
     });
 
     test('Admin role receives 200 OK on GET /api/users with directory list', async () => {
-      const response = await adminContext.get('/api/users');
+      const response = await adminContext.get(USERS_ENDPOINT);
       expect(response.status()).toBe(200);
 
       const users: UserDirectoryItem[] = await response.json();
       expect(Array.isArray(users)).toBe(true);
       expect(users.length).toBeGreaterThan(0);
 
-      const adminUser = users.find((u) => u.email === 'admin@example.com');
+      const adminUser = users.find((u) => u.email === ADMIN_EMAIL);
       expect(adminUser).toBeDefined();
       expect(adminUser?.role).toBe('ADMIN');
 
-      const agentUser = users.find((u) => u.email === 'agent@example.com');
+      const agentUser = users.find((u) => u.email === AGENT_EMAIL);
       expect(agentUser).toBeDefined();
       expect(agentUser?.role).toBe('AGENT');
     });
@@ -188,7 +201,7 @@ test.describe('Backend REST API & Authorization Suite', () => {
         role: 'AGENT',
       };
 
-      const response = await adminContext.post('/api/users', {
+      const response = await adminContext.post(USERS_ENDPOINT, {
         data: payload,
       });
 
@@ -202,10 +215,10 @@ test.describe('Backend REST API & Authorization Suite', () => {
     });
 
     test('POST /api/users returns 409 Conflict when attempting to create duplicate user', async () => {
-      const response = await adminContext.post('/api/users', {
+      const response = await adminContext.post(USERS_ENDPOINT, {
         data: {
           name: 'Duplicate Admin',
-          email: 'admin@example.com',
+          email: ADMIN_EMAIL,
           password: 'password12345',
           role: 'ADMIN',
         },
@@ -218,7 +231,7 @@ test.describe('Backend REST API & Authorization Suite', () => {
 
     test('POST /api/users returns 400 Bad Request on invalid payloads', async () => {
       // 1. Password too short (< 8 chars)
-      const shortPassRes = await adminContext.post('/api/users', {
+      const shortPassRes = await adminContext.post(USERS_ENDPOINT, {
         data: {
           name: 'Valid Name',
           email: 'valid@example.com',
@@ -228,7 +241,7 @@ test.describe('Backend REST API & Authorization Suite', () => {
       expect(shortPassRes.status()).toBe(400);
 
       // 2. Invalid email format
-      const badEmailRes = await adminContext.post('/api/users', {
+      const badEmailRes = await adminContext.post(USERS_ENDPOINT, {
         data: {
           name: 'Valid Name',
           email: 'not-an-email',
@@ -238,7 +251,7 @@ test.describe('Backend REST API & Authorization Suite', () => {
       expect(badEmailRes.status()).toBe(400);
 
       // 3. Name too short (< 3 chars)
-      const shortNameRes = await adminContext.post('/api/users', {
+      const shortNameRes = await adminContext.post(USERS_ENDPOINT, {
         data: {
           name: 'A',
           email: 'valid2@example.com',
@@ -250,13 +263,13 @@ test.describe('Backend REST API & Authorization Suite', () => {
 
     test('DELETE /api/users/:id on an Admin account returns 400 Bad Request', async () => {
       // 1. Get current users to find Admin ID
-      const usersRes = await adminContext.get('/api/users');
+      const usersRes = await adminContext.get(USERS_ENDPOINT);
       const users: UserDirectoryItem[] = await usersRes.json();
-      const adminUser = users.find((u) => u.email === 'admin@example.com');
+      const adminUser = users.find((u) => u.email === ADMIN_EMAIL);
       expect(adminUser).toBeDefined();
 
       // 2. Attempt to delete Admin account
-      const deleteRes = await adminContext.delete(`/api/users/${adminUser!.id}`);
+      const deleteRes = await adminContext.delete(`${USERS_ENDPOINT}/${adminUser!.id}`);
       expect(deleteRes.status()).toBe(400);
       const body = await deleteRes.json();
       expect(body.error).toMatch(/cannot delete|administrator/i);
@@ -265,7 +278,7 @@ test.describe('Backend REST API & Authorization Suite', () => {
     test('DELETE /api/users/:id on Agent account performs soft deletion', async () => {
       // 1. Create an Agent user to delete
       const timestamp = Date.now();
-      const createRes = await adminContext.post('/api/users', {
+      const createRes = await adminContext.post(USERS_ENDPOINT, {
         data: {
           name: `Soft Delete Test Agent ${timestamp}`,
           email: `soft.delete.${timestamp}@example.com`,
@@ -277,26 +290,26 @@ test.describe('Backend REST API & Authorization Suite', () => {
       const createdAgent: UserDirectoryItem = await createRes.json();
 
       // 2. Delete the created Agent
-      const deleteRes = await adminContext.delete(`/api/users/${createdAgent.id}`);
+      const deleteRes = await adminContext.delete(`${USERS_ENDPOINT}/${createdAgent.id}`);
       expect(deleteRes.status()).toBe(200);
       const deleteBody = await deleteRes.json();
       expect(deleteBody.message).toMatch(/user deleted successfully/i);
 
       // 3. Soft-deleted user should not appear in GET /api/users directory
-      const listRes = await adminContext.get('/api/users');
+      const listRes = await adminContext.get(USERS_ENDPOINT);
       const listUsers: UserDirectoryItem[] = await listRes.json();
       const foundInList = listUsers.find((u) => u.id === createdAgent.id);
       expect(foundInList).toBeUndefined();
     });
 
     test('Agent role receives 403 Forbidden on DELETE /api/users/:id', async () => {
-      const response = await agentContext.delete('/api/users/some-user-id');
+      const response = await agentContext.delete(`${USERS_ENDPOINT}/some-user-id`);
       expect(response.status()).toBe(403);
       const body = await response.json();
       expect(body.error).toBe('Forbidden');
     });
 
-    test('POST /api/tickets creates inbound ticket with AI auto-draft response', async ({ request }) => {
+    test('POST /api/tickets creates inbound plain ticket without AI processing', async ({ request }) => {
       const newTicketPayload = {
         studentName: 'Jordan Lee',
         studentEmail: 'jordan.lee@example.edu',
@@ -306,25 +319,24 @@ test.describe('Backend REST API & Authorization Suite', () => {
         message: 'I am getting a 403 error when clicking on the Week 3 recording link.',
       };
 
-      const response = await request.post(`${API_BASE_URL}/api/tickets`, {
+      const response = await request.post(`${API_BASE_URL}${TICKETS_ENDPOINT}`, {
         data: newTicketPayload,
       });
 
       expect(response.status()).toBe(201);
 
       const createdTicket: TicketResponse = await response.json();
-      expect(createdTicket.id).toBeDefined();
+      expect(typeof createdTicket.id).toBe('number');
+      expect(createdTicket.id).toBeGreaterThan(0);
       expect(createdTicket.subject).toBe(newTicketPayload.subject);
       expect(createdTicket.studentEmail).toBe(newTicketPayload.studentEmail.toLowerCase());
       expect(createdTicket.studentName).toBe(newTicketPayload.studentName);
       expect(createdTicket.category).toBe('TECHNICAL_QUESTION');
       expect(createdTicket.priority).toBe('HIGH');
-      expect(createdTicket.status).toBe('NEW');
+      expect(createdTicket.status).toBe('OPEN');
 
-      // Verify AI auto-draft response generation
-      expect(createdTicket.aiDraftResponse).toBeTruthy();
-      expect(createdTicket.aiDraftResponse).toContain('Jordan Lee');
-      expect(createdTicket.aiDraftResponse).toContain('Helpdesk Technical Team');
+      // Verify plain ticket has no AI draft response or summary
+      expect(createdTicket.aiDraftResponse).toBeNull();
 
       // Verify initial message from student
       expect(createdTicket.messages).toHaveLength(1);
@@ -333,9 +345,27 @@ test.describe('Backend REST API & Authorization Suite', () => {
       expect(createdTicket.messages[0].body).toBe(newTicketPayload.message);
     });
 
+    test('POST /api/tickets creates ticket with category omitted (category is optional with no default value)', async ({ request }) => {
+      const payloadWithoutCategory = {
+        studentName: 'Alex Mercer',
+        studentEmail: 'alex.mercer@example.edu',
+        subject: 'General syllabus query without category',
+        message: 'Where can I find the grading breakdown for Module 2?',
+      };
+
+      const response = await request.post(`${API_BASE_URL}${TICKETS_ENDPOINT}`, {
+        data: payloadWithoutCategory,
+      });
+
+      expect(response.status()).toBe(201);
+      const createdTicket: TicketResponse = await response.json();
+      expect(typeof createdTicket.id).toBe('number');
+      expect(createdTicket.category).toBeNull();
+    });
+
     test('POST /api/tickets/:id/messages adds replies to ticket threads by authenticated support staff', async () => {
       // Step 1: Create a ticket first
-      const ticketRes = await adminContext.post('/api/tickets', {
+      const ticketRes = await adminContext.post(TICKETS_ENDPOINT, {
         data: {
           studentName: 'Samantha Green',
           studentEmail: 'samantha.green@example.com',
@@ -354,7 +384,7 @@ test.describe('Backend REST API & Authorization Suite', () => {
         isInternalNote: false,
       };
 
-      const replyRes = await agentContext.post(`/api/tickets/${ticket.id}/messages`, {
+      const replyRes = await agentContext.post(`${TICKETS_ENDPOINT}/${ticket.id}/messages`, {
         data: replyPayload,
       });
 
@@ -363,27 +393,42 @@ test.describe('Backend REST API & Authorization Suite', () => {
       expect(createdMessage.id).toBeDefined();
       expect(createdMessage.ticketId).toBe(ticket.id);
       expect(createdMessage.senderType).toBe('AGENT');
-      expect(createdMessage.senderEmail).toBe('agent@example.com');
+      expect(createdMessage.senderEmail).toBe(AGENT_EMAIL);
       expect(createdMessage.body).toBe(replyPayload.body);
       expect(createdMessage.isInternalNote).toBe(false);
 
-      // Step 3: Fetch updated tickets list and verify status transition to IN_PROGRESS
-      const ticketsListRes = await agentContext.get('/api/tickets');
+      // Step 3: Fetch updated tickets list and verify status remains OPEN with 2 messages
+      const ticketsListRes = await agentContext.get(TICKETS_ENDPOINT);
       expect(ticketsListRes.status()).toBe(200);
       const allTickets: TicketResponse[] = await ticketsListRes.json();
       const updatedTicket = allTickets.find((t) => t.id === ticket.id);
-      expect(updatedTicket?.status).toBe('IN_PROGRESS');
+      expect(updatedTicket?.status).toBe('OPEN');
       expect(updatedTicket?.messages.length).toBe(2);
     });
 
-    test('POST /api/tickets returns 400 Bad Request when required fields are missing', async ({ request }) => {
+    test('POST /api/tickets returns 400 Bad Request when required sender name or fields are missing', async ({ request }) => {
+      // 1. Missing sender name
+      const noNameRes = await request.post(`${API_BASE_URL}${TICKETS_ENDPOINT}`, {
+        data: {
+          studentName: '',
+          studentEmail: 'valid@example.com',
+          subject: 'Valid Subject',
+          message: 'Valid Message',
+        },
+      });
+      expect(noNameRes.status()).toBe(400);
+      const nameBody = await noNameRes.json();
+      expect(nameBody.error).toMatch(/sender name is required|cannot be empty/i);
+
+      // 2. Missing email and body
       const invalidPayload = {
+        studentName: 'Some User',
         studentEmail: '',
         subject: '',
         message: '',
       };
 
-      const response = await request.post(`${API_BASE_URL}/api/tickets`, {
+      const response = await request.post(`${API_BASE_URL}${TICKETS_ENDPOINT}`, {
         data: invalidPayload,
       });
 

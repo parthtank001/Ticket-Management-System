@@ -27,13 +27,13 @@ async function main() {
       email: adminEmail,
       password: adminPassword,
       name: 'System Admin',
-      role: Role.ADMIN,
+      role: 'ADMIN',
     },
     {
       email: agentEmail,
       password: agentPassword,
       name: 'Helpdesk Agent',
-      role: Role.AGENT,
+      role: 'AGENT',
     },
   ];
 

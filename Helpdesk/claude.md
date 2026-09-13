@@ -36,22 +36,14 @@ This memory file contains project architectural specifications, technical stack 
   - Route handlers must validate inputs using `schema.safeParse(req.body)` and reject invalid payloads with HTTP 400 Bad Request: `return res.status(400).json({ error: result.error.issues[0].message });`.
   - Infer and export TypeScript types directly from schemas using `z.infer<typeof schema>`.
 
-### 1.3 Mandatory Enum Usage: Role Enum Enforcement
-> **CRITICAL INSTRUCTION**: All references to user roles across the frontend application, backend services, validation schemas, unit/integration tests, and database scripts **MUST** strictly use the strongly-typed **`Role` enum** (`Role.ADMIN`, `Role.AGENT`) rather than raw hardcoded magic strings (`"ADMIN"`, `"AGENT"`).
+### 1.3 Mandatory Type Definitions: Pure Explicit String Union Types
+> **CRITICAL INSTRUCTION**: All domain enums across the shared core library, frontend application, backend services, validation schemas, unit/integration tests, and database scripts **MUST** strictly use strongly-typed **explicit string union types** (`Role = 'ADMIN' | 'AGENT'`, `Category = 'GENERAL_QUESTION' | ...`, `Priority = 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT'`, `TicketStatus = 'OPEN' | 'RESOLVED' | 'CLOSED'`, `SenderType = 'STUDENT' | 'AGENT' | 'SYSTEM'`) defined in [`core/src/enums.ts`](file:///E:/claude_ai/Ticket%20Management%20System/Helpdesk/core/src/enums.ts).
 
-- **Strict Prohibitions**:
-  - ❌ **NO Raw Role Strings**: Never hardcode `"ADMIN"` or `"AGENT"` strings in JSX badges, component comparisons, form payloads, query filters, API client signatures, custom hooks, route handlers, schema defaults, or test assertions.
-- **Mandatory Enforced Architecture**:
-  1. **Frontend App & Components**: Always import `Role` from [`client/src/lib/types.ts`](file:///E:/claude_ai/Ticket%20Management%20System/Helpdesk/client/src/lib/types.ts) (or `@helpdesk/core`). Use `Role.ADMIN` and `Role.AGENT` everywhere:
-     - **Component Role Checks & RBAC**: e.g., `user?.role === Role.ADMIN`, `item.role !== Role.ADMIN`.
-     - **JSX Text & Badge Rendering**: e.g., `<span>{Role.ADMIN}</span>`, `<span>{Role.AGENT}</span>`.
-     - **Form Payloads & Mutations**: e.g., `role: Role.AGENT`, `role: userToEdit.role`.
-     - **API Service & React Query Hook Parameters**: e.g., `role?: Role | 'ALL' | string` in `usersApi.listUsers` and `useUsers`.
-     - **Frontend Interfaces**: e.g., `AuthUser`, `ManagedUser`, `CreateUserPayload`, `UpdateUserPayload`, `TicketAgent`.
-     - **Unit & Component Tests**: Assert rendered role labels using `{Role.ADMIN}` and `{Role.AGENT}` (e.g., `expect(screen.getByText(Role.ADMIN)).toBeInTheDocument()`).
-  2. **Backend Schemas & Validation**: In [`server/schemas.ts`](file:///E:/claude_ai/Ticket%20Management%20System/Helpdesk/server/schemas.ts) and [`core/src/schemas/user.ts`](file:///E:/claude_ai/Ticket%20Management%20System/Helpdesk/core/src/schemas/user.ts), use `z.nativeEnum(Role)` with `.default(Role.AGENT)` to guarantee type-safe parsing.
-  3. **Route Handlers & Auth**: In [`server/index.ts`](file:///E:/claude_ai/Ticket%20Management%20System/Helpdesk/server/index.ts), [`server/routes/users.ts`](file:///E:/claude_ai/Ticket%20Management%20System/Helpdesk/server/routes/users.ts), and [`server/auth.ts`](file:///E:/claude_ai/Ticket%20Management%20System/Helpdesk/server/auth.ts), reference `Role.ADMIN` and `Role.AGENT` for permission enforcement (`requireRole(Role.ADMIN)`), session initialization, and database queries.
-  4. **Scripts & Seeders**: In database seeds ([`prisma/seed.ts`](file:///E:/claude_ai/Ticket%20Management%20System/Helpdesk/prisma/seed.ts)) and CLI management scripts ([`scripts/create-user.ts`](file:///E:/claude_ai/Ticket%20Management%20System/Helpdesk/scripts/create-user.ts)), always use `Role.AGENT` and `Role.ADMIN`.
+- **Architecture Standards**:
+  1. **Core Package**: [`core/src/enums.ts`](file:///E:/claude_ai/Ticket%20Management%20System/Helpdesk/core/src/enums.ts) contains pure explicit string union types without duplicate companion runtime objects.
+  2. **Zod Validation Schemas**: Schemas use `z.enum(['ADMIN', 'AGENT'])` and `z.enum([...])` with appropriate typed defaults (e.g. `'AGENT'`, `'MEDIUM'`).
+  3. **TypeScript Types & Interfaces**: Components, services, and models use explicit string union types (`type Role`, `type Category`, `type Priority`, etc.).
+  4. **Direct Literal Constants**: Literals like `'ADMIN'`, `'AGENT'`, `'OPEN'`, `'RESOLVED'`, `'CLOSED'`, etc. are validated directly against the union types at compile time.
 
 ### 1.4 Mandatory Error Handling: Express 5 Automatic Async Promise Rejection
 > **CRITICAL INSTRUCTION**: In **Express 5**, route handlers and middleware that return a Promise **automatically forward rejected promises and unhandled exceptions** to the centralized error handling middleware (`next(err)`). Therefore, wrapping route handlers in manual `try { ... } catch (error) { ... }` blocks is **unnecessary and discouraged**.

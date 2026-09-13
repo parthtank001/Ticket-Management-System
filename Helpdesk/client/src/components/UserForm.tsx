@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Role } from '@helpdesk/core';
+import type { Role } from '@helpdesk/core';
 import { ManagedUser, UpdateUserPayload } from '../lib/users-api';
 import { useCreateUser, useUpdateUser } from '../lib/hooks/useUsers';
 import { cn } from '../lib/utils';
@@ -159,7 +159,7 @@ export const UserForm: React.FC<UserFormProps> = ({
           name: data.name.trim(),
           email: data.email.trim().toLowerCase(),
           password: data.password!,
-          role: Role.AGENT,
+          role: 'AGENT',
           isActive: true,
         });
       }

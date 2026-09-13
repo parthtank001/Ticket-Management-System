@@ -2,7 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import { fromNodeHeaders } from "better-auth/node";
 import { auth } from "../auth";
 
-import { Role } from "../types";
+import type { Role } from "../types";
 
 // Extend Express Request interface to include authenticated user & session types
 declare global {

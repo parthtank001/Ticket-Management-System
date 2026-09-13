@@ -20,7 +20,7 @@ export async function setupTestDatabase() {
 
   try {
     console.log('🔄 Syncing Prisma schema to test database...');
-    execSync('npx prisma db push --skip-generate --accept-data-loss', {
+    execSync('npx prisma db push --skip-generate --force-reset --accept-data-loss', {
       cwd: rootDir,
       env,
       stdio: 'inherit',

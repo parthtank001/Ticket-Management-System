@@ -1,8 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { UserForm } from '../UserForm';
 import { renderWithQuery, screen, waitFor, userEvent } from '../../test/test-utils';
-import { usersApi } from '../../lib/users-api';
-import { Role } from '../../lib/types';
+import { usersApi, ManagedUser } from '../../lib/users-api';
 
 // Mock usersApi service
 vi.mock('../../lib/users-api', () => ({
@@ -184,7 +183,7 @@ describe('UserForm Component (Create User Form)', () => {
         id: 'new-agent-123',
         name: 'Diana Prince',
         email: 'diana.prince@example.com',
-        role: Role.AGENT,
+        role: 'AGENT',
         isActive: true,
         createdAt: '2026-09-09T10:00:00.000Z',
         updatedAt: '2026-09-09T10:00:00.000Z',
@@ -207,7 +206,7 @@ describe('UserForm Component (Create User Form)', () => {
           name: 'Diana Prince',
           email: 'diana.prince@example.com',
           password: 'securePassword123',
-          role: Role.AGENT,
+          role: 'AGENT',
           isActive: true,
         });
       });
@@ -333,11 +332,11 @@ describe('UserForm Component (Create User Form)', () => {
   });
 
   describe('6. Edit User Mode & Password Handling', () => {
-    const existingUser = {
+    const existingUser: ManagedUser = {
       id: 'agent-123',
       name: 'Bob Smith',
       email: 'bob.smith@example.com',
-      role: Role.AGENT,
+      role: 'AGENT',
       isActive: true,
       createdAt: '2026-01-01T00:00:00.000Z',
       updatedAt: '2026-01-01T00:00:00.000Z',
@@ -408,7 +407,7 @@ describe('UserForm Component (Create User Form)', () => {
         expect(usersApi.updateUser).toHaveBeenCalledWith('agent-123', {
           name: 'Bob Updated',
           email: 'bob.updated@example.com',
-          role: Role.AGENT,
+          role: 'AGENT',
           isActive: true,
         });
       });
@@ -446,7 +445,7 @@ describe('UserForm Component (Create User Form)', () => {
         expect(usersApi.updateUser).toHaveBeenCalledWith('agent-123', {
           name: 'Bob Smith',
           email: 'bob.smith@example.com',
-          role: Role.AGENT,
+          role: 'AGENT',
           isActive: true,
           password: 'NewSecretPassword123',
         });

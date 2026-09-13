@@ -3,7 +3,6 @@ import { UsersPage } from '../UsersPage';
 import { renderWithQuery, screen, waitFor, userEvent } from '../../test/test-utils';
 import { usersApi, ManagedUser } from '../../lib/users-api';
 import { AuthUser } from '../../lib/auth-client';
-import { Role } from '../../lib/types';
 
 // Mock usersApi service
 vi.mock('../../lib/users-api', () => ({
@@ -20,7 +19,7 @@ describe('UsersPage Component', () => {
     id: 'admin-1',
     name: 'Alice Admin',
     email: 'alice.admin@example.com',
-    role: Role.ADMIN,
+    role: 'ADMIN',
     isActive: true,
     createdAt: '2026-01-15T10:00:00.000Z',
     updatedAt: '2026-01-15T10:00:00.000Z',
@@ -31,7 +30,7 @@ describe('UsersPage Component', () => {
       id: 'admin-1',
       name: 'Alice Admin',
       email: 'alice.admin@example.com',
-      role: Role.ADMIN,
+      role: 'ADMIN',
       isActive: true,
       createdAt: '2026-01-15T10:00:00.000Z',
       updatedAt: '2026-01-15T10:00:00.000Z',
@@ -40,7 +39,7 @@ describe('UsersPage Component', () => {
       id: 'agent-2',
       name: 'Bob Agent',
       email: 'bob.agent@example.com',
-      role: Role.AGENT,
+      role: 'AGENT',
       isActive: true,
       createdAt: '2026-02-10T14:30:00.000Z',
       updatedAt: '2026-02-10T14:30:00.000Z',
@@ -49,7 +48,7 @@ describe('UsersPage Component', () => {
       id: 'agent-3',
       name: 'Charlie Support',
       email: 'charlie@example.com',
-      role: Role.AGENT,
+      role: 'AGENT',
       isActive: true,
       createdAt: '2026-03-01T09:00:00.000Z',
       updatedAt: '2026-03-01T09:00:00.000Z',
@@ -100,8 +99,8 @@ describe('UsersPage Component', () => {
       expect(screen.getByText('3 users')).toBeInTheDocument();
 
       // Role indicators
-      expect(screen.getByText(Role.ADMIN)).toBeInTheDocument();
-      expect(screen.getAllByText(Role.AGENT)).toHaveLength(2);
+      expect(screen.getByText('ADMIN')).toBeInTheDocument();
+      expect(screen.getAllByText('AGENT')).toHaveLength(2);
     });
 
     it('renders empty state when no users are returned', async () => {
@@ -270,7 +269,7 @@ describe('UsersPage Component', () => {
         id: 'new-user-1',
         name: 'Diana Support',
         email: 'diana@example.com',
-        role: Role.AGENT,
+        role: 'AGENT',
         isActive: true,
         createdAt: '2026-09-07T12:00:00.000Z',
         updatedAt: '2026-09-07T12:00:00.000Z',
@@ -298,7 +297,7 @@ describe('UsersPage Component', () => {
           name: 'Diana Support',
           email: 'diana@example.com',
           password: 'password123',
-          role: Role.AGENT,
+          role: 'AGENT',
           isActive: true,
         });
       });
@@ -385,7 +384,7 @@ describe('UsersPage Component', () => {
           id: 'admin-2',
           name: 'Another Admin',
           email: 'admin2@example.com',
-          role: Role.ADMIN,
+          role: 'ADMIN',
           isActive: true,
           createdAt: '2026-01-20T10:00:00.000Z',
           updatedAt: '2026-01-20T10:00:00.000Z',
@@ -394,7 +393,7 @@ describe('UsersPage Component', () => {
           id: 'agent-2',
           name: 'Bob Agent',
           email: 'bob.agent@example.com',
-          role: Role.AGENT,
+          role: 'AGENT',
           isActive: true,
           createdAt: '2026-02-10T14:30:00.000Z',
           updatedAt: '2026-02-10T14:30:00.000Z',
@@ -553,7 +552,7 @@ describe('UsersPage Component', () => {
         id: 'agent-2',
         name: 'Bob Agent Updated',
         email: 'bob.agent.updated@example.com',
-        role: Role.AGENT,
+        role: 'AGENT',
         isActive: true,
         createdAt: '2026-02-10T14:30:00.000Z',
         updatedAt: '2026-09-09T12:00:00.000Z',
@@ -584,7 +583,7 @@ describe('UsersPage Component', () => {
         expect(usersApi.updateUser).toHaveBeenCalledWith('agent-2', {
           name: 'Bob Agent Updated',
           email: 'bob.agent.updated@example.com',
-          role: Role.AGENT,
+          role: 'AGENT',
           isActive: true,
         });
       });
@@ -606,7 +605,7 @@ describe('UsersPage Component', () => {
         id: 'agent-2',
         name: 'Bob Agent',
         email: 'bob.agent@example.com',
-        role: Role.AGENT,
+        role: 'AGENT',
         isActive: true,
         createdAt: '2026-02-10T14:30:00.000Z',
         updatedAt: '2026-09-09T12:00:00.000Z',
@@ -631,7 +630,7 @@ describe('UsersPage Component', () => {
         expect(usersApi.updateUser).toHaveBeenCalledWith('agent-2', {
           name: 'Bob Agent',
           email: 'bob.agent@example.com',
-          role: Role.AGENT,
+          role: 'AGENT',
           isActive: true,
           password: 'newPassword123',
         });

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Role } from '@helpdesk/core';
+import type { Role } from '@helpdesk/core';
 import { AuthUser } from '../lib/auth-client';
 import { ManagedUser } from '../lib/users-api';
 import {
@@ -134,7 +134,7 @@ export const UsersTable: React.FC<UsersTableProps> = ({
                       <div className="flex items-center space-x-2">
                         <div
                           className={`h-6 w-6 rounded-md flex items-center justify-center font-bold text-[9px] shadow-2xs shrink-0 ${
-                            item.role === Role.ADMIN
+                            item.role === 'ADMIN'
                               ? 'bg-indigo-600 text-white'
                               : 'bg-slate-200 text-slate-700'
                           }`}
@@ -164,15 +164,15 @@ export const UsersTable: React.FC<UsersTableProps> = ({
 
                     {/* 3. Role Column */}
                     <td className="px-2.5 py-1.5 whitespace-nowrap">
-                      {item.role === Role.ADMIN ? (
+                      {item.role === 'ADMIN' ? (
                         <span className="inline-flex items-center space-x-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200/60 shadow-2xs">
                           <Shield className="h-2.5 w-2.5 text-indigo-600" />
-                          <span>{Role.ADMIN}</span>
+                          <span>ADMIN</span>
                         </span>
                       ) : (
                         <span className="inline-flex items-center space-x-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-50 text-blue-700 border border-blue-200/60 shadow-2xs">
                           <UserCheck className="h-2.5 w-2.5 text-blue-600" />
-                          <span>{Role.AGENT}</span>
+                          <span>AGENT</span>
                         </span>
                       )}
                     </td>
@@ -195,7 +195,7 @@ export const UsersTable: React.FC<UsersTableProps> = ({
                             <Pencil className="h-3 w-3" />
                           </button>
 
-                          {!isSelf && item.role !== Role.ADMIN && (
+                          {!isSelf && item.role !== 'ADMIN' && (
                             <button
                               onClick={() => onDeleteUser({ id: item.id, name: item.name })}
                               className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-all"

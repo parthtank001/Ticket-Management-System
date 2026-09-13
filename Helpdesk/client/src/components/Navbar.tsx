@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { LogOut, Ticket, User as UserIcon, Shield, Loader2, Users } from 'lucide-react';
+import { LogOut, Ticket, Loader2, Users } from 'lucide-react';
 import { AuthUser } from '../lib/auth-client';
-import { Role } from '../lib/types';
+import type { Role } from '../lib/types';
 
 interface NavbarProps {
   user: AuthUser;
@@ -12,8 +12,8 @@ interface NavbarProps {
 
 export const Navbar: React.FC<NavbarProps> = ({ user, currentPath, onNavigate, onSignOut }) => {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
-  const isAdmin = user?.role === Role.ADMIN;
-  const displayRole = isAdmin ? Role.ADMIN : Role.AGENT;
+  const isAdmin = user?.role === 'ADMIN';
+  const displayRole: Role = isAdmin ? 'ADMIN' : 'AGENT';
 
   const handleSignOutClick = async () => {
     setIsLoggingOut(true);
@@ -24,10 +24,13 @@ export const Navbar: React.FC<NavbarProps> = ({ user, currentPath, onNavigate, o
     }
   };
 
+  const isTicketsActive = currentPath === '/' || currentPath === '/tickets';
+  const isUsersActive = currentPath === '/users';
+
   return (
     <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-slate-200 px-4 lg:px-8 py-3 shadow-xs">
       <div className="max-w-7xl mx-auto flex items-center justify-between">
-        {/* Brand & Navigation */}
+        {/* Brand & Navigation Links */}
         <div className="flex items-center space-x-6">
           <div
             onClick={() => onNavigate('/')}
@@ -36,30 +39,42 @@ export const Navbar: React.FC<NavbarProps> = ({ user, currentPath, onNavigate, o
             <div className="h-9 w-9 rounded-xl bg-indigo-600 group-hover:bg-indigo-700 flex items-center justify-center shadow-sm text-white transition-colors">
               <Ticket className="h-4.5 w-4.5" />
             </div>
-            <div className="flex items-center space-x-3">
-              <div>
-                <h2 className="text-sm font-bold text-slate-900 tracking-tight">
-                  Helpdesk AI
-                </h2>
-              </div>
-
-              {isAdmin && (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onNavigate('/users');
-                  }}
-                  className={`inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${currentPath === '/users'
-                      ? 'bg-indigo-50 text-indigo-700 border border-indigo-200/60 shadow-2xs'
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-                    }`}
-                  title="Go to Users Directory"
-                >
-                  <Users className="h-3.5 w-3.5 text-indigo-600" />
-                  <span>Users</span>
-                </button>
-              )}
+            <div>
+              <h2 className="text-sm font-bold text-slate-900 tracking-tight">
+                Helpdesk AI
+              </h2>
             </div>
+          </div>
+
+          {/* Navigation Links */}
+          <div className="flex items-center space-x-1.5">
+            <button
+              onClick={() => onNavigate('/')}
+              className={`inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                isTicketsActive
+                  ? 'bg-indigo-50 text-indigo-700 border border-indigo-200/60 shadow-2xs'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+              }`}
+              title="Go to Tickets"
+            >
+              <Ticket className="h-3.5 w-3.5 text-indigo-600" />
+              <span>Tickets</span>
+            </button>
+
+            {isAdmin && (
+              <button
+                onClick={() => onNavigate('/users')}
+                className={`inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                  isUsersActive
+                    ? 'bg-indigo-50 text-indigo-700 border border-indigo-200/60 shadow-2xs'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                }`}
+                title="Go to Users Directory"
+              >
+                <Users className="h-3.5 w-3.5 text-indigo-600" />
+                <span>Users</span>
+              </button>
+            )}
           </div>
         </div>
 

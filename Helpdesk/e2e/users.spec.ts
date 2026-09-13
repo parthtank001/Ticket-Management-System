@@ -1,5 +1,4 @@
 import { test, expect, Page } from '@playwright/test';
-import { Role } from '@helpdesk/core';
 
 /**
  * User Management E2E Test Suite (Happy Paths Only)
@@ -66,11 +65,11 @@ test.describe('User Management E2E CRUD Suite (Happy Paths)', () => {
       // 4. Modal should dismiss
       await expect(page.getByRole('heading', { name: 'Add New User' })).not.toBeVisible();
 
-      // 5. Verify the newly created user appears in the directory table with Role.AGENT badge
+      // 5. Verify the newly created user appears in the directory table with AGENT badge
       const userRow = page.locator('tr').filter({ hasText: newUserEmail });
       await expect(userRow).toBeVisible({ timeout: 10000 });
       await expect(userRow.getByText(newUserName, { exact: true })).toBeVisible();
-      await expect(userRow.getByText(Role.AGENT, { exact: true })).toBeVisible();
+      await expect(userRow.getByText('AGENT', { exact: true })).toBeVisible();
     });
   });
 
@@ -88,16 +87,16 @@ test.describe('User Management E2E CRUD Suite (Happy Paths)', () => {
       // 2. Verify user count text is displayed (e.g. "2 users" or "3 users")
       await expect(page.getByText(/\d+\s+users?/).first()).toBeVisible();
 
-      // 3. Verify seeded Admin user details and Role.ADMIN badge
+      // 3. Verify seeded Admin user details and ADMIN badge
       const adminRow = page.locator('tr').filter({ hasText: 'admin@example.com' });
       await expect(adminRow).toBeVisible({ timeout: 10000 });
-      await expect(adminRow.getByText(Role.ADMIN, { exact: true })).toBeVisible();
+      await expect(adminRow.getByText('ADMIN', { exact: true })).toBeVisible();
       await expect(adminRow.getByText('You', { exact: true })).toBeVisible();
 
-      // 4. Verify seeded Agent user details and Role.AGENT badge
+      // 4. Verify seeded Agent user details and AGENT badge
       const agentRow = page.locator('tr').filter({ hasText: 'agent@example.com' });
       await expect(agentRow).toBeVisible({ timeout: 10000 });
-      await expect(agentRow.getByText(Role.AGENT, { exact: true })).toBeVisible();
+      await expect(agentRow.getByText('AGENT', { exact: true })).toBeVisible();
     });
   });
 
@@ -180,9 +179,10 @@ test.describe('User Management E2E CRUD Suite (Happy Paths)', () => {
       await page.getByRole('button', { name: /sign in to workspace/i }).click();
 
       // 6. Verify successful login to workspace
-      await expect(page.getByRole('heading', { name: /welcome to the helpdesk/i })).toBeVisible({ timeout: 15000 });
-      await expect(page.getByText(agentName)).toBeVisible();
-      await expect(page.getByText(Role.AGENT, { exact: true })).toBeVisible();
+      const welcomeHeading = page.getByRole('heading', { name: /welcome to the helpdesk/i });
+      await expect(welcomeHeading).toBeVisible({ timeout: 15000 });
+      await expect(welcomeHeading).toContainText(agentName);
+      await expect(page.getByText('AGENT', { exact: true })).toBeVisible();
     });
   });
 
@@ -249,7 +249,7 @@ test.describe('User Management E2E CRUD Suite (Happy Paths)', () => {
       const initialRow = page.locator('tr').filter({ hasText: initialEmail });
       await expect(initialRow).toBeVisible({ timeout: 10000 });
       await expect(initialRow.getByText(initialName, { exact: true })).toBeVisible();
-      await expect(initialRow.getByText(Role.AGENT, { exact: true })).toBeVisible();
+      await expect(initialRow.getByText('AGENT', { exact: true })).toBeVisible();
 
       // --- 3. UPDATE ---
       const editBtn = initialRow.getByRole('button', { name: `Edit ${initialName}` });

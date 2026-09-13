@@ -1,7 +1,6 @@
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { prisma } from "./db";
-import { Role } from "./types";
 
 export const auth = betterAuth({
   database: prismaAdapter(prisma, {
@@ -12,7 +11,7 @@ export const auth = betterAuth({
       role: {
         type: "string",
         required: true,
-        defaultValue: Role.AGENT,
+        defaultValue: "AGENT",
         input: false,
       },
       isActive: {

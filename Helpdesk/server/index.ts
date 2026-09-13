@@ -7,6 +7,8 @@ import { requireAuth } from './middleware/auth';
 import { prisma, checkDatabaseConnection } from './db';
 import { apiLimiter, authLimiter, ticketCreationLimiter, isProductionEnvironment } from './middleware/rate-limiter';
 import usersRouter from './routes/users';
+import emailsRouter from './routes/emails';
+import type { Category, Priority, TicketStatus, SenderType } from '@helpdesk/core';
 import {
   createTicketSchema,
   updateTicketSchema,
@@ -32,6 +34,7 @@ app.use('/api/', apiLimiter);
 app.all('/api/auth/*splat', authLimiter, toNodeHandler(auth));
 
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 // Healthcheck API endpoint
 app.get('/api/health', async (req: Request, res: Response) => {
@@ -61,6 +64,10 @@ app.get('/api/me', requireAuth, (req: Request, res: Response) => {
 
 // Mount User Management Routes
 app.use('/api/users', usersRouter);
+
+// Mount Inbound Email & Webhook Routes
+app.use('/api/emails', emailsRouter);
+app.use('/api/webhooks', emailsRouter);
 
 // List Active Agents for ticket assignment (Authenticated agents & admins)
 app.get('/api/agents', requireAuth, async (req: Request, res: Response) => {
@@ -111,28 +118,24 @@ app.post('/api/tickets', ticketCreationLimiter, async (req: Request, res: Respon
   const { studentName, studentEmail, subject, category, priority, message } = validationResult.data;
 
   const trimmedEmail = studentEmail.toLowerCase();
-  const trimmedSubject = subject;
-  const trimmedMessage = message;
+  const trimmedSubject = subject.trim();
+  const trimmedMessage = message.trim();
+  const trimmedName = studentName.trim();
 
-  // Generate AI draft response based on category & subject
-  let aiDraftResponse = `Hello ${studentName?.trim() || 'Student'},\n\nThank you for reaching out to Helpdesk Support. We have received your inquiry regarding "${trimmedSubject}". An agent will review your request shortly.\n\nBest regards,\nHelpdesk AI Support`;
+  const selectedCategory = category !== undefined ? category : null;
+  const selectedPriority = priority || 'MEDIUM';
 
-  if (category === 'TECHNICAL_QUESTION') {
-    aiDraftResponse = `Hello ${studentName?.trim() || 'Student'},\n\nRegarding your technical issue "${trimmedSubject}": Please try clearing your browser cache, re-authenticating, or verifying your system configuration. Our technical support team is inspecting the logs for your account.\n\nBest regards,\nHelpdesk Technical Team`;
-  } else if (category === 'REFUND_REQUEST') {
-    aiDraftResponse = `Hello ${studentName?.trim() || 'Student'},\n\nThank you for submitting a refund inquiry for "${trimmedSubject}". Refund requests are processed within 3-5 business days. Please verify your invoice number for speedier processing.\n\nBest regards,\nBilling Support Team`;
-  }
-
-  // Create Ticket and initial TicketMessage transaction
+  // Create Ticket and initial TicketMessage transaction (plain ticket without AI processing)
   const ticket = await prisma.ticket.create({
     data: {
       subject: trimmedSubject,
       studentEmail: trimmedEmail,
-      studentName: studentName ? studentName.trim() : trimmedEmail.split('@')[0],
-      category: category || 'GENERAL_QUESTION',
-      priority: priority || 'MEDIUM',
-      status: 'NEW',
-      aiDraftResponse,
+      studentName: trimmedName,
+      category: selectedCategory,
+      priority: selectedPriority,
+      status: 'OPEN',
+      summary: null,
+      aiDraftResponse: null,
       messages: {
         create: {
           senderType: 'STUDENT',
@@ -152,14 +155,17 @@ app.post('/api/tickets', ticketCreationLimiter, async (req: Request, res: Respon
 
 // Update ticket status or assigned agent (Authenticated support staff only)
 app.patch('/api/tickets/:id', requireAuth, async (req: Request, res: Response) => {
-  const id = req.params.id as string;
+  const id = parseInt(req.params.id as string, 10);
+  if (isNaN(id)) {
+    return res.status(400).json({ error: 'Invalid ticket ID' });
+  }
 
   const validationResult = updateTicketSchema.safeParse(req.body);
   if (!validationResult.success) {
     return res.status(400).json({ error: validationResult.error.issues[0].message });
   }
 
-  const { status, assignedAgentId } = validationResult.data;
+  const { status, category, priority, assignedAgentId } = validationResult.data;
 
   const existingTicket = await prisma.ticket.findUnique({ where: { id } });
   if (!existingTicket) {
@@ -168,6 +174,8 @@ app.patch('/api/tickets/:id', requireAuth, async (req: Request, res: Response) =
 
   const dataToUpdate: any = {};
   if (status) dataToUpdate.status = status;
+  if (category !== undefined) dataToUpdate.category = category;
+  if (priority !== undefined) dataToUpdate.priority = priority;
   if (assignedAgentId !== undefined) dataToUpdate.assignedAgentId = assignedAgentId || null;
 
   const updatedTicket = await prisma.ticket.update({
@@ -186,7 +194,10 @@ app.patch('/api/tickets/:id', requireAuth, async (req: Request, res: Response) =
 
 // Add message reply to ticket (Authenticated support staff only - identity derived from session)
 app.post('/api/tickets/:id/messages', requireAuth, async (req: Request, res: Response) => {
-  const id = req.params.id as string;
+  const id = parseInt(req.params.id as string, 10);
+  if (isNaN(id)) {
+    return res.status(400).json({ error: 'Invalid ticket ID' });
+  }
 
   const validationResult = createTicketMessageSchema.safeParse(req.body);
   if (!validationResult.success) {
@@ -213,14 +224,6 @@ app.post('/api/tickets/:id/messages', requireAuth, async (req: Request, res: Res
       isInternalNote: Boolean(isInternalNote),
     },
   });
-
-  // Optionally update ticket status to IN_PROGRESS or ASSIGNED if it was NEW
-  if (existingTicket.status === 'NEW') {
-    await prisma.ticket.update({
-      where: { id },
-      data: { status: 'IN_PROGRESS' },
-    });
-  }
 
   res.status(201).json(newMessage);
 });

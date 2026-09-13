@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSession, useSignOut } from './lib/hooks/useAuth';
 import { AuthUser } from './lib/auth-client';
-import { Role } from './lib/types';
+import type { Role } from './lib/types';
 import { Navbar } from './components/Navbar';
 import { LoginPage } from './components/LoginPage';
 import { HomePage } from './components/HomePage';
@@ -97,7 +97,7 @@ export default function App() {
   // Determine active view component based on route
   const renderMainContent = () => {
     if (currentPath === '/users') {
-      const isAdmin = user?.role === Role.ADMIN;
+      const isAdmin = user?.role === 'ADMIN';
       if (!isAdmin) {
         return (
           <div className="max-w-4xl mx-auto py-16 px-4 text-center font-sans">

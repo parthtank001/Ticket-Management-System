@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { hashPassword } from 'better-auth/crypto';
 import { requireAuth, requireRole } from '../middleware/auth';
-import { Role } from '../types';
+import type { Role } from '../types';
 import { prisma } from '../db';
 import { createUserSchema, updateUserSchema } from '../schemas';
 
@@ -26,7 +26,7 @@ const userSelect = {
  * GET /api/users
  * List all users for Admin directory with optional search, role, and status filters (Admin only)
  */
-router.get('/', requireAuth, requireRole(Role.ADMIN), async (req: Request, res: Response) => {
+router.get('/', requireAuth, requireRole('ADMIN'), async (req: Request, res: Response) => {
   const { search, role, status } = req.query;
 
   const where: any = {
@@ -41,7 +41,7 @@ router.get('/', requireAuth, requireRole(Role.ADMIN), async (req: Request, res: 
     ];
   }
 
-  if (role && (role === Role.ADMIN || role === Role.AGENT)) {
+  if (role && (role === 'ADMIN' || role === 'AGENT')) {
     where.role = role as Role;
   }
 
@@ -63,7 +63,7 @@ router.get('/', requireAuth, requireRole(Role.ADMIN), async (req: Request, res: 
  * POST /api/users
  * Create a new user account (Admin only)
  */
-router.post('/', requireAuth, requireRole(Role.ADMIN), async (req: Request, res: Response) => {
+router.post('/', requireAuth, requireRole('ADMIN'), async (req: Request, res: Response) => {
   const validationResult = createUserSchema.safeParse(req.body);
   if (!validationResult.success) {
     return res.status(400).json({ error: validationResult.error.issues[0].message });
@@ -115,7 +115,7 @@ router.post('/', requireAuth, requireRole(Role.ADMIN), async (req: Request, res:
  * PATCH /api/users/:id
  * Update user details, role, status, or password (Admin only)
  */
-router.patch('/:id', requireAuth, requireRole(Role.ADMIN), async (req: Request, res: Response) => {
+router.patch('/:id', requireAuth, requireRole('ADMIN'), async (req: Request, res: Response) => {
   const id = req.params.id as string;
 
   const validationResult = updateUserSchema.safeParse(req.body);
@@ -151,7 +151,7 @@ router.patch('/:id', requireAuth, requireRole(Role.ADMIN), async (req: Request, 
     if (isActive === false) {
       return res.status(400).json({ error: 'You cannot deactivate your own administrator account.' });
     }
-    if (role && role !== Role.ADMIN) {
+    if (role && role !== 'ADMIN') {
       return res.status(400).json({ error: 'You cannot revoke your own administrator privileges.' });
     }
   }
@@ -205,7 +205,7 @@ router.patch('/:id', requireAuth, requireRole(Role.ADMIN), async (req: Request, 
  * DELETE /api/users/:id
  * Delete user account with soft deletion (Admin only)
  */
-router.delete('/:id', requireAuth, requireRole(Role.ADMIN), async (req: Request, res: Response) => {
+router.delete('/:id', requireAuth, requireRole('ADMIN'), async (req: Request, res: Response) => {
   const id = req.params.id as string;
 
   if (req.user?.id === id) {
@@ -221,7 +221,7 @@ router.delete('/:id', requireAuth, requireRole(Role.ADMIN), async (req: Request,
   }
 
   // Administrator accounts cannot be deleted
-  if (existingUser.role === Role.ADMIN) {
+  if (existingUser.role === 'ADMIN') {
     return res.status(400).json({ error: 'Administrator accounts cannot be deleted.' });
   }
 

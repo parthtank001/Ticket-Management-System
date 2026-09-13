@@ -3,14 +3,13 @@ import { UsersTable } from '../UsersTable';
 import { renderWithQuery, screen, userEvent } from '../../test/test-utils';
 import { AuthUser } from '../../lib/auth-client';
 import { ManagedUser } from '../../lib/users-api';
-import { Role } from '../../lib/types';
 
 describe('UsersTable Component', () => {
   const mockCurrentUser: AuthUser = {
     id: 'admin-1',
     name: 'Alice Admin',
     email: 'alice.admin@example.com',
-    role: Role.ADMIN,
+    role: 'ADMIN',
     isActive: true,
     createdAt: '2026-01-15T10:00:00.000Z',
     updatedAt: '2026-01-15T10:00:00.000Z',
@@ -21,7 +20,7 @@ describe('UsersTable Component', () => {
       id: 'admin-1',
       name: 'Alice Admin',
       email: 'alice.admin@example.com',
-      role: Role.ADMIN,
+      role: 'ADMIN',
       isActive: true,
       createdAt: '2026-01-15T10:00:00.000Z',
       updatedAt: '2026-01-15T10:00:00.000Z',
@@ -30,7 +29,7 @@ describe('UsersTable Component', () => {
       id: 'agent-2',
       name: 'Bob Agent',
       email: 'bob.agent@example.com',
-      role: Role.AGENT,
+      role: 'AGENT',
       isActive: true,
       createdAt: '2026-02-10T14:30:00.000Z',
       updatedAt: '2026-02-10T14:30:00.000Z',
@@ -95,8 +94,8 @@ describe('UsersTable Component', () => {
     expect(screen.getByText('You')).toBeInTheDocument();
 
     // Roles
-    expect(screen.getByText(Role.ADMIN)).toBeInTheDocument();
-    expect(screen.getByText(Role.AGENT)).toBeInTheDocument();
+    expect(screen.getByText('ADMIN')).toBeInTheDocument();
+    expect(screen.getByText('AGENT')).toBeInTheDocument();
   });
 
   it('calls onEditUser when edit button is clicked for any user row', async () => {
@@ -155,7 +154,7 @@ describe('UsersTable Component', () => {
         id: 'admin-2',
         name: 'Second Admin',
         email: 'admin2@example.com',
-        role: Role.ADMIN,
+        role: 'ADMIN',
         isActive: true,
         createdAt: '2026-01-20T10:00:00.000Z',
         updatedAt: '2026-01-20T10:00:00.000Z',
@@ -164,7 +163,7 @@ describe('UsersTable Component', () => {
         id: 'agent-1',
         name: 'Agent User',
         email: 'agent@example.com',
-        role: Role.AGENT,
+        role: 'AGENT',
         isActive: true,
         createdAt: '2026-02-01T10:00:00.000Z',
         updatedAt: '2026-02-01T10:00:00.000Z',
