@@ -143,29 +143,59 @@ describe('TicketsPage Component', () => {
     },
   ];
 
+  const PRIORITY_ORDER: Record<string, number> = {
+    URGENT: 4,
+    HIGH: 3,
+    MEDIUM: 2,
+    LOW: 1,
+  };
+
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(ticketsApi.listTickets).mockResolvedValue(mockTickets);
+    vi.mocked(ticketsApi.listTickets).mockImplementation(async (params) => {
+      const sortBy = params?.sortBy || 'createdAt';
+      const sortOrder = params?.sortOrder || 'desc';
+
+      const copy = [...mockTickets];
+      copy.sort((a, b) => {
+        let comp = 0;
+        if (sortBy === 'createdAt' || sortBy === 'created') {
+          comp = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+        } else if (sortBy === 'priority') {
+          comp = (PRIORITY_ORDER[a.priority] || 0) - (PRIORITY_ORDER[b.priority] || 0);
+        } else if (sortBy === 'id' || sortBy === 'ticket') {
+          comp = a.id - b.id;
+        } else if (sortBy === 'studentName' || sortBy === 'sender') {
+          comp = a.studentName.localeCompare(b.studentName);
+        } else if (sortBy === 'subject') {
+          comp = a.subject.localeCompare(b.subject);
+        } else if (sortBy === 'status') {
+          comp = a.status.localeCompare(b.status);
+        }
+        return sortOrder === 'asc' ? comp : -comp;
+      });
+      return copy;
+    });
     vi.mocked(ticketsApi.listAgents).mockResolvedValue(mockAgents);
   });
 
-  describe('Initial Rendering & Sorting by Newest First', () => {
-    it('renders the tickets dashboard with status count tabs', async () => {
+  describe('Initial Rendering & Table', () => {
+    it('renders the tickets table and loaded rows with Ticket header', async () => {
       renderWithQuery(<TicketsPage user={mockUser} />);
+
+      expect(screen.getByRole('heading', { name: 'Ticket' })).toBeInTheDocument();
 
       // Wait for tickets to load
       await waitFor(() => {
         expect(screen.getByText('Payment Issue with Stripe')).toBeInTheDocument();
       });
 
-      // Verify status tabs and badge counts
-      expect(screen.getByRole('button', { name: /all tickets \(4\)/i })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /open \(2\)/i })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /resolved \(1\)/i })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /closed \(1\)/i })).toBeInTheDocument();
+      expect(screen.getByText('Login Failure on Student Portal')).toBeInTheDocument();
+      expect(screen.getByText('Course Registration Inquiry')).toBeInTheDocument();
+      expect(screen.getByText('General Campus Question')).toBeInTheDocument();
     });
 
-    it('sorts tickets by newest first by default', async () => {
+    it('sorts tickets by newest first by default in table', async () => {
       renderWithQuery(<TicketsPage user={mockUser} />);
 
       await waitFor(() => {
@@ -182,7 +212,7 @@ describe('TicketsPage Component', () => {
       expect(within(rows[3]).getByText('Payment Issue with Stripe')).toBeInTheDocument();
     });
 
-    it('allows changing sort order to oldest first', async () => {
+    it('triggers server-side sorting when clicking column headers in TanStack table', async () => {
       const user = userEvent.setup();
       renderWithQuery(<TicketsPage user={mockUser} />);
 
@@ -190,191 +220,15 @@ describe('TicketsPage Component', () => {
         expect(screen.getByText('Payment Issue with Stripe')).toBeInTheDocument();
       });
 
-      const sortSelect = screen.getByDisplayValue('Newest First (Default)');
-      await user.selectOptions(sortSelect, 'oldest');
-
-      const rows = screen.getAllByRole('row').slice(1);
-      expect(within(rows[0]).getByText('Payment Issue with Stripe')).toBeInTheDocument();
-      expect(within(rows[1]).getByText('Login Failure on Student Portal')).toBeInTheDocument();
-      expect(within(rows[2]).getByText('Course Registration Inquiry')).toBeInTheDocument();
-      expect(within(rows[3]).getByText('General Campus Question')).toBeInTheDocument();
-    });
-
-    it('allows changing sort order to highest priority', async () => {
-      const user = userEvent.setup();
-      renderWithQuery(<TicketsPage user={mockUser} />);
+      const senderHeader = screen.getByRole('columnheader', { name: /sender/i });
+      await user.click(senderHeader);
 
       await waitFor(() => {
-        expect(screen.getByText('Payment Issue with Stripe')).toBeInTheDocument();
+        expect(ticketsApi.listTickets).toHaveBeenCalledWith({
+          sortBy: 'studentName',
+          sortOrder: 'asc',
+        });
       });
-
-      const sortSelect = screen.getByDisplayValue('Newest First (Default)');
-      await user.selectOptions(sortSelect, 'priority_desc');
-
-      const rows = screen.getAllByRole('row').slice(1);
-      // URGENT (Ticket 2) -> HIGH (Ticket 1) -> MEDIUM (Ticket 4) -> LOW (Ticket 3)
-      expect(within(rows[0]).getByText('Login Failure on Student Portal')).toBeInTheDocument();
-      expect(within(rows[1]).getByText('Payment Issue with Stripe')).toBeInTheDocument();
-      expect(within(rows[2]).getByText('General Campus Question')).toBeInTheDocument();
-      expect(within(rows[3]).getByText('Course Registration Inquiry')).toBeInTheDocument();
-    });
-  });
-
-  describe('Status Tabs Filtering', () => {
-    it('filters tickets when clicking Open status tab', async () => {
-      const user = userEvent.setup();
-      renderWithQuery(<TicketsPage user={mockUser} />);
-
-      await waitFor(() => {
-        expect(screen.getByText('General Campus Question')).toBeInTheDocument();
-      });
-
-      const openTab = screen.getByRole('button', { name: /open/i });
-      await user.click(openTab);
-
-      const rows = screen.getAllByRole('row').slice(1);
-      expect(rows).toHaveLength(2);
-      expect(screen.getByText('Login Failure on Student Portal')).toBeInTheDocument();
-      expect(screen.getByText('Payment Issue with Stripe')).toBeInTheDocument();
-      expect(screen.queryByText('Course Registration Inquiry')).not.toBeInTheDocument();
-      expect(screen.queryByText('General Campus Question')).not.toBeInTheDocument();
-    });
-
-    it('filters tickets when clicking Resolved status tab', async () => {
-      const user = userEvent.setup();
-      renderWithQuery(<TicketsPage user={mockUser} />);
-
-      await waitFor(() => {
-        expect(screen.getByText('Course Registration Inquiry')).toBeInTheDocument();
-      });
-
-      const resolvedTab = screen.getByRole('button', { name: /resolved/i });
-      await user.click(resolvedTab);
-
-      const rows = screen.getAllByRole('row').slice(1);
-      expect(rows).toHaveLength(1);
-      expect(screen.getByText('Course Registration Inquiry')).toBeInTheDocument();
-      expect(screen.queryByText('Payment Issue with Stripe')).not.toBeInTheDocument();
-    });
-
-    it('filters tickets when clicking Closed status tab', async () => {
-      const user = userEvent.setup();
-      renderWithQuery(<TicketsPage user={mockUser} />);
-
-      await waitFor(() => {
-        expect(screen.getByText('General Campus Question')).toBeInTheDocument();
-      });
-
-      const closedTab = screen.getByRole('button', { name: /closed/i });
-      await user.click(closedTab);
-
-      const rows = screen.getAllByRole('row').slice(1);
-      expect(rows).toHaveLength(1);
-      expect(screen.getByText('General Campus Question')).toBeInTheDocument();
-      expect(screen.queryByText('Payment Issue with Stripe')).not.toBeInTheDocument();
-    });
-  });
-
-  describe('Search and Filter Dropdowns', () => {
-    it('filters tickets matching search input by student name or subject', async () => {
-      const user = userEvent.setup();
-      renderWithQuery(<TicketsPage user={mockUser} />);
-
-      await waitFor(() => {
-        expect(screen.getByText('Payment Issue with Stripe')).toBeInTheDocument();
-      });
-
-      const searchInput = screen.getByPlaceholderText(/search by subject, student, email, or #id/i);
-      await user.type(searchInput, 'Alice');
-
-      const rows = screen.getAllByRole('row').slice(1);
-      expect(rows).toHaveLength(1);
-      expect(screen.getByText('Payment Issue with Stripe')).toBeInTheDocument();
-      expect(screen.queryByText('Login Failure on Student Portal')).not.toBeInTheDocument();
-    });
-
-    it('filters tickets matching search input by ticket ID', async () => {
-      const user = userEvent.setup();
-      renderWithQuery(<TicketsPage user={mockUser} />);
-
-      await waitFor(() => {
-        expect(screen.getByText('Payment Issue with Stripe')).toBeInTheDocument();
-      });
-
-      const searchInput = screen.getByPlaceholderText(/search by subject, student, email, or #id/i);
-      await user.type(searchInput, '2');
-
-      expect(screen.getByText('Login Failure on Student Portal')).toBeInTheDocument();
-      expect(screen.queryByText('Payment Issue with Stripe')).not.toBeInTheDocument();
-    });
-
-    it('filters tickets by category dropdown', async () => {
-      const user = userEvent.setup();
-      renderWithQuery(<TicketsPage user={mockUser} />);
-
-      await waitFor(() => {
-        expect(screen.getByText('Payment Issue with Stripe')).toBeInTheDocument();
-      });
-
-      const categorySelect = screen.getByDisplayValue('All Categories');
-      await user.selectOptions(categorySelect, 'REFUND_REQUEST');
-
-      const rows = screen.getAllByRole('row').slice(1);
-      expect(rows).toHaveLength(1);
-      expect(screen.getByText('Payment Issue with Stripe')).toBeInTheDocument();
-      expect(screen.queryByText('Login Failure on Student Portal')).not.toBeInTheDocument();
-    });
-
-    it('filters tickets by priority dropdown', async () => {
-      const user = userEvent.setup();
-      renderWithQuery(<TicketsPage user={mockUser} />);
-
-      await waitFor(() => {
-        expect(screen.getByText('Payment Issue with Stripe')).toBeInTheDocument();
-      });
-
-      const prioritySelect = screen.getByDisplayValue('All Priorities');
-      await user.selectOptions(prioritySelect, 'URGENT');
-
-      const rows = screen.getAllByRole('row').slice(1);
-      expect(rows).toHaveLength(1);
-      expect(screen.getByText('Login Failure on Student Portal')).toBeInTheDocument();
-      expect(screen.queryByText('Payment Issue with Stripe')).not.toBeInTheDocument();
-    });
-
-    it('filters tickets by assignee dropdown (e.g. Assigned to Me)', async () => {
-      const user = userEvent.setup();
-      renderWithQuery(<TicketsPage user={mockUser} />);
-
-      await waitFor(() => {
-        expect(screen.getByText('Payment Issue with Stripe')).toBeInTheDocument();
-      });
-
-      const assigneeSelect = screen.getByDisplayValue('All Assignees');
-      await user.selectOptions(assigneeSelect, 'ME');
-
-      const rows = screen.getAllByRole('row').slice(1);
-      expect(rows).toHaveLength(1);
-      expect(screen.getByText('Payment Issue with Stripe')).toBeInTheDocument();
-      expect(screen.queryByText('Login Failure on Student Portal')).not.toBeInTheDocument();
-    });
-
-    it('shows empty state and allows resetting filters when no tickets match', async () => {
-      const user = userEvent.setup();
-      renderWithQuery(<TicketsPage user={mockUser} />);
-
-      await waitFor(() => {
-        expect(screen.getByText('Payment Issue with Stripe')).toBeInTheDocument();
-      });
-
-      const searchInput = screen.getByPlaceholderText(/search by subject, student, email, or #id/i);
-      await user.type(searchInput, 'NonExistentTicketQuery999');
-
-      expect(screen.getByText('No Tickets Found')).toBeInTheDocument();
-      const clearBtn = screen.getByRole('button', { name: /clear filters/i });
-      await user.click(clearBtn);
-
-      expect(screen.getByText('Payment Issue with Stripe')).toBeInTheDocument();
     });
   });
 
@@ -397,22 +251,6 @@ describe('TicketsPage Component', () => {
         expect(screen.getByRole('heading', { name: 'Payment Issue with Stripe' })).toBeInTheDocument();
       });
       expect(screen.getByText('My tuition payment failed with error 402.')).toBeInTheDocument();
-    });
-
-    it('opens create ticket modal when clicking "New Ticket"', async () => {
-      const user = userEvent.setup();
-      renderWithQuery(<TicketsPage user={mockUser} />);
-
-      await waitFor(() => {
-        expect(screen.getByRole('heading', { name: /welcome to the helpdesk/i })).toBeInTheDocument();
-      });
-
-      const createBtn = screen.getByRole('button', { name: /new ticket/i });
-      await user.click(createBtn);
-
-      await waitFor(() => {
-        expect(screen.getByRole('heading', { name: /create new ticket/i })).toBeInTheDocument();
-      });
     });
   });
 });

@@ -5,6 +5,9 @@ export {
   updateTicketSchema,
   createTicketMessageSchema,
   inboundEmailSchema,
+  ticketSortFieldSchema,
+  sortOrderSchema,
+  getTicketsQuerySchema,
   type CreateUserInput,
   type CreateUserOutput,
   type UpdateUserInput,
@@ -17,4 +20,9 @@ export {
   type CreateTicketMessageOutput,
   type InboundEmailInput,
   type InboundEmailOutput,
+  type TicketSortField,
+  type SortOrder,
+  type GetTicketsQueryInput,
+  type GetTicketsQueryOutput,
 } from '@helpdesk/core';
+

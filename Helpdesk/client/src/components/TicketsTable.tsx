@@ -1,56 +1,173 @@
-import React from 'react';
+import React, { useState, useMemo } from 'react';
+import {
+  flexRender,
+  type SortingState,
+} from '@tanstack/react-table';
+import {
+  useLegacyTable as useReactTable,
+  getCoreRowModel,
+  getSortedRowModel,
+  type LegacyColumnDef as ColumnDef,
+} from '@tanstack/react-table/legacy';
 import {
   Ticket,
   TicketStatus,
   Category,
-  Priority,
-  Role,
 } from '../lib/types';
 import {
   TicketStatusBadge,
-  TicketPriorityBadge,
   TicketCategoryBadge,
 } from './TicketBadges';
 import { Skeleton } from './ui/skeleton';
 import {
   MessageSquare,
-  User,
-  Clock,
-  ChevronRight,
   Inbox,
-  AlertCircle,
+  ArrowUp,
+  ArrowDown,
+  ArrowUpDown,
 } from 'lucide-react';
 
-interface TicketsTableProps {
+export interface TicketsTableProps {
   tickets: Ticket[];
   isLoading: boolean;
   onSelectTicket: (ticket: Ticket) => void;
+  sorting?: SortingState;
+  onSortingChange?: React.Dispatch<React.SetStateAction<SortingState>>;
 }
 
 export const TicketsTable: React.FC<TicketsTableProps> = ({
   tickets,
   isLoading,
   onSelectTicket,
+  sorting: externalSorting,
+  onSortingChange: externalOnSortingChange,
 }) => {
-  if (isLoading) {
-    return (
-      <div className="bg-white border border-slate-200/80 rounded-2xl shadow-xs overflow-hidden">
-        <div className="divide-y divide-slate-100">
-          {[1, 2, 3, 4, 5].map((i) => (
-            <div key={i} className="p-4 flex items-center justify-between space-x-4">
-              <div className="flex items-center space-x-3 w-1/3">
-                <Skeleton className="h-6 w-12 rounded-md" />
-                <div className="space-y-1.5 flex-1">
-                  <Skeleton className="h-4 w-48 rounded" />
-                  <Skeleton className="h-3 w-32 rounded" />
+  const [internalSorting, setInternalSorting] = useState<SortingState>([
+    { id: 'createdAt', desc: true },
+  ]);
+
+  const sorting = externalSorting !== undefined ? externalSorting : internalSorting;
+  const onSortingChange =
+    externalOnSortingChange !== undefined ? externalOnSortingChange : setInternalSorting;
+
+  const columns = useMemo<ColumnDef<Ticket>[]>(
+    () => [
+      {
+        id: 'subject',
+        accessorKey: 'subject',
+        header: 'Subject',
+        cell: ({ row }) => {
+          const ticket = row.original;
+          return (
+            <div className="flex items-start space-x-2.5">
+              <span className="font-bold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded text-[10px] border border-indigo-100/80 shrink-0">
+                #{ticket.id}
+              </span>
+              <div>
+                <span className="font-semibold text-slate-900 group-hover:text-indigo-600 transition-colors line-clamp-1">
+                  {ticket.subject}
+                </span>
+                <div className="flex items-center space-x-2 text-[10px] text-slate-400 mt-0.5">
+                  <span className="flex items-center space-x-1">
+                    <MessageSquare className="h-3 w-3" />
+                    <span>{ticket.messages?.length || 0}</span>
+                  </span>
                 </div>
               </div>
-              <div className="flex items-center space-x-3">
-                <Skeleton className="h-5 w-16 rounded-full" />
-                <Skeleton className="h-5 w-16 rounded-md" />
-                <Skeleton className="h-5 w-24 rounded-md" />
+            </div>
+          );
+        },
+      },
+      {
+        id: 'studentName',
+        accessorKey: 'studentName',
+        header: 'Sender',
+        cell: ({ row }) => {
+          const ticket = row.original;
+          return (
+            <div>
+              <div className="font-semibold text-slate-800">
+                {ticket.studentName}
               </div>
-              <Skeleton className="h-4 w-24 rounded" />
+              <div className="text-[10px] text-slate-400 truncate max-w-[150px]">
+                {ticket.studentEmail}
+              </div>
+            </div>
+          );
+        },
+      },
+      {
+        id: 'status',
+        accessorKey: 'status',
+        header: 'Status',
+        cell: ({ row }) => (
+          <TicketStatusBadge status={row.original.status} size="sm" />
+        ),
+      },
+      {
+        id: 'category',
+        accessorFn: (row) => row.category || '',
+        header: 'Category',
+        cell: ({ row }) => (
+          <TicketCategoryBadge category={row.original.category} size="sm" />
+        ),
+      },
+      {
+        id: 'createdAt',
+        accessorKey: 'createdAt',
+        header: 'Created',
+        cell: ({ row }) => {
+          const formattedDate = new Date(row.original.createdAt).toLocaleString(
+            undefined,
+            {
+              month: 'short',
+              day: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit',
+            }
+          );
+          return (
+            <div className="text-right text-[10px] text-slate-400 whitespace-nowrap">
+              {formattedDate}
+            </div>
+          );
+        },
+      },
+    ],
+    []
+  );
+
+  const table = useReactTable({
+    data: tickets,
+    columns,
+    state: {
+      sorting,
+    },
+    onSortingChange,
+    manualSorting: true,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+  });
+
+  if (isLoading) {
+    return (
+      <div className="bg-white border border-slate-200/80 rounded-lg shadow-xs overflow-hidden">
+        <div className="divide-y divide-slate-100">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <div key={i} className="py-2.5 px-3 flex items-center justify-between space-x-3">
+              <div className="flex items-center space-x-2.5 w-1/3">
+                <Skeleton className="h-5 w-10 rounded" />
+                <div className="space-y-1 flex-1">
+                  <Skeleton className="h-3.5 w-40 rounded" />
+                  <Skeleton className="h-2.5 w-24 rounded" />
+                </div>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Skeleton className="h-4.5 w-14 rounded-full" />
+                <Skeleton className="h-4.5 w-14 rounded-md" />
+                <Skeleton className="h-4.5 w-20 rounded-md" />
+              </div>
+              <Skeleton className="h-3.5 w-20 rounded" />
             </div>
           ))}
         </div>
@@ -60,11 +177,11 @@ export const TicketsTable: React.FC<TicketsTableProps> = ({
 
   if (tickets.length === 0) {
     return (
-      <div className="bg-white border border-slate-200/80 rounded-2xl p-12 text-center shadow-xs">
-        <div className="mx-auto h-12 w-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 mb-3">
-          <Inbox className="h-6 w-6" />
+      <div className="bg-white border border-slate-200/80 rounded-lg p-8 text-center shadow-xs">
+        <div className="mx-auto h-10 w-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 mb-2.5">
+          <Inbox className="h-5 w-5" />
         </div>
-        <h3 className="text-base font-bold text-slate-800 mb-1">No Tickets Found</h3>
+        <h3 className="text-sm font-bold text-slate-800 mb-1">No Tickets Found</h3>
         <p className="text-xs text-slate-500 max-w-sm mx-auto">
           No tickets match your search filters, or no support inquiries have been submitted yet.
         </p>
@@ -73,113 +190,116 @@ export const TicketsTable: React.FC<TicketsTableProps> = ({
   }
 
   return (
-    <div className="bg-white border border-slate-200/80 rounded-2xl shadow-xs overflow-hidden">
+    <div className="bg-white border border-slate-200/80 rounded-lg shadow-xs overflow-hidden">
       <div className="overflow-x-auto">
         <table className="w-full text-left border-collapse">
           <thead>
-            <tr className="border-b border-slate-200/80 bg-slate-50/60 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-              <th className="py-3.5 px-4">Ticket</th>
-              <th className="py-3.5 px-4">Sender</th>
-              <th className="py-3.5 px-4">Category</th>
-              <th className="py-3.5 px-4">Priority</th>
-              <th className="py-3.5 px-4">Status</th>
-              <th className="py-3.5 px-4">Assignee</th>
-              <th className="py-3.5 px-4 text-right">Created</th>
-              <th className="py-3.5 px-3 text-center"></th>
-            </tr>
+            {table.getHeaderGroups().map((headerGroup) => (
+              <tr
+                key={headerGroup.id}
+                className="border-b border-slate-200 bg-slate-50/90 text-[10px] font-bold text-slate-500 uppercase tracking-wider"
+              >
+                {headerGroup.headers.map((header) => {
+                  const canSort = header.column.getCanSort();
+                  const isSorted = header.column.getIsSorted();
+
+                  return (
+                    <th
+                      key={header.id}
+                      scope="col"
+                      className={`py-2 px-3 ${
+                        header.column.id === 'createdAt' ? 'text-right' : ''
+                      } ${
+                        header.column.id === 'actions' ? 'px-2 text-center' : ''
+                      } ${
+                        canSort ? 'cursor-pointer select-none' : ''
+                      }`}
+                      aria-sort={
+                        isSorted === 'asc'
+                          ? 'ascending'
+                          : isSorted === 'desc'
+                          ? 'descending'
+                          : undefined
+                      }
+                      onClick={canSort ? header.column.getToggleSortingHandler() : undefined}
+                    >
+                      {header.isPlaceholder ? null : canSort ? (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            // Let the click bubble to th or handle here
+                            e.stopPropagation();
+                            header.column.getToggleSortingHandler()?.(e);
+                          }}
+                          className={`inline-flex items-center gap-1.5 px-1.5 py-0.5 -mx-1.5 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all duration-150 group/sort focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/30 cursor-pointer ${
+                            isSorted
+                              ? 'text-indigo-700 bg-indigo-50/80 hover:bg-indigo-100 font-extrabold shadow-2xs'
+                              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/90'
+                          } ${header.column.id === 'createdAt' ? 'ml-auto justify-end' : ''}`}
+                          title={`Sort by ${typeof header.column.columnDef.header === 'string' ? header.column.columnDef.header : header.column.id}`}
+                        >
+                          <span>
+                            {flexRender(
+                              header.column.columnDef.header,
+                              header.getContext()
+                            )}
+                          </span>
+                          <span className="inline-flex items-center shrink-0">
+                            {isSorted === 'asc' ? (
+                              <ArrowUp className="h-3 w-3 text-indigo-600 shrink-0" aria-label="sorted ascending" />
+                            ) : isSorted === 'desc' ? (
+                              <ArrowDown className="h-3 w-3 text-indigo-600 shrink-0" aria-label="sorted descending" />
+                            ) : (
+                              <ArrowUpDown className="h-3 w-3 text-slate-400 group-hover/sort:text-slate-700 shrink-0 transition-colors" />
+                            )}
+                          </span>
+                        </button>
+                      ) : (
+                        <div
+                          className={`inline-flex items-center ${
+                            header.column.id === 'createdAt' ? 'justify-end w-full' : ''
+                          }`}
+                        >
+                          <span>
+                            {flexRender(
+                              header.column.columnDef.header,
+                              header.getContext()
+                            )}
+                          </span>
+                        </div>
+                      )}
+                    </th>
+                  );
+                })}
+              </tr>
+            ))}
           </thead>
           <tbody className="divide-y divide-slate-100 text-xs text-slate-700">
-            {tickets.map((ticket) => {
-              const formattedDate = new Date(ticket.createdAt).toLocaleString(
-                undefined,
-                {
-                  month: 'short',
-                  day: 'numeric',
-                  hour: '2-digit',
-                  minute: '2-digit',
-                }
-              );
-
+            {table.getRowModel().rows.map((row) => {
+              const ticket = row.original;
               return (
                 <tr
-                  key={ticket.id}
+                  key={row.id}
                   onClick={() => onSelectTicket(ticket)}
                   className="hover:bg-slate-50/80 cursor-pointer transition-colors group"
                 >
-                  {/* Ticket # and Subject */}
-                  <td className="py-3.5 px-4">
-                    <div className="flex items-start space-x-2.5">
-                      <span className="font-bold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded text-[11px] border border-indigo-100/80 shrink-0">
-                        #{ticket.id}
-                      </span>
-                      <div>
-                        <span className="font-semibold text-slate-900 group-hover:text-indigo-600 transition-colors line-clamp-1">
-                          {ticket.subject}
-                        </span>
-                        <div className="flex items-center space-x-2 text-[11px] text-slate-400 mt-0.5">
-                          <span className="flex items-center space-x-1">
-                            <MessageSquare className="h-3 w-3" />
-                            <span>{ticket.messages?.length || 0}</span>
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </td>
-
-                  {/* Sender Info */}
-                  <td className="py-3.5 px-4">
-                    <div>
-                      <div className="font-semibold text-slate-800">
-                        {ticket.studentName}
-                      </div>
-                      <div className="text-[11px] text-slate-400 truncate max-w-[150px]">
-                        {ticket.studentEmail}
-                      </div>
-                    </div>
-                  </td>
-
-                  {/* Category */}
-                  <td className="py-3.5 px-4">
-                    <TicketCategoryBadge category={ticket.category} size="sm" />
-                  </td>
-
-                  {/* Priority */}
-                  <td className="py-3.5 px-4">
-                    <TicketPriorityBadge priority={ticket.priority} size="sm" />
-                  </td>
-
-                  {/* Status */}
-                  <td className="py-3.5 px-4">
-                    <TicketStatusBadge status={ticket.status} size="sm" />
-                  </td>
-
-                  {/* Assignee */}
-                  <td className="py-3.5 px-4">
-                    {ticket.assignedAgent ? (
-                      <span className="inline-flex items-center space-x-1.5 text-xs text-slate-700 font-medium">
-                        <span className="h-5 w-5 rounded-full bg-slate-200 text-slate-700 font-bold flex items-center justify-center text-[10px]">
-                          {ticket.assignedAgent.name.charAt(0).toUpperCase()}
-                        </span>
-                        <span className="truncate max-w-[120px]">
-                          {ticket.assignedAgent.name}
-                        </span>
-                      </span>
-                    ) : (
-                      <span className="text-slate-400 text-[11px] italic">
-                        Unassigned
-                      </span>
-                    )}
-                  </td>
-
-                  {/* Created Date */}
-                  <td className="py-3.5 px-4 text-right text-[11px] text-slate-400 whitespace-nowrap">
-                    {formattedDate}
-                  </td>
-
-                  {/* Arrow action */}
-                  <td className="py-3.5 px-3 text-center">
-                    <ChevronRight className="h-4 w-4 text-slate-300 group-hover:text-indigo-600 transition-colors inline-block" />
-                  </td>
+                  {row.getVisibleCells().map((cell) => (
+                    <td
+                      key={cell.id}
+                      className={`py-2.5 px-3 ${
+                        cell.column.id === 'createdAt'
+                          ? 'text-right'
+                          : ''
+                      } ${
+                        cell.column.id === 'actions' ? 'px-2 text-center' : ''
+                      }`}
+                    >
+                      {flexRender(
+                        cell.column.columnDef.cell,
+                        cell.getContext()
+                      )}
+                    </td>
+                  ))}
                 </tr>
               );
             })}
@@ -189,3 +309,5 @@ export const TicketsTable: React.FC<TicketsTableProps> = ({
     </div>
   );
 };
+
+export default TicketsTable;

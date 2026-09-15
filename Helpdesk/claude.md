@@ -178,8 +178,8 @@ e:\claude_ai\Ticket Management System\
     │   │   │   ├── HomePage.tsx      # Main agent ticket workspace dashboard
     │   │   │   ├── LoginPage.tsx     # Modernized login screen with role credentials hint (Zod validation)
     │   │   │   ├── Navbar.tsx        # App navigation header with session user details & sign-out
-    │   │   │   ├── TicketsPage.tsx   # Tickets dashboard with search, tabs, status/priority/category filters
-    │   │   │   ├── TicketsTable.tsx  # Interactive tickets list table with skeleton loading & badges
+    │   │   │   ├── TicketsPage.tsx   # Tickets dashboard with quick actions (refresh, create ticket) & table view
+    │   │   │   ├── TicketsTable.tsx  # Interactive tickets list table with skeleton loading, sorting & badges
     │   │   │   ├── TicketBadges.tsx  # Reusable status, priority, and category badge components
     │   │   │   ├── TicketDetailModal.tsx # Full ticket view with conversation thread & reply composer
     │   │   │   ├── CreateTicketModal.tsx # Inbound manual ticket creation modal dialog
@@ -235,7 +235,7 @@ e:\claude_ai\Ticket Management System\
     ├── package.json            # Root dependencies & execution scripts
     ├── playwright.config.ts    # Playwright E2E configuration with isolated test server
     ├── tsconfig.json           # Shared TypeScript configuration
-    ├── project-scope.md        # Comprehensive functional scope specification
+    └── project-scope.md        # Comprehensive functional scope specification
 ```
 
 ### Running the Application
@@ -300,16 +300,16 @@ From `e:\claude_ai\Ticket Management System\Helpdesk`:
 
 ## 7. Testing Architecture (Component-First: Vitest + React Testing Library & Selective Playwright E2E)
 
-The project enforces a **Component-First Testing Philosophy**: The vast majority of test coverage (**133/133 tests, 100% pass rate**) is maintained via fast, deterministic Vitest + React Testing Library tests in jsdom, reserving Playwright E2E tests strictly for critical full-stack integration validation.
+The project enforces a **Component-First Testing Philosophy**: The vast majority of test coverage (**126/126 tests, 100% pass rate**) is maintained via fast, deterministic Vitest + React Testing Library tests in jsdom, reserving Playwright E2E tests strictly for critical full-stack integration validation.
 
 ### 7.1 Client Component & Unit Test Suite (Vitest + RTL)
 - **Test Framework**: Vitest (`vitest`), React Testing Library (`@testing-library/react`, `@testing-library/user-event`), `@testing-library/jest-dom`, and jsdom.
 - **Test Directory**: `client/src/**/__tests__/*.test.tsx` and `client/src/test/*.test.ts`.
-- **Current Coverage**: **133/133 tests passing (100%)** across 10 test suites:
+- **Current Coverage**: **126/126 tests passing (100%)** across 10 test suites:
   1. `client/src/components/__tests__/TicketDetailModal.test.tsx` (16 tests): Modal open/close, ticket metadata rendering, status updates (`OPEN`, `RESOLVED`, `CLOSED`), category & assignee updates, conversation thread rendering with role badges, public reply vs. internal note composer, submission whitespace trimming, and API error alerts.
   2. `client/src/components/__tests__/CreateTicketModal.test.tsx` (11 tests): Modal visibility, input validations, form submission with whitespace trimming, category mapping, and API error banners.
-  3. `client/src/components/__tests__/TicketsPage.test.tsx` (15 tests): Search input, category/priority/status filters, sort order (newest/oldest), empty states, and ticket creation triggers.
-  4. `client/src/components/__tests__/TicketsTable.test.tsx` (4 tests): Skeleton loading, sorting, badge rendering, and row selection callbacks.
+  3. `client/src/components/__tests__/TicketsPage.test.tsx` (4 tests): Table rows rendering, default newest-first sorting, server-side TanStack column sorting, and ticket detail modal interaction.
+  4. `client/src/components/__tests__/TicketsTable.test.tsx` (8 tests): Skeleton loading, sorting, badge rendering, and row selection callbacks.
   5. `client/src/components/__tests__/TicketBadges.test.tsx` (11 tests): Status, Priority, and Category badge styling and labels.
   6. `client/src/components/__tests__/UserForm.test.tsx` (23 tests): Create and edit user form validations, role selection, password requirements, and submission.
   7. `client/src/components/__tests__/UsersPage.test.tsx` (23 tests): Admin user directory listing, create user modal trigger, delete confirmation, and edit user workflows.

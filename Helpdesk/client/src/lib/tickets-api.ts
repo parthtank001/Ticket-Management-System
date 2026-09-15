@@ -65,13 +65,23 @@ export interface AddTicketMessagePayload {
   isInternalNote?: boolean;
 }
 
+export interface ListTicketsParams {
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
+}
+
 export const ticketsApi = {
   /**
-   * Fetch all tickets with nested relations
+   * Fetch all tickets with nested relations and optional server-side sorting
    */
-  async listTickets(): Promise<Ticket[]> {
+  async listTickets(params?: ListTicketsParams): Promise<Ticket[]> {
     try {
-      const response = await apiClient.get<Ticket[]>('/api/tickets');
+      const response = await apiClient.get<Ticket[]>('/api/tickets', {
+        params: {
+          sortBy: params?.sortBy,
+          sortOrder: params?.sortOrder,
+        },
+      });
       return response.data;
     } catch (error: any) {
       const message =

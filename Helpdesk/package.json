@@ -9,6 +9,7 @@
     "build": "npm --prefix client run build",
     "start": "ts-node server/index.ts",
     "seed": "ts-node prisma/seed.ts",
+    "seed:tickets": "ts-node scripts/seed-100-tickets.ts",
     "create-user": "ts-node scripts/create-user.ts",
     "db:test:setup": "ts-node scripts/setup-test-db.ts",
     "db:test:reset": "dotenv -e .env.test -- prisma migrate reset --force",

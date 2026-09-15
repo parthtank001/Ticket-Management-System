@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { TicketsTable } from '../TicketsTable';
 import type { Ticket } from '../../lib/types';
@@ -55,6 +55,23 @@ describe('TicketsTable Component', () => {
       createdAt: '2026-03-02T15:30:00.000Z',
       updatedAt: '2026-03-02T15:30:00.000Z',
     },
+    {
+      id: 103,
+      ticketNumber: 103,
+      subject: 'Academic Record Access',
+      studentName: 'Alex Smith',
+      studentEmail: 'alex@uni.edu',
+      category: 'GENERAL_QUESTION',
+      priority: 'URGENT',
+      status: 'CLOSED',
+      summary: null,
+      aiDraftResponse: null,
+      assignedAgentId: null,
+      assignedAgent: null,
+      messages: [],
+      createdAt: '2026-03-03T18:00:00.000Z',
+      updatedAt: '2026-03-03T18:00:00.000Z',
+    },
   ];
 
   it('renders loading skeletons when isLoading is true', () => {
@@ -88,13 +105,14 @@ describe('TicketsTable Component', () => {
     expect(screen.getByText('VPN Connection Lost')).toBeInTheDocument();
     expect(screen.getByText('John Doe')).toBeInTheDocument();
     expect(screen.getByText('john@uni.edu')).toBeInTheDocument();
-    expect(screen.getByText('Jane Support')).toBeInTheDocument();
 
     expect(screen.getByText('#102')).toBeInTheDocument();
     expect(screen.getByText('Scholarship Document Inquiry')).toBeInTheDocument();
     expect(screen.getByText('Sarah Connor')).toBeInTheDocument();
     expect(screen.getByText('sarah@uni.edu')).toBeInTheDocument();
-    expect(screen.getByText('Unassigned')).toBeInTheDocument();
+
+    expect(screen.getByText('#103')).toBeInTheDocument();
+    expect(screen.getByText('Academic Record Access')).toBeInTheDocument();
   });
 
   it('invokes onSelectTicket when a ticket row is clicked', async () => {
@@ -117,5 +135,90 @@ describe('TicketsTable Component', () => {
 
     expect(handleSelectTicket).toHaveBeenCalledTimes(1);
     expect(handleSelectTicket).toHaveBeenCalledWith(mockTickets[0]);
+  });
+
+  describe('TanStack Table Sorting Interactions', () => {
+    it('renders tickets in the order provided by the server', () => {
+      render(
+        <TicketsTable
+          tickets={mockTickets}
+          isLoading={false}
+          onSelectTicket={vi.fn()}
+        />
+      );
+
+      const rows = screen.getAllByRole('row').slice(1);
+      expect(rows).toHaveLength(3);
+      expect(within(rows[0]).getByText('#101')).toBeInTheDocument();
+      expect(within(rows[1]).getByText('#102')).toBeInTheDocument();
+      expect(within(rows[2]).getByText('#103')).toBeInTheDocument();
+    });
+
+    it('triggers onSortingChange when column headers are clicked', async () => {
+      const user = userEvent.setup();
+      const handleSortingChange = vi.fn();
+
+      render(
+        <TicketsTable
+          tickets={mockTickets}
+          isLoading={false}
+          onSelectTicket={vi.fn()}
+          sorting={[{ id: 'createdAt', desc: true }]}
+          onSortingChange={handleSortingChange}
+        />
+      );
+
+      const senderHeader = screen.getByRole('columnheader', { name: /sender/i });
+      await user.click(senderHeader);
+
+      expect(handleSortingChange).toHaveBeenCalledTimes(1);
+    });
+
+    it('sets aria-sort attribute appropriately based on sorting state', () => {
+      const { rerender } = render(
+        <TicketsTable
+          tickets={mockTickets}
+          isLoading={false}
+          onSelectTicket={vi.fn()}
+          sorting={[{ id: 'subject', desc: false }]}
+          onSortingChange={vi.fn()}
+        />
+      );
+
+      const subjectHeader = screen.getByRole('columnheader', { name: /subject/i });
+      expect(subjectHeader).toHaveAttribute('aria-sort', 'ascending');
+
+      rerender(
+        <TicketsTable
+          tickets={mockTickets}
+          isLoading={false}
+          onSelectTicket={vi.fn()}
+          sorting={[{ id: 'subject', desc: true }]}
+          onSortingChange={vi.fn()}
+        />
+      );
+
+      expect(subjectHeader).toHaveAttribute('aria-sort', 'descending');
+    });
+
+    it('toggles internal sorting state when no external sorting prop is passed', async () => {
+      const user = userEvent.setup();
+      render(
+        <TicketsTable
+          tickets={mockTickets}
+          isLoading={false}
+          onSelectTicket={vi.fn()}
+        />
+      );
+
+      const subjectHeader = screen.getByRole('columnheader', { name: /subject/i });
+      expect(subjectHeader).not.toHaveAttribute('aria-sort');
+
+      await user.click(subjectHeader);
+      expect(subjectHeader).toHaveAttribute('aria-sort', 'ascending');
+
+      await user.click(subjectHeader);
+      expect(subjectHeader).toHaveAttribute('aria-sort', 'descending');
+    });
   });
 });

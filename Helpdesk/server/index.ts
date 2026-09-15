@@ -87,8 +87,59 @@ app.get('/api/agents', requireAuth, async (req: Request, res: Response) => {
   res.json(agents);
 });
 
-// Get all tickets (Authenticated support staff only)
+// Get all tickets with server-side sorting (Authenticated support staff only)
 app.get('/api/tickets', requireAuth, async (req: Request, res: Response) => {
+  const { sortBy, sortOrder } = req.query;
+
+  let orderBy: any = { createdAt: 'desc' };
+
+  if (sortBy && typeof sortBy === 'string') {
+    const rawField = sortBy.trim();
+    const order: 'asc' | 'desc' =
+      typeof sortOrder === 'string' && sortOrder.toLowerCase() === 'asc'
+        ? 'asc'
+        : 'desc';
+
+    switch (rawField) {
+      case 'id':
+      case 'ticket':
+        orderBy = { id: order };
+        break;
+      case 'subject':
+        orderBy = { subject: order };
+        break;
+      case 'studentName':
+      case 'sender':
+        orderBy = { studentName: order };
+        break;
+      case 'studentEmail':
+        orderBy = { studentEmail: order };
+        break;
+      case 'category':
+        orderBy = { category: order };
+        break;
+      case 'priority':
+        orderBy = { priority: order };
+        break;
+      case 'status':
+        orderBy = { status: order };
+        break;
+      case 'assignedAgent':
+      case 'assignee':
+        orderBy = { assignedAgent: { name: order } };
+        break;
+      case 'createdAt':
+      case 'created':
+        orderBy = { createdAt: order };
+        break;
+      case 'updatedAt':
+        orderBy = { updatedAt: order };
+        break;
+      default:
+        orderBy = { createdAt: 'desc' };
+    }
+  }
+
   const tickets = await prisma.ticket.findMany({
     include: {
       assignedAgent: {
@@ -103,7 +154,7 @@ app.get('/api/tickets', requireAuth, async (req: Request, res: Response) => {
         orderBy: { createdAt: 'asc' },
       },
     },
-    orderBy: { createdAt: 'desc' },
+    orderBy,
   });
   res.json(tickets);
 });

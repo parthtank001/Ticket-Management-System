@@ -131,3 +131,36 @@ export type CreateTicketMessageInput = z.input<typeof createTicketMessageSchema>
 export type CreateTicketMessageOutput = z.output<typeof createTicketMessageSchema>;
 export type InboundEmailInput = z.input<typeof inboundEmailSchema>;
 export type InboundEmailOutput = z.output<typeof inboundEmailSchema>;
+
+/**
+ * Zod validation schema for querying tickets with server-side sorting
+ */
+export const ticketSortFieldSchema = z.enum([
+  'id',
+  'ticket',
+  'subject',
+  'studentName',
+  'sender',
+  'studentEmail',
+  'category',
+  'priority',
+  'status',
+  'assignedAgent',
+  'assignee',
+  'createdAt',
+  'created',
+  'updatedAt',
+]);
+
+export const sortOrderSchema = z.enum(['asc', 'desc']);
+
+export const getTicketsQuerySchema = z.object({
+  sortBy: ticketSortFieldSchema.optional().default('createdAt'),
+  sortOrder: sortOrderSchema.optional().default('desc'),
+});
+
+export type TicketSortField = z.infer<typeof ticketSortFieldSchema>;
+export type SortOrder = z.infer<typeof sortOrderSchema>;
+export type GetTicketsQueryInput = z.input<typeof getTicketsQuerySchema>;
+export type GetTicketsQueryOutput = z.output<typeof getTicketsQuerySchema>;
+

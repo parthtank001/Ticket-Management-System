@@ -6,18 +6,19 @@ import {
   CreateTicketPayload,
   UpdateTicketPayload,
   AddTicketMessagePayload,
+  ListTicketsParams,
 } from '../tickets-api';
 
 export const TICKETS_QUERY_KEY = ['tickets'] as const;
 export const AGENTS_QUERY_KEY = ['agents'] as const;
 
 /**
- * Hook to fetch all tickets with automatic caching
+ * Hook to fetch all tickets with automatic caching and optional server-side sorting
  */
-export function useTickets() {
+export function useTickets(params?: ListTicketsParams) {
   return useQuery<Ticket[]>({
-    queryKey: TICKETS_QUERY_KEY,
-    queryFn: () => ticketsApi.listTickets(),
+    queryKey: params ? ([...TICKETS_QUERY_KEY, params] as const) : TICKETS_QUERY_KEY,
+    queryFn: () => ticketsApi.listTickets(params),
   });
 }
 
