@@ -68,19 +68,30 @@ export interface AddTicketMessagePayload {
 export interface ListTicketsParams {
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
+  search?: string;
+  status?: string;
+  category?: string;
+  priority?: string;
+  assignedAgentId?: string;
 }
 
 export const ticketsApi = {
   /**
-   * Fetch all tickets with nested relations and optional server-side sorting
+   * Fetch all tickets with nested relations, optional server-side sorting and filtering
    */
   async listTickets(params?: ListTicketsParams): Promise<Ticket[]> {
     try {
+      const queryParams: Record<string, any> = {};
+      if (params?.sortBy) queryParams.sortBy = params.sortBy;
+      if (params?.sortOrder) queryParams.sortOrder = params.sortOrder;
+      if (params?.search && params.search.trim()) queryParams.search = params.search.trim();
+      if (params?.status && params.status !== 'ALL') queryParams.status = params.status;
+      if (params?.category && params.category !== 'ALL') queryParams.category = params.category;
+      if (params?.priority && params.priority !== 'ALL') queryParams.priority = params.priority;
+      if (params?.assignedAgentId && params.assignedAgentId !== 'ALL') queryParams.assignedAgentId = params.assignedAgentId;
+
       const response = await apiClient.get<Ticket[]>('/api/tickets', {
-        params: {
-          sortBy: params?.sortBy,
-          sortOrder: params?.sortOrder,
-        },
+        params: queryParams,
       });
       return response.data;
     } catch (error: any) {

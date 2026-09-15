@@ -232,6 +232,85 @@ describe('TicketsPage Component', () => {
     });
   });
 
+  describe('Filtering & Search Interactions', () => {
+    it('triggers search query filtering when user types in search input', async () => {
+      const user = userEvent.setup();
+      renderWithQuery(<TicketsPage user={mockUser} />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Payment Issue with Stripe')).toBeInTheDocument();
+      });
+
+      const searchInput = screen.getByPlaceholderText(/search tickets by subject, sender, #id/i);
+      await user.type(searchInput, 'Stripe');
+
+      await waitFor(() => {
+        expect(ticketsApi.listTickets).toHaveBeenCalledWith(
+          expect.objectContaining({
+            search: 'Stripe',
+          })
+        );
+      });
+    });
+
+    it('clears search input when clicking clear button', async () => {
+      const user = userEvent.setup();
+      renderWithQuery(<TicketsPage user={mockUser} />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Payment Issue with Stripe')).toBeInTheDocument();
+      });
+
+      const searchInput = screen.getByPlaceholderText(/search tickets by subject, sender, #id/i);
+      await user.type(searchInput, 'Stripe');
+
+      const clearSearchButton = screen.getByRole('button', { name: /clear search/i });
+      await user.click(clearSearchButton);
+
+      expect(searchInput).toHaveValue('');
+    });
+
+    it('filters by status when selecting a status option', async () => {
+      const user = userEvent.setup();
+      renderWithQuery(<TicketsPage user={mockUser} />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Payment Issue with Stripe')).toBeInTheDocument();
+      });
+
+      const statusSelect = screen.getByRole('combobox', { name: /filter by status/i });
+      await user.selectOptions(statusSelect, 'OPEN');
+
+      await waitFor(() => {
+        expect(ticketsApi.listTickets).toHaveBeenCalledWith(
+          expect.objectContaining({
+            status: 'OPEN',
+          })
+        );
+      });
+    });
+
+    it('filters by category when selecting a category option', async () => {
+      const user = userEvent.setup();
+      renderWithQuery(<TicketsPage user={mockUser} />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Payment Issue with Stripe')).toBeInTheDocument();
+      });
+
+      const categorySelect = screen.getByRole('combobox', { name: /filter by category/i });
+      await user.selectOptions(categorySelect, 'REFUND_REQUEST');
+
+      await waitFor(() => {
+        expect(ticketsApi.listTickets).toHaveBeenCalledWith(
+          expect.objectContaining({
+            category: 'REFUND_REQUEST',
+          })
+        );
+      });
+    });
+  });
+
   describe('Modal Interactions', () => {
     it('opens ticket detail modal when clicking on a ticket row', async () => {
       const user = userEvent.setup();

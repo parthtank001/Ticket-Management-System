@@ -178,8 +178,8 @@ e:\claude_ai\Ticket Management System\
     │   │   │   ├── HomePage.tsx      # Main agent ticket workspace dashboard
     │   │   │   ├── LoginPage.tsx     # Modernized login screen with role credentials hint (Zod validation)
     │   │   │   ├── Navbar.tsx        # App navigation header with session user details & sign-out
-    │   │   │   ├── TicketsPage.tsx   # Tickets dashboard with quick actions (refresh, create ticket) & table view
-    │   │   │   ├── TicketsTable.tsx  # Interactive tickets list table with skeleton loading, sorting & badges
+    │   │   │   ├── TicketsPage.tsx   # Tickets dashboard with search, status/category/priority/assignee filters, sorting & quick actions
+    │   │   │   ├── TicketsTable.tsx  # Interactive tickets list table with skeleton loading, sorting, badges & filter empty-states
     │   │   │   ├── TicketBadges.tsx  # Reusable status, priority, and category badge components
     │   │   │   ├── TicketDetailModal.tsx # Full ticket view with conversation thread & reply composer
     │   │   │   ├── CreateTicketModal.tsx # Inbound manual ticket creation modal dialog
@@ -189,12 +189,12 @@ e:\claude_ai\Ticket Management System\
     │   │   ├── lib/
     │   │   │   ├── hooks/
     │   │   │   │   ├── useAuth.ts    # React Query hooks for session & auth lifecycle
-    │   │   │   │   ├── useTickets.ts # React Query hooks for tickets, agents & messaging
+    │   │   │   │   ├── useTickets.ts # React Query hooks for tickets, agents & messaging with reactive filter params
     │   │   │   │   └── useUsers.ts   # React Query hooks for user CRUD management
     │   │   │   ├── api-client.ts     # Centralized Axios client instance with credentials
     │   │   │   ├── auth-client.ts    # Client authentication helper (Better Auth client wrapper)
     │   │   │   ├── query-client.ts   # TanStack React Query client instance & default cache policies
-    │   │   │   ├── tickets-api.ts    # Typed API service for tickets, agents & replies
+    │   │   │   ├── tickets-api.ts    # Typed API service for tickets, agents & replies with search and filter params
     │   │   │   ├── users-api.ts      # Typed API service for user endpoints using axios
     │   │   │   ├── types.ts          # Centralized client type re-exports from @helpdesk/core
     │   │   │   └── utils.ts          # Class merging utilities (clsx + tailwind-merge)
@@ -217,7 +217,7 @@ e:\claude_ai\Ticket Management System\
     │   │   └── email-ingestion.ts # Inbound email processing, threading matching & ticket creation
     │   ├── auth.ts             # Better Auth server configuration with Prisma adapter
     │   ├── db.ts               # Prisma client instance & PostgreSQL health check
-    │   ├── index.ts            # Express server entry point, middleware & route mounting
+    │   ├── index.ts            # Express server entry point, middleware & route mounting (GET /api/tickets filtering & sorting)
     │   ├── schemas.ts          # Centralized Zod validation schemas for all API payloads
     │   └── types.ts            # Server-side TypeScript type definitions
     ├── prisma/
@@ -278,18 +278,18 @@ From `e:\claude_ai\Ticket Management System\Helpdesk`:
 - **Centralized Axios Client (`client/src/lib/api-client.ts`)**:
   - Always use the shared `apiClient` instance configured with `withCredentials: true` and JSON headers.
   - Never use native `fetch()` or instantiate ad-hoc `axios` clients directly inside UI components.
-  - Structure all API endpoints as strongly-typed service objects in `client/src/lib/*-api.ts` (e.g., `usersApi` in `users-api.ts`).
+  - Structure all API endpoints as strongly-typed service objects in `client/src/lib/*-api.ts` (e.g., `usersApi` in `users-api.ts`, `ticketsApi` in `tickets-api.ts`).
   - Standardize error extraction: parse `error.response?.data?.error || error.response?.data?.message || error.message` before throwing.
 - **TanStack React Query (`@tanstack/react-query`)**:
-  - Encapsulate server-state queries and mutations within dedicated custom hooks inside `client/src/lib/hooks/` (e.g., `useUsers.ts`, `useAuth.ts`).
-  - Query Keys: Define typed tuple constants (e.g., `export const USERS_QUERY_KEY = ['users'] as const;`). Append parameters (filters, pagination) to the query key array (`[...USERS_QUERY_KEY, params]`) to trigger automatic reactive re-fetching.
+  - Encapsulate server-state queries and mutations within dedicated custom hooks inside `client/src/lib/hooks/` (e.g., `useUsers.ts`, `useTickets.ts`, `useAuth.ts`).
+  - Query Keys: Define typed tuple constants (e.g., `export const TICKETS_QUERY_KEY = ['tickets'] as const;`). Append parameters (filters, sorting, search) to the query key array (`[...TICKETS_QUERY_KEY, params]`) to trigger automatic reactive re-fetching.
   - Mutations (`useMutation`): Execute all write/update/delete operations with `useMutation` and invalidate corresponding query keys on success (`queryClient.invalidateQueries({ queryKey: ... })`).
   - Cache Policies (`client/src/lib/query-client.ts`): Set to `staleTime: 2 minutes`, `gcTime: 10 minutes`, `retry: 1`, and `refetchOnWindowFocus: false`.
   - **UI States**: Always handle `isLoading` / `isPending` and `isError` / `error` states gracefully with loaders and alert banners.
 
 ### 6.6 Data Validation Architecture (Zod)
 - **Centralized Backend Schemas (`server/schemas.ts`)**:
-  - Request validation across all Express routes (`POST /api/users`, `PATCH /api/users/:id`, `POST /api/tickets`, `PATCH /api/tickets/:id`, `POST /api/tickets/:id/messages`) is handled via `schema.safeParse(req.body)`.
+  - Request validation across all Express routes (`POST /api/users`, `PATCH /api/users/:id`, `POST /api/tickets`, `PATCH /api/tickets/:id`, `POST /api/tickets/:id/messages`, `GET /api/tickets`) is handled via `schema.safeParse(req.body)` and `getTicketsQuerySchema`.
   - Schema errors return HTTP 400 Bad Request with the primary validation issue message (`res.status(400).json({ error: result.error.issues[0].message })`).
   - Schemas provide inferred TypeScript types via `z.infer<typeof schema>`.
 - **Client-Side Form Validation (`zod` + `@hookform/resolvers/zod`)**:
@@ -300,16 +300,16 @@ From `e:\claude_ai\Ticket Management System\Helpdesk`:
 
 ## 7. Testing Architecture (Component-First: Vitest + React Testing Library & Selective Playwright E2E)
 
-The project enforces a **Component-First Testing Philosophy**: The vast majority of test coverage (**126/126 tests, 100% pass rate**) is maintained via fast, deterministic Vitest + React Testing Library tests in jsdom, reserving Playwright E2E tests strictly for critical full-stack integration validation.
+The project enforces a **Component-First Testing Philosophy**: The vast majority of test coverage (**134/134 tests, 100% pass rate**) is maintained via fast, deterministic Vitest + React Testing Library tests in jsdom, reserving Playwright E2E tests strictly for critical full-stack integration validation.
 
 ### 7.1 Client Component & Unit Test Suite (Vitest + RTL)
 - **Test Framework**: Vitest (`vitest`), React Testing Library (`@testing-library/react`, `@testing-library/user-event`), `@testing-library/jest-dom`, and jsdom.
 - **Test Directory**: `client/src/**/__tests__/*.test.tsx` and `client/src/test/*.test.ts`.
-- **Current Coverage**: **126/126 tests passing (100%)** across 10 test suites:
+- **Current Coverage**: **134/134 tests passing (100%)** across 10 test suites:
   1. `client/src/components/__tests__/TicketDetailModal.test.tsx` (16 tests): Modal open/close, ticket metadata rendering, status updates (`OPEN`, `RESOLVED`, `CLOSED`), category & assignee updates, conversation thread rendering with role badges, public reply vs. internal note composer, submission whitespace trimming, and API error alerts.
   2. `client/src/components/__tests__/CreateTicketModal.test.tsx` (11 tests): Modal visibility, input validations, form submission with whitespace trimming, category mapping, and API error banners.
-  3. `client/src/components/__tests__/TicketsPage.test.tsx` (4 tests): Table rows rendering, default newest-first sorting, server-side TanStack column sorting, and ticket detail modal interaction.
-  4. `client/src/components/__tests__/TicketsTable.test.tsx` (8 tests): Skeleton loading, sorting, badge rendering, and row selection callbacks.
+  3. `client/src/components/__tests__/TicketsPage.test.tsx` (12 tests): Table rows rendering, default newest-first sorting, server-side TanStack column sorting, search query filtering, status/category/priority/assignee filtering, filter reset with active count, and ticket modal interactions.
+  4. `client/src/components/__tests__/TicketsTable.test.tsx` (8 tests): Skeleton loading, sorting, badge rendering, filter empty state, and row selection callbacks.
   5. `client/src/components/__tests__/TicketBadges.test.tsx` (11 tests): Status, Priority, and Category badge styling and labels.
   6. `client/src/components/__tests__/UserForm.test.tsx` (23 tests): Create and edit user form validations, role selection, password requirements, and submission.
   7. `client/src/components/__tests__/UsersPage.test.tsx` (23 tests): Admin user directory listing, create user modal trigger, delete confirmation, and edit user workflows.

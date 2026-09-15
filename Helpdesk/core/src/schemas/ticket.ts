@@ -157,10 +157,16 @@ export const sortOrderSchema = z.enum(['asc', 'desc']);
 export const getTicketsQuerySchema = z.object({
   sortBy: ticketSortFieldSchema.optional().default('createdAt'),
   sortOrder: sortOrderSchema.optional().default('desc'),
+  search: z.string().optional(),
+  status: z.string().optional(),
+  category: z.string().optional(),
+  priority: z.string().optional(),
+  assignedAgentId: z.string().optional(),
 });
 
 export type TicketSortField = z.infer<typeof ticketSortFieldSchema>;
 export type SortOrder = z.infer<typeof sortOrderSchema>;
 export type GetTicketsQueryInput = z.input<typeof getTicketsQuerySchema>;
 export type GetTicketsQueryOutput = z.output<typeof getTicketsQuerySchema>;
+
 

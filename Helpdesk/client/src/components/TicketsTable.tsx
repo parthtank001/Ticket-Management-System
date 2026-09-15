@@ -25,6 +25,7 @@ import {
   ArrowUp,
   ArrowDown,
   ArrowUpDown,
+  RotateCcw,
 } from 'lucide-react';
 
 export interface TicketsTableProps {
@@ -33,6 +34,8 @@ export interface TicketsTableProps {
   onSelectTicket: (ticket: Ticket) => void;
   sorting?: SortingState;
   onSortingChange?: React.Dispatch<React.SetStateAction<SortingState>>;
+  hasActiveFilters?: boolean;
+  onClearFilters?: () => void;
 }
 
 export const TicketsTable: React.FC<TicketsTableProps> = ({
@@ -41,6 +44,8 @@ export const TicketsTable: React.FC<TicketsTableProps> = ({
   onSelectTicket,
   sorting: externalSorting,
   onSortingChange: externalOnSortingChange,
+  hasActiveFilters = false,
+  onClearFilters,
 }) => {
   const [internalSorting, setInternalSorting] = useState<SortingState>([
     { id: 'createdAt', desc: true },
@@ -181,10 +186,24 @@ export const TicketsTable: React.FC<TicketsTableProps> = ({
         <div className="mx-auto h-10 w-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 mb-2.5">
           <Inbox className="h-5 w-5" />
         </div>
-        <h3 className="text-sm font-bold text-slate-800 mb-1">No Tickets Found</h3>
-        <p className="text-xs text-slate-500 max-w-sm mx-auto">
-          No tickets match your search filters, or no support inquiries have been submitted yet.
+        <h3 className="text-sm font-bold text-slate-800 mb-1">
+          {hasActiveFilters ? 'No Matching Tickets' : 'No Tickets Found'}
+        </h3>
+        <p className="text-xs text-slate-500 max-w-sm mx-auto mb-3">
+          {hasActiveFilters
+            ? 'No tickets match your search filters. Try adjusting your query or resetting filters.'
+            : 'No tickets match your search filters, or no support inquiries have been submitted yet.'}
         </p>
+        {hasActiveFilters && onClearFilters && (
+          <button
+            type="button"
+            onClick={onClearFilters}
+            className="inline-flex items-center space-x-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md text-xs font-semibold transition-colors cursor-pointer"
+          >
+            <RotateCcw className="h-3.5 w-3.5" />
+            <span>Clear All Filters</span>
+          </button>
+        )}
       </div>
     );
   }

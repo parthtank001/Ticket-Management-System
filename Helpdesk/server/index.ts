@@ -87,9 +87,48 @@ app.get('/api/agents', requireAuth, async (req: Request, res: Response) => {
   res.json(agents);
 });
 
-// Get all tickets with server-side sorting (Authenticated support staff only)
+// Get all tickets with server-side sorting & filtering (Authenticated support staff only)
 app.get('/api/tickets', requireAuth, async (req: Request, res: Response) => {
-  const { sortBy, sortOrder } = req.query;
+  const { sortBy, sortOrder, search, status, category, priority, assignedAgentId } = req.query;
+
+  const where: any = {};
+
+  if (status && typeof status === 'string' && status !== 'ALL') {
+    where.status = status;
+  }
+
+  if (category && typeof category === 'string' && category !== 'ALL') {
+    if (category === 'UNCATEGORIZED' || category === 'NONE') {
+      where.category = null;
+    } else {
+      where.category = category;
+    }
+  }
+
+  if (priority && typeof priority === 'string' && priority !== 'ALL') {
+    where.priority = priority;
+  }
+
+  if (assignedAgentId && typeof assignedAgentId === 'string' && assignedAgentId !== 'ALL') {
+    if (assignedAgentId === 'UNASSIGNED' || assignedAgentId === 'NONE') {
+      where.assignedAgentId = null;
+    } else {
+      where.assignedAgentId = assignedAgentId;
+    }
+  }
+
+  if (search && typeof search === 'string' && search.trim() !== '') {
+    const searchTerm = search.trim();
+    const cleanId = searchTerm.replace(/^#/, '');
+    const numericId = parseInt(cleanId, 10);
+
+    where.OR = [
+      { subject: { contains: searchTerm, mode: 'insensitive' } },
+      { studentName: { contains: searchTerm, mode: 'insensitive' } },
+      { studentEmail: { contains: searchTerm, mode: 'insensitive' } },
+      ...(!isNaN(numericId) && numericId > 0 && String(numericId) === cleanId ? [{ id: numericId }] : []),
+    ];
+  }
 
   let orderBy: any = { createdAt: 'desc' };
 
@@ -141,6 +180,7 @@ app.get('/api/tickets', requireAuth, async (req: Request, res: Response) => {
   }
 
   const tickets = await prisma.ticket.findMany({
+    where,
     include: {
       assignedAgent: {
         select: {
