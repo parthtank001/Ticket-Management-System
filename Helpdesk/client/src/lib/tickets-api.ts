@@ -133,6 +133,23 @@ export const ticketsApi = {
   },
 
   /**
+   * Fetch a single ticket by ID with messages and assigned agent
+   */
+  async getTicket(id: number): Promise<Ticket> {
+    try {
+      const response = await apiClient.get<Ticket>(`/api/tickets/${id}`);
+      return response.data;
+    } catch (error: any) {
+      const message =
+        error.response?.data?.error ||
+        error.response?.data?.message ||
+        error.message ||
+        'Failed to fetch ticket';
+      throw new Error(message);
+    }
+  },
+
+  /**
    * Fetch active support agents available for assignment
    */
   async listAgents(): Promise<TicketAgent[]> {

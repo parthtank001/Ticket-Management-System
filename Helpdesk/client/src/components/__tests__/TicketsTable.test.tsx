@@ -137,6 +137,27 @@ describe('TicketsTable Component', () => {
     expect(handleSelectTicket).toHaveBeenCalledWith(mockTickets[0]);
   });
 
+  it('renders ticket subject as a link to /tickets/:id and invokes onNavigate on click', async () => {
+    const user = userEvent.setup();
+    const handleNavigate = vi.fn();
+
+    render(
+      <TicketsTable
+        tickets={mockTickets}
+        isLoading={false}
+        onSelectTicket={vi.fn()}
+        onNavigate={handleNavigate}
+      />
+    );
+
+    const subjectLink = screen.getByRole('link', { name: 'VPN Connection Lost' });
+    expect(subjectLink).toHaveAttribute('href', '/tickets/101');
+
+    await user.click(subjectLink);
+
+    expect(handleNavigate).toHaveBeenCalledWith('/tickets/101');
+  });
+
   describe('TanStack Table Sorting Interactions', () => {
     it('renders tickets in the order provided by the server', () => {
       render(

@@ -41,6 +41,7 @@ export interface TicketsTableProps {
   tickets: Ticket[];
   isLoading: boolean;
   onSelectTicket: (ticket: Ticket) => void;
+  onNavigate?: (path: string) => void;
   sorting?: SortingState;
   onSortingChange?: React.Dispatch<React.SetStateAction<SortingState>>;
   hasActiveFilters?: boolean;
@@ -52,6 +53,7 @@ export const TicketsTable: React.FC<TicketsTableProps> = ({
   tickets,
   isLoading,
   onSelectTicket,
+  onNavigate,
   sorting: externalSorting,
   onSortingChange: externalOnSortingChange,
   hasActiveFilters = false,
@@ -80,9 +82,20 @@ export const TicketsTable: React.FC<TicketsTableProps> = ({
                 #{ticket.id}
               </span>
               <div>
-                <span className="font-semibold text-slate-900 group-hover:text-indigo-600 transition-colors line-clamp-1">
+                <a
+                  href={`/tickets/${ticket.id}`}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    if (onNavigate) {
+                      onNavigate(`/tickets/${ticket.id}`);
+                    } else {
+                      onSelectTicket(ticket);
+                    }
+                  }}
+                  className="font-semibold text-slate-900 group-hover:text-indigo-600 hover:underline transition-colors line-clamp-1 cursor-pointer block"
+                >
                   {ticket.subject}
-                </span>
+                </a>
                 <div className="flex items-center space-x-2 text-[10px] text-slate-400 mt-0.5">
                   <span className="flex items-center space-x-1">
                     <MessageSquare className="h-3 w-3" />

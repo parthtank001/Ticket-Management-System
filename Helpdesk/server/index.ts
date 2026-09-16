@@ -289,6 +289,37 @@ app.post('/api/tickets', ticketCreationLimiter, async (req: Request, res: Respon
   res.status(201).json(ticket);
 });
 
+// Get a single ticket by ID with messages and assigned agent (Authenticated support staff only)
+app.get('/api/tickets/:id', requireAuth, async (req: Request, res: Response) => {
+  const id = parseInt(req.params.id as string, 10);
+  if (isNaN(id)) {
+    return res.status(400).json({ error: 'Invalid ticket ID' });
+  }
+
+  const ticket = await prisma.ticket.findUnique({
+    where: { id },
+    include: {
+      assignedAgent: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          role: true,
+        },
+      },
+      messages: {
+        orderBy: { createdAt: 'asc' },
+      },
+    },
+  });
+
+  if (!ticket) {
+    return res.status(404).json({ error: 'Ticket not found' });
+  }
+
+  res.json(ticket);
+});
+
 // Update ticket status or assigned agent (Authenticated support staff only)
 app.patch('/api/tickets/:id', requireAuth, async (req: Request, res: Response) => {
   const id = parseInt(req.params.id as string, 10);

@@ -6,6 +6,7 @@ import { Navbar } from './components/Navbar';
 import { LoginPage } from './components/LoginPage';
 import { HomePage } from './components/HomePage';
 import { TicketsPage } from './components/TicketsPage';
+import { TicketDetailPage } from './components/TicketDetailPage';
 import { UsersPage } from './components/UsersPage';
 import { Ticket } from 'lucide-react';
 import { Skeleton } from './components/ui/skeleton';
@@ -121,8 +122,20 @@ export default function App() {
       return <UsersPage user={user} />;
     }
 
+    const ticketDetailMatch = currentPath.match(/^\/tickets\/(\d+)$/);
+    if (ticketDetailMatch) {
+      const ticketId = parseInt(ticketDetailMatch[1], 10);
+      return (
+        <TicketDetailPage
+          ticketId={ticketId}
+          user={user}
+          onNavigate={navigateTo}
+        />
+      );
+    }
+
     if (currentPath === '/tickets') {
-      return <TicketsPage user={user} />;
+      return <TicketsPage user={user} onNavigate={navigateTo} />;
     }
 
     return <HomePage user={user} onNavigate={navigateTo} />;

@@ -24,6 +24,32 @@ export function useTickets(params?: ListTicketsParams) {
 }
 
 /**
+ * Hook to fetch a single ticket by ID with automatic caching and instant cache hydration
+ */
+export function useTicket(id: number | null | undefined) {
+  const queryClient = useQueryClient();
+
+  return useQuery<Ticket>({
+    queryKey: ['tickets', id],
+    queryFn: () => ticketsApi.getTicket(id!),
+    enabled: typeof id === 'number' && !isNaN(id) && id > 0,
+    initialData: () => {
+      if (!id || typeof id !== 'number') return undefined;
+      const queries = queryClient.getQueriesData<PaginatedTicketsResponse | Ticket[]>({
+        queryKey: TICKETS_QUERY_KEY,
+      });
+      for (const [, data] of queries) {
+        if (!data) continue;
+        const list = Array.isArray(data) ? data : data.tickets;
+        const found = list?.find((t) => t.id === id);
+        if (found) return found;
+      }
+      return undefined;
+    },
+  });
+}
+
+/**
  * Hook to fetch active agents list for assignments
  */
 export function useAgents() {

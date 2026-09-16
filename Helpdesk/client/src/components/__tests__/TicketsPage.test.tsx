@@ -319,8 +319,8 @@ describe('TicketsPage Component', () => {
     });
   });
 
-  describe('Modal Interactions', () => {
-    it('opens ticket detail modal when clicking on a ticket row', async () => {
+  describe('Modal & Navigation Interactions', () => {
+    it('opens ticket detail modal when clicking on a ticket row when onNavigate is not provided', async () => {
       const user = userEvent.setup();
       renderWithQuery(<TicketsPage user={mockUser} />);
 
@@ -338,6 +338,21 @@ describe('TicketsPage Component', () => {
         expect(screen.getByRole('heading', { name: 'Payment Issue with Stripe' })).toBeInTheDocument();
       });
       expect(screen.getByText('My tuition payment failed with error 402.')).toBeInTheDocument();
+    });
+
+    it('navigates to /tickets/:id when clicking on ticket subject when onNavigate is provided', async () => {
+      const user = userEvent.setup();
+      const handleNavigate = vi.fn();
+      renderWithQuery(<TicketsPage user={mockUser} onNavigate={handleNavigate} />);
+
+      await waitFor(() => {
+        expect(screen.getByRole('link', { name: 'Payment Issue with Stripe' })).toBeInTheDocument();
+      });
+
+      const subjectLink = screen.getByRole('link', { name: 'Payment Issue with Stripe' });
+      await user.click(subjectLink);
+
+      expect(handleNavigate).toHaveBeenCalledWith('/tickets/1');
     });
   });
 

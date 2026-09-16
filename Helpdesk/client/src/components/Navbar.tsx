@@ -24,7 +24,7 @@ export const Navbar: React.FC<NavbarProps> = ({ user, currentPath, onNavigate, o
     }
   };
 
-  const isTicketsActive = currentPath === '/tickets';
+  const isTicketsActive = currentPath === '/tickets' || currentPath.startsWith('/tickets/');
   const isUsersActive = currentPath === '/users';
 
   return (

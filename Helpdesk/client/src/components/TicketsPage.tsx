@@ -12,9 +12,10 @@ import {
 
 interface TicketsPageProps {
   user?: AuthUser;
+  onNavigate?: (path: string) => void;
 }
 
-export const TicketsPage: React.FC<TicketsPageProps> = ({ user }) => {
+export const TicketsPage: React.FC<TicketsPageProps> = ({ user, onNavigate }) => {
   const [sorting, setSorting] = useState<SortingState>([
     { id: 'createdAt', desc: true },
   ]);
@@ -117,8 +118,12 @@ export const TicketsPage: React.FC<TicketsPageProps> = ({ user }) => {
   }, [tickets, selectedTicket]);
 
   const handleSelectTicket = (ticket: Ticket) => {
-    setSelectedTicket(ticket);
-    setIsDetailOpen(true);
+    if (onNavigate) {
+      onNavigate(`/tickets/${ticket.id}`);
+    } else {
+      setSelectedTicket(ticket);
+      setIsDetailOpen(true);
+    }
   };
 
   return (
@@ -193,6 +198,7 @@ export const TicketsPage: React.FC<TicketsPageProps> = ({ user }) => {
         tickets={tickets}
         isLoading={isLoading}
         onSelectTicket={handleSelectTicket}
+        onNavigate={onNavigate}
         sorting={sorting}
         onSortingChange={handleSortingChange}
         hasActiveFilters={activeFiltersCount > 0}
