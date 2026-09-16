@@ -65,6 +65,14 @@ export interface AddTicketMessagePayload {
   isInternalNote?: boolean;
 }
 
+export interface PaginatedTicketsResponse {
+  tickets: Ticket[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}
+
 export interface ListTicketsParams {
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
@@ -73,13 +81,16 @@ export interface ListTicketsParams {
   category?: string;
   priority?: string;
   assignedAgentId?: string;
+  page?: number;
+  pageSize?: number;
+  limit?: number;
 }
 
 export const ticketsApi = {
   /**
-   * Fetch all tickets with nested relations, optional server-side sorting and filtering
+   * Fetch tickets with nested relations, optional server-side sorting, filtering, and pagination
    */
-  async listTickets(params?: ListTicketsParams): Promise<Ticket[]> {
+  async listTickets(params?: ListTicketsParams): Promise<PaginatedTicketsResponse> {
     try {
       const queryParams: Record<string, any> = {};
       if (params?.sortBy) queryParams.sortBy = params.sortBy;
@@ -89,10 +100,27 @@ export const ticketsApi = {
       if (params?.category && params.category !== 'ALL') queryParams.category = params.category;
       if (params?.priority && params.priority !== 'ALL') queryParams.priority = params.priority;
       if (params?.assignedAgentId && params.assignedAgentId !== 'ALL') queryParams.assignedAgentId = params.assignedAgentId;
+      if (params?.page !== undefined) queryParams.page = params.page;
+      if (params?.pageSize !== undefined) queryParams.pageSize = params.pageSize;
+      if (params?.limit !== undefined) queryParams.limit = params.limit;
 
-      const response = await apiClient.get<Ticket[]>('/api/tickets', {
+      const response = await apiClient.get<Ticket[] | PaginatedTicketsResponse>('/api/tickets', {
         params: queryParams,
       });
+
+      if (Array.isArray(response.data)) {
+        const list = response.data;
+        const pageNum = params?.page || 1;
+        const pageSizeNum = params?.pageSize || params?.limit || (list.length > 0 ? list.length : 15);
+        return {
+          tickets: list,
+          total: list.length,
+          page: pageNum,
+          pageSize: pageSizeNum,
+          totalPages: Math.ceil(list.length / pageSizeNum) || 1,
+        };
+      }
+
       return response.data;
     } catch (error: any) {
       const message =

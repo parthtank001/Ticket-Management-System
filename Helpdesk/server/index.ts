@@ -87,9 +87,9 @@ app.get('/api/agents', requireAuth, async (req: Request, res: Response) => {
   res.json(agents);
 });
 
-// Get all tickets with server-side sorting & filtering (Authenticated support staff only)
+// Get all tickets with server-side sorting, filtering & optional pagination (Authenticated support staff only)
 app.get('/api/tickets', requireAuth, async (req: Request, res: Response) => {
-  const { sortBy, sortOrder, search, status, category, priority, assignedAgentId } = req.query;
+  const { sortBy, sortOrder, search, status, category, priority, assignedAgentId, page, limit, pageSize } = req.query;
 
   const where: any = {};
 
@@ -177,6 +177,51 @@ app.get('/api/tickets', requireAuth, async (req: Request, res: Response) => {
       default:
         orderBy = { createdAt: 'desc' };
     }
+  }
+
+  const isPaginationRequested = page !== undefined || limit !== undefined || pageSize !== undefined;
+
+  if (isPaginationRequested) {
+    const pageNum = Math.max(1, parseInt(String(page || '1'), 10) || 1);
+    const takeNum = Math.max(1, Math.min(100, parseInt(String(pageSize || limit || '15'), 10) || 15));
+    const skipNum = (pageNum - 1) * takeNum;
+
+    const [total, tickets] = await Promise.all([
+      prisma.ticket.count({ where }),
+      prisma.ticket.findMany({
+        where,
+        include: {
+          assignedAgent: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              role: true,
+            },
+          },
+          messages: {
+            orderBy: { createdAt: 'asc' },
+          },
+        },
+        orderBy,
+        skip: skipNum,
+        take: takeNum,
+      }),
+    ]);
+
+    const totalPages = Math.ceil(total / takeNum) || 1;
+
+    res.setHeader('X-Total-Count', total.toString());
+    res.setHeader('X-Page', pageNum.toString());
+    res.setHeader('X-Total-Pages', totalPages.toString());
+
+    return res.json({
+      tickets,
+      total,
+      page: pageNum,
+      pageSize: takeNum,
+      totalPages,
+    });
   }
 
   const tickets = await prisma.ticket.findMany({

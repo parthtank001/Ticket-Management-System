@@ -174,7 +174,13 @@ describe('TicketsPage Component', () => {
         }
         return sortOrder === 'asc' ? comp : -comp;
       });
-      return copy;
+      return {
+        tickets: copy,
+        total: copy.length,
+        page: params?.page || 1,
+        pageSize: params?.pageSize || 15,
+        totalPages: 1,
+      };
     });
     vi.mocked(ticketsApi.listAgents).mockResolvedValue(mockAgents);
   });
@@ -224,10 +230,12 @@ describe('TicketsPage Component', () => {
       await user.click(senderHeader);
 
       await waitFor(() => {
-        expect(ticketsApi.listTickets).toHaveBeenCalledWith({
-          sortBy: 'studentName',
-          sortOrder: 'asc',
-        });
+        expect(ticketsApi.listTickets).toHaveBeenCalledWith(
+          expect.objectContaining({
+            sortBy: 'studentName',
+            sortOrder: 'asc',
+          })
+        );
       });
     });
   });
@@ -241,7 +249,7 @@ describe('TicketsPage Component', () => {
         expect(screen.getByText('Payment Issue with Stripe')).toBeInTheDocument();
       });
 
-      const searchInput = screen.getByPlaceholderText(/search tickets by subject, sender, #id/i);
+      const searchInput = screen.getByPlaceholderText(/search tickets/i);
       await user.type(searchInput, 'Stripe');
 
       await waitFor(() => {
@@ -261,7 +269,7 @@ describe('TicketsPage Component', () => {
         expect(screen.getByText('Payment Issue with Stripe')).toBeInTheDocument();
       });
 
-      const searchInput = screen.getByPlaceholderText(/search tickets by subject, sender, #id/i);
+      const searchInput = screen.getByPlaceholderText(/search tickets/i);
       await user.type(searchInput, 'Stripe');
 
       const clearSearchButton = screen.getByRole('button', { name: /clear search/i });
@@ -330,6 +338,75 @@ describe('TicketsPage Component', () => {
         expect(screen.getByRole('heading', { name: 'Payment Issue with Stripe' })).toBeInTheDocument();
       });
       expect(screen.getByText('My tuition payment failed with error 402.')).toBeInTheDocument();
+    });
+  });
+
+  describe('Pagination Interactions', () => {
+    it('requests 15 records per page by default', async () => {
+      renderWithQuery(<TicketsPage user={mockUser} />);
+
+      await waitFor(() => {
+        expect(ticketsApi.listTickets).toHaveBeenCalledWith(
+          expect.objectContaining({
+            page: 1,
+            pageSize: 15,
+          })
+        );
+      });
+    });
+
+    it('renders pagination bar with summary', async () => {
+      renderWithQuery(<TicketsPage user={mockUser} />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Payment Issue with Stripe')).toBeInTheDocument();
+      });
+
+      expect(screen.getByTestId('pagination-container')).toBeInTheDocument();
+      expect(screen.getByTestId('pagination-summary')).toHaveTextContent(/showing 1 to 4 of 4 tickets/i);
+    });
+
+    it('requests new page when clicking next page button in paginated mode', async () => {
+      const user = userEvent.setup();
+
+      // Mock 50 tickets total with 4 pages (15 per page)
+      vi.mocked(ticketsApi.listTickets).mockResolvedValue({
+        tickets: mockTickets,
+        total: 50,
+        page: 1,
+        pageSize: 15,
+        totalPages: 4,
+      });
+
+      renderWithQuery(<TicketsPage user={mockUser} />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Payment Issue with Stripe')).toBeInTheDocument();
+      });
+
+      const nextButton = screen.getByRole('button', { name: /next page/i });
+      expect(nextButton).toBeEnabled();
+
+      await user.click(nextButton);
+
+      await waitFor(() => {
+        expect(ticketsApi.listTickets).toHaveBeenCalledWith(
+          expect.objectContaining({
+            page: 2,
+            pageSize: 15,
+          })
+        );
+      });
+    });
+
+    it('does not render a page size dropdown selector', async () => {
+      renderWithQuery(<TicketsPage user={mockUser} />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Payment Issue with Stripe')).toBeInTheDocument();
+      });
+
+      expect(screen.queryByRole('combobox', { name: /rows per page/i })).not.toBeInTheDocument();
     });
   });
 });

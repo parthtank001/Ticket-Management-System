@@ -5,6 +5,7 @@ import type { Role } from './lib/types';
 import { Navbar } from './components/Navbar';
 import { LoginPage } from './components/LoginPage';
 import { HomePage } from './components/HomePage';
+import { TicketsPage } from './components/TicketsPage';
 import { UsersPage } from './components/UsersPage';
 import { Ticket } from 'lucide-react';
 import { Skeleton } from './components/ui/skeleton';
@@ -119,7 +120,12 @@ export default function App() {
       }
       return <UsersPage user={user} />;
     }
-    return <HomePage user={user} />;
+
+    if (currentPath === '/tickets') {
+      return <TicketsPage user={user} />;
+    }
+
+    return <HomePage user={user} onNavigate={navigateTo} />;
   };
 
   // Render Navbar & active workspace view

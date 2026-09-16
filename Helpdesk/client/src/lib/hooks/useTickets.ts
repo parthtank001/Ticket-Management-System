@@ -7,16 +7,17 @@ import {
   UpdateTicketPayload,
   AddTicketMessagePayload,
   ListTicketsParams,
+  PaginatedTicketsResponse,
 } from '../tickets-api';
 
 export const TICKETS_QUERY_KEY = ['tickets'] as const;
 export const AGENTS_QUERY_KEY = ['agents'] as const;
 
 /**
- * Hook to fetch all tickets with automatic caching and optional server-side sorting
+ * Hook to fetch tickets with automatic caching and optional server-side sorting, filtering, and pagination
  */
 export function useTickets(params?: ListTicketsParams) {
-  return useQuery<Ticket[]>({
+  return useQuery<PaginatedTicketsResponse>({
     queryKey: params ? ([...TICKETS_QUERY_KEY, params] as const) : TICKETS_QUERY_KEY,
     queryFn: () => ticketsApi.listTickets(params),
   });

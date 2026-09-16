@@ -24,7 +24,7 @@ export const Navbar: React.FC<NavbarProps> = ({ user, currentPath, onNavigate, o
     }
   };
 
-  const isTicketsActive = currentPath === '/' || currentPath === '/tickets';
+  const isTicketsActive = currentPath === '/tickets';
   const isUsersActive = currentPath === '/users';
 
   return (
@@ -49,7 +49,7 @@ export const Navbar: React.FC<NavbarProps> = ({ user, currentPath, onNavigate, o
           {/* Navigation Links */}
           <div className="flex items-center space-x-1.5">
             <button
-              onClick={() => onNavigate('/')}
+              onClick={() => onNavigate('/tickets')}
               className={`inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
                 isTicketsActive
                   ? 'bg-indigo-50 text-indigo-700 border border-indigo-200/60 shadow-2xs'

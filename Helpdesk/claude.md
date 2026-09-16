@@ -150,7 +150,7 @@ Every ticket belongs to **exactly one** category:
 | **Authentication** | **Better Auth + Database-backed Sessions** | Server-managed session store enabling instant admin session revocation and RBAC |
 | **AI / LLM Engine** | **Google Gemini API** (`@google/genai`) | `gemini-1.5-flash` for classification, summaries & draft generation; `text-embedding-004` for RAG |
 | **Email Gateway** | **Inbound Webhooks & Direct Ingestion** | Inbound parse webhooks (`Message-ID`, `In-Reply-To`), threading, and audit logging |
-| **Runtime & Dev Tools** | **Bun / ts-node / Docker / Vitest** | High-performance execution, test suite (133 tests), and local development |
+| **Runtime & Dev Tools** | **Bun / ts-node / Docker / Vitest** | High-performance execution, test suite (144 tests), and local development |
 
 ---
 
@@ -178,8 +178,9 @@ e:\claude_ai\Ticket Management System\
     │   │   │   ├── HomePage.tsx      # Main agent ticket workspace dashboard
     │   │   │   ├── LoginPage.tsx     # Modernized login screen with role credentials hint (Zod validation)
     │   │   │   ├── Navbar.tsx        # App navigation header with session user details & sign-out
-    │   │   │   ├── TicketsPage.tsx   # Tickets dashboard with search, status/category/priority/assignee filters, sorting & quick actions
-    │   │   │   ├── TicketsTable.tsx  # Interactive tickets list table with skeleton loading, sorting, badges & filter empty-states
+    │   │   │   ├── Pagination.tsx    # Reusable smart pagination component with range summary & page size selector
+    │   │   │   ├── TicketsPage.tsx   # Tickets dashboard with search, filters, sorting, page state & quick actions
+    │   │   │   ├── TicketsTable.tsx  # Interactive tickets list table with skeleton loading, sorting, badges & pagination footer
     │   │   │   ├── TicketBadges.tsx  # Reusable status, priority, and category badge components
     │   │   │   ├── TicketDetailModal.tsx # Full ticket view with conversation thread & reply composer
     │   │   │   ├── CreateTicketModal.tsx # Inbound manual ticket creation modal dialog
@@ -189,7 +190,7 @@ e:\claude_ai\Ticket Management System\
     │   │   ├── lib/
     │   │   │   ├── hooks/
     │   │   │   │   ├── useAuth.ts    # React Query hooks for session & auth lifecycle
-    │   │   │   │   ├── useTickets.ts # React Query hooks for tickets, agents & messaging with reactive filter params
+    │   │   │   │   ├── useTickets.ts # React Query hooks for tickets, agents & messaging with reactive pagination & filter params
     │   │   │   │   └── useUsers.ts   # React Query hooks for user CRUD management
     │   │   │   ├── api-client.ts     # Centralized Axios client instance with credentials
     │   │   │   ├── auth-client.ts    # Client authentication helper (Better Auth client wrapper)

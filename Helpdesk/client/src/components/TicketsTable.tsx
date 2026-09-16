@@ -19,6 +19,7 @@ import {
   TicketCategoryBadge,
 } from './TicketBadges';
 import { Skeleton } from './ui/skeleton';
+import { Pagination } from './Pagination';
 import {
   MessageSquare,
   Inbox,
@@ -28,6 +29,14 @@ import {
   RotateCcw,
 } from 'lucide-react';
 
+export interface TicketsTablePaginationProps {
+  currentPage: number;
+  totalPages: number;
+  totalCount: number;
+  pageSize: number;
+  onPageChange: (page: number) => void;
+}
+
 export interface TicketsTableProps {
   tickets: Ticket[];
   isLoading: boolean;
@@ -36,6 +45,7 @@ export interface TicketsTableProps {
   onSortingChange?: React.Dispatch<React.SetStateAction<SortingState>>;
   hasActiveFilters?: boolean;
   onClearFilters?: () => void;
+  pagination?: TicketsTablePaginationProps;
 }
 
 export const TicketsTable: React.FC<TicketsTableProps> = ({
@@ -46,6 +56,7 @@ export const TicketsTable: React.FC<TicketsTableProps> = ({
   onSortingChange: externalOnSortingChange,
   hasActiveFilters = false,
   onClearFilters,
+  pagination,
 }) => {
   const [internalSorting, setInternalSorting] = useState<SortingState>([
     { id: 'createdAt', desc: true },
@@ -209,122 +220,136 @@ export const TicketsTable: React.FC<TicketsTableProps> = ({
   }
 
   return (
-    <div className="bg-white border border-slate-200/80 rounded-lg shadow-xs overflow-hidden">
-      <div className="overflow-x-auto">
-        <table className="w-full text-left border-collapse">
-          <thead>
-            {table.getHeaderGroups().map((headerGroup) => (
-              <tr
-                key={headerGroup.id}
-                className="border-b border-slate-200 bg-slate-50/90 text-[10px] font-bold text-slate-500 uppercase tracking-wider"
-              >
-                {headerGroup.headers.map((header) => {
-                  const canSort = header.column.getCanSort();
-                  const isSorted = header.column.getIsSorted();
-
-                  return (
-                    <th
-                      key={header.id}
-                      scope="col"
-                      className={`py-2 px-3 ${
-                        header.column.id === 'createdAt' ? 'text-right' : ''
-                      } ${
-                        header.column.id === 'actions' ? 'px-2 text-center' : ''
-                      } ${
-                        canSort ? 'cursor-pointer select-none' : ''
-                      }`}
-                      aria-sort={
-                        isSorted === 'asc'
-                          ? 'ascending'
-                          : isSorted === 'desc'
-                          ? 'descending'
-                          : undefined
-                      }
-                      onClick={canSort ? header.column.getToggleSortingHandler() : undefined}
-                    >
-                      {header.isPlaceholder ? null : canSort ? (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            // Let the click bubble to th or handle here
-                            e.stopPropagation();
-                            header.column.getToggleSortingHandler()?.(e);
-                          }}
-                          className={`inline-flex items-center gap-1.5 px-1.5 py-0.5 -mx-1.5 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all duration-150 group/sort focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/30 cursor-pointer ${
-                            isSorted
-                              ? 'text-indigo-700 bg-indigo-50/80 hover:bg-indigo-100 font-extrabold shadow-2xs'
-                              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/90'
-                          } ${header.column.id === 'createdAt' ? 'ml-auto justify-end' : ''}`}
-                          title={`Sort by ${typeof header.column.columnDef.header === 'string' ? header.column.columnDef.header : header.column.id}`}
-                        >
-                          <span>
-                            {flexRender(
-                              header.column.columnDef.header,
-                              header.getContext()
-                            )}
-                          </span>
-                          <span className="inline-flex items-center shrink-0">
-                            {isSorted === 'asc' ? (
-                              <ArrowUp className="h-3 w-3 text-indigo-600 shrink-0" aria-label="sorted ascending" />
-                            ) : isSorted === 'desc' ? (
-                              <ArrowDown className="h-3 w-3 text-indigo-600 shrink-0" aria-label="sorted descending" />
-                            ) : (
-                              <ArrowUpDown className="h-3 w-3 text-slate-400 group-hover/sort:text-slate-700 shrink-0 transition-colors" />
-                            )}
-                          </span>
-                        </button>
-                      ) : (
-                        <div
-                          className={`inline-flex items-center ${
-                            header.column.id === 'createdAt' ? 'justify-end w-full' : ''
-                          }`}
-                        >
-                          <span>
-                            {flexRender(
-                              header.column.columnDef.header,
-                              header.getContext()
-                            )}
-                          </span>
-                        </div>
-                      )}
-                    </th>
-                  );
-                })}
-              </tr>
-            ))}
-          </thead>
-          <tbody className="divide-y divide-slate-100 text-xs text-slate-700">
-            {table.getRowModel().rows.map((row) => {
-              const ticket = row.original;
-              return (
+    <div className="space-y-3">
+      <div className="bg-white border border-slate-200/80 rounded-lg shadow-xs overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              {table.getHeaderGroups().map((headerGroup) => (
                 <tr
-                  key={row.id}
-                  onClick={() => onSelectTicket(ticket)}
-                  className="hover:bg-slate-50/80 cursor-pointer transition-colors group"
+                  key={headerGroup.id}
+                  className="border-b border-slate-200 bg-slate-50/90 text-[10px] font-bold text-slate-500 uppercase tracking-wider"
                 >
-                  {row.getVisibleCells().map((cell) => (
-                    <td
-                      key={cell.id}
-                      className={`py-2.5 px-3 ${
-                        cell.column.id === 'createdAt'
-                          ? 'text-right'
-                          : ''
-                      } ${
-                        cell.column.id === 'actions' ? 'px-2 text-center' : ''
-                      }`}
-                    >
-                      {flexRender(
-                        cell.column.columnDef.cell,
-                        cell.getContext()
-                      )}
-                    </td>
-                  ))}
+                  {headerGroup.headers.map((header) => {
+                    const canSort = header.column.getCanSort();
+                    const isSorted = header.column.getIsSorted();
+
+                    return (
+                      <th
+                        key={header.id}
+                        scope="col"
+                        className={`py-2 px-3 ${
+                          header.column.id === 'createdAt' ? 'text-right' : ''
+                        } ${
+                          header.column.id === 'actions' ? 'px-2 text-center' : ''
+                        } ${
+                          canSort ? 'cursor-pointer select-none' : ''
+                        }`}
+                        aria-sort={
+                          isSorted === 'asc'
+                            ? 'ascending'
+                            : isSorted === 'desc'
+                            ? 'descending'
+                            : undefined
+                        }
+                        onClick={canSort ? header.column.getToggleSortingHandler() : undefined}
+                      >
+                        {header.isPlaceholder ? null : canSort ? (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              // Let the click bubble to th or handle here
+                              e.stopPropagation();
+                              header.column.getToggleSortingHandler()?.(e);
+                            }}
+                            className={`inline-flex items-center gap-1.5 px-1.5 py-0.5 -mx-1.5 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all duration-150 group/sort focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/30 cursor-pointer ${
+                              isSorted
+                                ? 'text-indigo-700 bg-indigo-50/80 hover:bg-indigo-100 font-extrabold shadow-2xs'
+                                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/90'
+                            } ${header.column.id === 'createdAt' ? 'ml-auto justify-end' : ''}`}
+                            title={`Sort by ${typeof header.column.columnDef.header === 'string' ? header.column.columnDef.header : header.column.id}`}
+                          >
+                            <span>
+                              {flexRender(
+                                header.column.columnDef.header,
+                                header.getContext()
+                              )}
+                            </span>
+                            <span className="inline-flex items-center shrink-0">
+                              {isSorted === 'asc' ? (
+                                <ArrowUp className="h-3 w-3 text-indigo-600 shrink-0" aria-label="sorted ascending" />
+                              ) : isSorted === 'desc' ? (
+                                <ArrowDown className="h-3 w-3 text-indigo-600 shrink-0" aria-label="sorted descending" />
+                              ) : (
+                                <ArrowUpDown className="h-3 w-3 text-slate-400 group-hover/sort:text-slate-700 shrink-0 transition-colors" />
+                              )}
+                            </span>
+                          </button>
+                        ) : (
+                          <div
+                            className={`inline-flex items-center ${
+                              header.column.id === 'createdAt' ? 'justify-end w-full' : ''
+                            }`}
+                          >
+                            <span>
+                              {flexRender(
+                                header.column.columnDef.header,
+                                header.getContext()
+                              )}
+                            </span>
+                          </div>
+                        )}
+                      </th>
+                    );
+                  })}
                 </tr>
-              );
-            })}
-          </tbody>
-        </table>
+              ))}
+            </thead>
+            <tbody className="divide-y divide-slate-100 text-xs text-slate-700">
+              {table.getRowModel().rows.map((row) => {
+                const ticket = row.original;
+                return (
+                  <tr
+                    key={row.id}
+                    onClick={() => onSelectTicket(ticket)}
+                    className="hover:bg-slate-50/80 cursor-pointer transition-colors group"
+                  >
+                    {row.getVisibleCells().map((cell) => (
+                      <td
+                        key={cell.id}
+                        className={`py-2.5 px-3 ${
+                          cell.column.id === 'createdAt'
+                            ? 'text-right'
+                            : ''
+                        } ${
+                          cell.column.id === 'actions' ? 'px-2 text-center' : ''
+                        }`}
+                      >
+                        {flexRender(
+                          cell.column.columnDef.cell,
+                          cell.getContext()
+                        )}
+                      </td>
+                    ))}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       </div>
+
+      {pagination && pagination.totalCount > 0 && (
+        <Pagination
+          currentPage={pagination.currentPage}
+          totalPages={pagination.totalPages}
+          totalCount={pagination.totalCount}
+          pageSize={pagination.pageSize}
+          onPageChange={pagination.onPageChange}
+          isLoading={isLoading}
+          itemLabel="tickets"
+        />
+      )}
     </div>
   );
 };

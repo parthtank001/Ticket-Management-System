@@ -162,11 +162,22 @@ export const getTicketsQuerySchema = z.object({
   category: z.string().optional(),
   priority: z.string().optional(),
   assignedAgentId: z.string().optional(),
+  page: z.coerce.number().int().min(1).optional().default(1),
+  limit: z.coerce.number().int().min(1).max(100).optional().default(15),
+  pageSize: z.coerce.number().int().min(1).max(100).optional().default(15),
 });
 
 export type TicketSortField = z.infer<typeof ticketSortFieldSchema>;
 export type SortOrder = z.infer<typeof sortOrderSchema>;
 export type GetTicketsQueryInput = z.input<typeof getTicketsQuerySchema>;
 export type GetTicketsQueryOutput = z.output<typeof getTicketsQuerySchema>;
+
+export interface PaginatedTicketsResponse {
+  tickets: Ticket[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}
 
 

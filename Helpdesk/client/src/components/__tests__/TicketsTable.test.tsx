@@ -221,4 +221,41 @@ describe('TicketsTable Component', () => {
       expect(subjectHeader).toHaveAttribute('aria-sort', 'descending');
     });
   });
+
+  describe('Pagination Controls Integration', () => {
+    it('renders Pagination component when pagination prop is provided', () => {
+      const handlePageChange = vi.fn();
+      render(
+        <TicketsTable
+          tickets={mockTickets}
+          isLoading={false}
+          onSelectTicket={vi.fn()}
+          pagination={{
+            currentPage: 1,
+            totalPages: 2,
+            totalCount: 30,
+            pageSize: 15,
+            onPageChange: handlePageChange,
+          }}
+        />
+      );
+
+      expect(screen.getByTestId('pagination-container')).toBeInTheDocument();
+      expect(screen.getByTestId('pagination-summary')).toHaveTextContent('Showing 1 to 15 of 30 tickets');
+      expect(screen.getByTestId('pagination-page-indicator')).toHaveTextContent('Page 1 of 2');
+      expect(screen.getByRole('button', { name: /next page/i })).toBeInTheDocument();
+    });
+
+    it('does not render Pagination when pagination prop is omitted', () => {
+      render(
+        <TicketsTable
+          tickets={mockTickets}
+          isLoading={false}
+          onSelectTicket={vi.fn()}
+        />
+      );
+
+      expect(screen.queryByTestId('pagination-container')).not.toBeInTheDocument();
+    });
+  });
 });

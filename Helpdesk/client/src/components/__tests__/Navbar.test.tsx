@@ -51,20 +51,8 @@ describe('Navbar Component', () => {
     expect(screen.queryByRole('button', { name: /users/i })).not.toBeInTheDocument();
   });
 
-  it('highlights "Tickets" button when currentPath is "/" or "/tickets"', () => {
+  it('highlights "Tickets" button when currentPath is "/tickets"', () => {
     const { rerender } = render(
-      <Navbar
-        user={mockAdminUser}
-        currentPath="/"
-        onNavigate={vi.fn()}
-        onSignOut={vi.fn()}
-      />
-    );
-
-    const ticketsBtnRoot = screen.getByRole('button', { name: /tickets/i });
-    expect(ticketsBtnRoot.className).toContain('bg-indigo-50');
-
-    rerender(
       <Navbar
         user={mockAdminUser}
         currentPath="/tickets"
@@ -75,6 +63,18 @@ describe('Navbar Component', () => {
 
     const ticketsBtnPath = screen.getByRole('button', { name: /tickets/i });
     expect(ticketsBtnPath.className).toContain('bg-indigo-50');
+
+    rerender(
+      <Navbar
+        user={mockAdminUser}
+        currentPath="/"
+        onNavigate={vi.fn()}
+        onSignOut={vi.fn()}
+      />
+    );
+
+    const ticketsBtnRoot = screen.getByRole('button', { name: /tickets/i });
+    expect(ticketsBtnRoot.className).not.toContain('bg-indigo-50');
 
     rerender(
       <Navbar
@@ -91,14 +91,14 @@ describe('Navbar Component', () => {
     expect(usersBtnActive.className).toContain('bg-indigo-50');
   });
 
-  it('calls onNavigate with "/" when Tickets button or Brand logo is clicked', async () => {
+  it('calls onNavigate with "/tickets" when Tickets button is clicked and "/" when Brand logo is clicked', async () => {
     const user = userEvent.setup();
     const handleNavigate = vi.fn();
 
     render(
       <Navbar
         user={mockAdminUser}
-        currentPath="/users"
+        currentPath="/"
         onNavigate={handleNavigate}
         onSignOut={vi.fn()}
       />
@@ -106,7 +106,7 @@ describe('Navbar Component', () => {
 
     const ticketsBtn = screen.getByRole('button', { name: /tickets/i });
     await user.click(ticketsBtn);
-    expect(handleNavigate).toHaveBeenCalledWith('/');
+    expect(handleNavigate).toHaveBeenCalledWith('/tickets');
 
     const brandLogo = screen.getByText('Helpdesk AI');
     await user.click(brandLogo);

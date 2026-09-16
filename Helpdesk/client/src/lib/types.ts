@@ -17,4 +17,6 @@ export type {
   CreateTicketPayload,
   UpdateTicketPayload,
   AddTicketMessagePayload,
+  PaginatedTicketsResponse,
+  ListTicketsParams,
 } from './tickets-api';

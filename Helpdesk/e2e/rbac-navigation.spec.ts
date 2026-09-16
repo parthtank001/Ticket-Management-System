@@ -11,7 +11,7 @@ test.describe('Role-Based Access Control (RBAC) & Navigation Suite', () => {
       await expect(page.getByRole('heading', { name: /welcome to the helpdesk/i })).toBeVisible({ timeout: 15000 });
     });
 
-    test('Admin navigates between /users and / (Tickets) via Navbar buttons', async ({ page }) => {
+    test('Admin navigates between /users and /tickets via Navbar buttons', async ({ page }) => {
       // 1. Confirm both Tickets and Users buttons are visible in Navbar
       const ticketsButton = page.locator('header').getByRole('button', { name: 'Tickets', exact: true });
       const usersButton = page.locator('header').getByRole('button', { name: 'Users', exact: true });
@@ -27,8 +27,8 @@ test.describe('Role-Based Access Control (RBAC) & Navigation Suite', () => {
 
       // 3. Navigate back to Tickets via Tickets button
       await ticketsButton.click();
-      await expect(page).toHaveURL(/\/$/);
-      await expect(page.getByRole('heading', { name: /welcome to the helpdesk/i })).toBeVisible();
+      await expect(page).toHaveURL(/\/tickets$/);
+      await expect(page.getByRole('heading', { name: /ticket/i })).toBeVisible();
     });
 
     test('Admin navigates to /users directory via direct URL', async ({ page }) => {
@@ -52,7 +52,7 @@ test.describe('Role-Based Access Control (RBAC) & Navigation Suite', () => {
       await expect(page.getByRole('heading', { name: /welcome to the helpdesk/i })).toBeVisible({ timeout: 15000 });
     });
 
-    test('Agent has Tickets button in Navbar and can navigate back from restricted pages', async ({ page }) => {
+    test('Agent has Tickets button in Navbar and can navigate to /tickets from restricted pages', async ({ page }) => {
       // 1. Confirm Tickets button is rendered, but Users button is NOT rendered
       const ticketsButton = page.locator('header').getByRole('button', { name: 'Tickets', exact: true });
       await expect(ticketsButton).toBeVisible();
@@ -62,10 +62,10 @@ test.describe('Role-Based Access Control (RBAC) & Navigation Suite', () => {
       await page.goto('/users');
       await expect(page.getByRole('heading', { name: 'Access Restricted' })).toBeVisible();
 
-      // 3. Click Tickets button in Navbar to return to home
+      // 3. Click Tickets button in Navbar to navigate to /tickets
       await ticketsButton.click();
-      await expect(page).toHaveURL(/\/$/);
-      await expect(page.getByRole('heading', { name: /welcome to the helpdesk/i })).toBeVisible();
+      await expect(page).toHaveURL(/\/tickets$/);
+      await expect(page.getByRole('heading', { name: /ticket/i })).toBeVisible();
     });
 
     test('Agent access restriction: Attempting to access /users shows "Access Restricted" screen', async ({ page }) => {
