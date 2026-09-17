@@ -78,12 +78,13 @@
   1. **Core Package Structure**:
      - `core/src/enums.ts`: Pure explicit string union types (`Role`, `Category`, `Priority`, `TicketStatus`, `SenderType`).
      - `core/src/schemas/user.ts`: User Zod validation schemas (`createUserSchema`, `updateUserSchema`) and exported input/output types (`CreateUserInput`, `CreateUserOutput`, `UpdateUserInput`, `UpdateUserOutput`).
-     - `core/src/schemas/ticket.ts`: Ticket schemas (`createTicketSchema`, `updateTicketSchema`, `createTicketMessageSchema`, `inboundEmailSchema`) and interfaces (`Ticket`, `TicketAgent`, `TicketMessage`).
+     - `core/src/schemas/ticket.ts`: Ticket schemas (`createTicketSchema`, `updateTicketSchema`, `createTicketMessageSchema`, `inboundEmailSchema`, `getTicketsQuerySchema`) supporting `assignedAgentId` / `assignedToId` and interfaces (`Ticket`, `TicketAgent`, `TicketMessage`).
      - `core/src/email-parser.ts`: RFC 2822 / 5322 header parsing, `[Ticket #XXXX]` subject parsing, threading extraction, and loop detection utilities.
      - `core/src/index.ts`: Central barrel exporting all enums, schemas, and email utilities.
-  2. **Server-Side Consumption**:
+  2. **Server-Side Consumption & Assigned User Verification**:
      - Route handlers and schemas (e.g., [`server/routes/users.ts`](file:///E:/claude_ai/Ticket%20Management%20System/Helpdesk/server/routes/users.ts), [`server/routes/emails.ts`](file:///E:/claude_ai/Ticket%20Management%20System/Helpdesk/server/routes/emails.ts), [`server/schemas.ts`](file:///E:/claude_ai/Ticket%20Management%20System/Helpdesk/server/schemas.ts)) import schemas directly from `@helpdesk/core`.
      - Validate incoming request bodies using `schema.safeParse(req.body)` which returns the transformed output data with defaults applied.
+     - Enforce that any assigned user ID (`assignedToId` / `assignedAgentId`) on `POST /api/tickets` and `PATCH /api/tickets/:id` corresponds to a valid, existing user in the database (`deletedAt: null`). Reject invalid or non-existent user assignments with HTTP 400 Bad Request.
   3. **Client-Side Consumption**:
      - React forms (e.g., [`UsersPage.tsx`](file:///E:/claude_ai/Ticket%20Management%20System/Helpdesk/client/src/components/UsersPage.tsx), [`UserForm.tsx`](file:///E:/claude_ai/Ticket%20Management%20System/Helpdesk/client/src/components/UserForm.tsx), [`CreateTicketModal.tsx`](file:///E:/claude_ai/Ticket%20Management%20System/Helpdesk/client/src/components/CreateTicketModal.tsx)) import schemas and types from `@helpdesk/core` and `client/src/lib/types.ts`.
      - Initialize forms using `useForm<T>({ resolver: zodResolver(schema) })` to guarantee 100% type safety and identical validation logic across frontend and backend.

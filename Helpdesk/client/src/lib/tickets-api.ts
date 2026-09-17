@@ -51,6 +51,8 @@ export interface CreateTicketPayload {
   category?: Category | null;
   priority?: Priority;
   message: string;
+  assignedAgentId?: string | null;
+  assignedToId?: string | null;
 }
 
 export interface UpdateTicketPayload {
@@ -58,6 +60,7 @@ export interface UpdateTicketPayload {
   category?: Category | null;
   priority?: Priority;
   assignedAgentId?: string | null;
+  assignedToId?: string | null;
 }
 
 export interface AddTicketMessagePayload {
@@ -81,6 +84,7 @@ export interface ListTicketsParams {
   category?: string;
   priority?: string;
   assignedAgentId?: string;
+  assignedToId?: string;
   page?: number;
   pageSize?: number;
   limit?: number;
@@ -99,7 +103,8 @@ export const ticketsApi = {
       if (params?.status && params.status !== 'ALL') queryParams.status = params.status;
       if (params?.category && params.category !== 'ALL') queryParams.category = params.category;
       if (params?.priority && params.priority !== 'ALL') queryParams.priority = params.priority;
-      if (params?.assignedAgentId && params.assignedAgentId !== 'ALL') queryParams.assignedAgentId = params.assignedAgentId;
+      const filterAssignedId = params?.assignedAgentId || params?.assignedToId;
+      if (filterAssignedId && filterAssignedId !== 'ALL') queryParams.assignedAgentId = filterAssignedId;
       if (params?.page !== undefined) queryParams.page = params.page;
       if (params?.pageSize !== undefined) queryParams.pageSize = params.pageSize;
       if (params?.limit !== undefined) queryParams.limit = params.limit;

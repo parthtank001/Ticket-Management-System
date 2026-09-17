@@ -32,6 +32,7 @@ export interface Ticket {
   summary: string | null;
   aiDraftResponse: string | null;
   assignedAgentId: string | null;
+  assignedToId?: string | null;
   assignedAgent?: TicketAgent | null;
   messages: TicketMessage[];
   createdAt: string | Date;
@@ -66,6 +67,8 @@ export const createTicketSchema = z.object({
     .string({ message: 'Message body is required.' })
     .trim()
     .min(1, 'Message body cannot be empty.'),
+  assignedAgentId: z.string().nullable().optional(),
+  assignedToId: z.string().nullable().optional(),
 });
 
 /**
@@ -76,6 +79,7 @@ export const updateTicketSchema = z.object({
   category: z.enum(['GENERAL_QUESTION', 'TECHNICAL_QUESTION', 'REFUND_REQUEST']).nullable().optional(),
   priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'URGENT']).optional(),
   assignedAgentId: z.string().nullable().optional(),
+  assignedToId: z.string().nullable().optional(),
   summary: z.string().nullable().optional(),
   aiDraftResponse: z.string().nullable().optional(),
 });
@@ -162,6 +166,7 @@ export const getTicketsQuerySchema = z.object({
   category: z.string().optional(),
   priority: z.string().optional(),
   assignedAgentId: z.string().optional(),
+  assignedToId: z.string().optional(),
   page: z.coerce.number().int().min(1).optional().default(1),
   limit: z.coerce.number().int().min(1).max(100).optional().default(15),
   pageSize: z.coerce.number().int().min(1).max(100).optional().default(15),

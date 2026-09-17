@@ -89,7 +89,7 @@ app.get('/api/agents', requireAuth, async (req: Request, res: Response) => {
 
 // Get all tickets with server-side sorting, filtering & optional pagination (Authenticated support staff only)
 app.get('/api/tickets', requireAuth, async (req: Request, res: Response) => {
-  const { sortBy, sortOrder, search, status, category, priority, assignedAgentId, page, limit, pageSize } = req.query;
+  const { sortBy, sortOrder, search, status, category, priority, assignedAgentId, assignedToId, page, limit, pageSize } = req.query;
 
   const where: any = {};
 
@@ -109,11 +109,12 @@ app.get('/api/tickets', requireAuth, async (req: Request, res: Response) => {
     where.priority = priority;
   }
 
-  if (assignedAgentId && typeof assignedAgentId === 'string' && assignedAgentId !== 'ALL') {
-    if (assignedAgentId === 'UNASSIGNED' || assignedAgentId === 'NONE') {
+  const filterAssignedId = (assignedAgentId as string) || (assignedToId as string);
+  if (filterAssignedId && typeof filterAssignedId === 'string' && filterAssignedId !== 'ALL') {
+    if (filterAssignedId === 'UNASSIGNED' || filterAssignedId === 'NONE') {
       where.assignedAgentId = null;
     } else {
-      where.assignedAgentId = assignedAgentId;
+      where.assignedAgentId = filterAssignedId;
     }
   }
 
@@ -251,7 +252,7 @@ app.post('/api/tickets', ticketCreationLimiter, async (req: Request, res: Respon
     return res.status(400).json({ error: validationResult.error.issues[0].message });
   }
 
-  const { studentName, studentEmail, subject, category, priority, message } = validationResult.data;
+  const { studentName, studentEmail, subject, category, priority, message, assignedAgentId, assignedToId } = validationResult.data;
 
   const trimmedEmail = studentEmail.toLowerCase();
   const trimmedSubject = subject.trim();
@@ -260,6 +261,24 @@ app.post('/api/tickets', ticketCreationLimiter, async (req: Request, res: Respon
 
   const selectedCategory = category !== undefined ? category : null;
   const selectedPriority = priority || 'MEDIUM';
+
+  const rawAssignedId = assignedAgentId !== undefined ? assignedAgentId : assignedToId;
+  let finalAssignedAgentId: string | null = null;
+
+  if (rawAssignedId !== undefined && rawAssignedId !== null && rawAssignedId !== '') {
+    const assignedUser = await prisma.user.findFirst({
+      where: {
+        id: rawAssignedId,
+        deletedAt: null,
+      },
+    });
+
+    if (!assignedUser) {
+      return res.status(400).json({ error: 'Assigned user does not exist or is invalid.' });
+    }
+
+    finalAssignedAgentId = assignedUser.id;
+  }
 
   // Create Ticket and initial TicketMessage transaction (plain ticket without AI processing)
   const ticket = await prisma.ticket.create({
@@ -272,6 +291,7 @@ app.post('/api/tickets', ticketCreationLimiter, async (req: Request, res: Respon
       status: 'OPEN',
       summary: null,
       aiDraftResponse: null,
+      assignedAgentId: finalAssignedAgentId,
       messages: {
         create: {
           senderType: 'STUDENT',
@@ -332,7 +352,7 @@ app.patch('/api/tickets/:id', requireAuth, async (req: Request, res: Response) =
     return res.status(400).json({ error: validationResult.error.issues[0].message });
   }
 
-  const { status, category, priority, assignedAgentId } = validationResult.data;
+  const { status, category, priority, assignedAgentId, assignedToId } = validationResult.data;
 
   const existingTicket = await prisma.ticket.findUnique({ where: { id } });
   if (!existingTicket) {
@@ -343,7 +363,26 @@ app.patch('/api/tickets/:id', requireAuth, async (req: Request, res: Response) =
   if (status) dataToUpdate.status = status;
   if (category !== undefined) dataToUpdate.category = category;
   if (priority !== undefined) dataToUpdate.priority = priority;
-  if (assignedAgentId !== undefined) dataToUpdate.assignedAgentId = assignedAgentId || null;
+
+  const rawAssignedId = assignedAgentId !== undefined ? assignedAgentId : assignedToId;
+  if (rawAssignedId !== undefined) {
+    if (rawAssignedId === null || rawAssignedId === '') {
+      dataToUpdate.assignedAgentId = null;
+    } else {
+      const assignedUser = await prisma.user.findFirst({
+        where: {
+          id: rawAssignedId,
+          deletedAt: null,
+        },
+      });
+
+      if (!assignedUser) {
+        return res.status(400).json({ error: 'Assigned user does not exist or is invalid.' });
+      }
+
+      dataToUpdate.assignedAgentId = assignedUser.id;
+    }
+  }
 
   const updatedTicket = await prisma.ticket.update({
     where: { id },
