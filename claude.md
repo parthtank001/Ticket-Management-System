@@ -57,6 +57,7 @@
   2. **Zod Validation Schemas**: Schemas use `z.enum(['ADMIN', 'AGENT'])`, `z.enum(['LOW', 'MEDIUM', 'HIGH', 'URGENT'])`, and `z.enum(['OPEN', 'RESOLVED', 'CLOSED'])` with typed defaults (`.default('AGENT')`, `.default('MEDIUM')`).
   3. **Frontend Type Centralization (`client/src/lib/types.ts`)**: Re-exports pure type definitions (`export type { Role, Category, Priority, TicketStatus, SenderType } from '@helpdesk/core'`) to prevent value-import errors in consumers.
   4. **Component & Service Consumption**: UI switch statements, select dropdown options, state filters, and API payload properties use direct typed string literals (`'ADMIN'`, `'OPEN'`, `'TECHNICAL_QUESTION'`, etc.) that are checked directly against the union types at compile time.
+  5. **Direct Interface Usage (No `Pick` Types)**: Do not create fragmented or subset types using TypeScript utility types like `Pick<Ticket, ...>`. Directly use the primary [`Ticket`](file:///E:/claude_ai/Ticket%20Management%20System/Helpdesk/core/src/schemas/ticket.ts) interface across all components, props, hooks, and service functions.
 
 ### 1.4 Mandatory Error Handling: Express 5 Automatic Async Promise Rejection
 > **CRITICAL INSTRUCTION**: In **Express 5**, route handlers and middleware that return a Promise **automatically forward rejected promises and unhandled exceptions** to the centralized error handling middleware (`next(err)`). Therefore, wrapping route handlers in manual `try { ... } catch (error) { ... }` blocks is **unnecessary and discouraged**.
@@ -183,7 +184,12 @@ e:\claude_ai\Ticket Management System\
     │   │   │   ├── TicketsPage.tsx   # Tickets dashboard with search, filters, sorting, page state & quick actions
     │   │   │   ├── TicketsTable.tsx  # Interactive tickets list table with skeleton loading, sorting, badges & pagination footer
     │   │   │   ├── TicketBadges.tsx  # Reusable status, priority, and category badge components
-    │   │   │   ├── TicketDetailModal.tsx # Full ticket view with conversation thread & reply composer
+    │   │   │   ├── TicketDetailPage.tsx  # Standalone 2-column ticket details view with thread & status actions
+    │   │   │   ├── TicketDetailModal.tsx # Full ticket view dialog with conversation thread & reply composer
+    │   │   │   ├── UpdateTicket.tsx      # Reusable ticket status quick actions & properties dropdowns (Category, Assignee, Priority)
+    │   │   │   ├── TicketReplyForm.tsx   # Reusable reply composer form with Agent reply posting, validation & error alerts
+    │   │   │   ├── ReplyThred.tsx        # Reusable conversation thread component displaying chronological messages, sender role badges & empty state
+    │   │   │   ├── ErrorMessage.tsx      # Reusable error banner component with AlertCircle icon, styling variants, and optional dismiss
     │   │   │   ├── CreateTicketModal.tsx # Inbound manual ticket creation modal dialog
     │   │   │   ├── UsersPage.tsx     # Admin user management directory (Zod validation)
     │   │   │   ├── UsersTable.tsx    # Admin user listing table with role badges & actions
@@ -293,31 +299,74 @@ From `e:\claude_ai\Ticket Management System\Helpdesk`:
 - **Centralized Backend Schemas (`server/schemas.ts`)**:
   - Request validation across all Express routes (`POST /api/users`, `PATCH /api/users/:id`, `POST /api/tickets`, `PATCH /api/tickets/:id`, `POST /api/tickets/:id/messages`, `GET /api/tickets`) is handled via `schema.safeParse(req.body)` and `getTicketsQuerySchema`.
   - Schema errors return HTTP 400 Bad Request with the primary validation issue message (`res.status(400).json({ error: result.error.issues[0].message })`).
-  - Schemas provide inferred TypeScript types via `z.infer<typeof schema>`.
-- **Client-Side Form Validation (`zod` + `@hookform/resolvers/zod`)**:
-  - React Hook Form integrations bind schemas via `zodResolver(schema)`.
-  - Form validation errors are mapped directly to input field alerts without server roundtrips.
+### 6.7 Reusable UI & Formatting Utilities (`client/src/lib/utils.ts`)
+- **Explicit Title Formatters**:
+  - `formatStatusTitle(status)`: Maps `'OPEN'`, `'RESOLVED'`, `'CLOSED'` to Title Case using `STATUS_LABELS`.
+  - `formatCategoryTitle(category)`: Maps `'GENERAL_QUESTION'`, `'TECHNICAL_QUESTION'`, `'REFUND_REQUEST'` using `CATEGORY_LABELS` (defaults to `'Uncategorized'`).
+  - `formatPriorityTitle(priority)`: Maps `'LOW'`, `'MEDIUM'`, `'HIGH'`, `'URGENT'` using `PRIORITY_LABELS` (defaults to `'Medium'`).
+  - `formatRoleTitle(role)`: Maps `'ADMIN'`, `'AGENT'` using `ROLE_LABELS` (defaults to `'Agent'`).
+  - `formatSenderTypeTitle(senderType)`: Maps `'STUDENT'` -> `'Customer'`, `'AGENT'` -> `'Support Agent'`, `'SYSTEM'` -> `'System'` using `SENDER_TYPE_LABELS`.
+- **Date & Time Formatting Utilities**:
+  - `formatDateTime(date, options)`: Safe timestamp formatter using `Intl.DateTimeFormat` / `toLocaleString` with fallback handling for null/invalid values.
+  - `formatDateMedium(date)`: Formats date with medium date style and short time (e.g., `"Sep 17, 2026, 7:45 PM"`) for ticket headers.
+  - `formatDateShort(date)`: Formats date with short date style and short time (e.g., `"9/17/26, 7:45 PM"`) for conversation thread messages.
+  - `formatDateCompact(date)`: Formats month, day, 2-digit hour, and 2-digit minute for table cells (e.g., `"Sep 17, 07:45 PM"`).
+  - `formatDateOnly(date)`: Formats month, day, and year for user tables without time components.
+- **String & Avatar Utilities**:
+  - `getInitials(name)`: Safely extracts uppercase 1-2 letter avatar initials from single-word or multi-word user names.
+  - `cn(...inputs)`: Merges Tailwind CSS classes resolving conflicts with `clsx` and `tailwind-merge`.
+
+### 6.8 Reusable Error Banner Component (`client/src/components/ErrorMessage.tsx`)
+- **Centralized Error Display**: Reusable `<ErrorMessage message={...} />` component with `role="alert"`, `AlertCircle` icon, and flexible styling.
+- **Null Safety**: Returns `null` if both `message` and `children` are empty/null.
+- **Variants**: Supports `'rose'` (default), `'amber'`, and `'red'` themes with `'sm'` (default 11px) and `'md'` (12px) sizes.
+- **Dismissible**: Optional `onDismiss` prop renders a clean dismiss button (`X` icon).
+
+### 6.9 Reusable Conversation Thread Component (`client/src/components/ReplyThred.tsx`)
+- **Conversation Timeline Rendering**: Reusable `<ReplyThred messages={...} />` component displaying ticket messages chronologically with role badges (`TicketSenderBadge`), sender email headers, formatted short timestamps (`formatDateShort`), and message body text.
+- **Base Tailwind Component Layer (`client/src/index.css`)**: Encapsulates common thread styles in `@layer components` (`.thread-container`, `.thread-header`, `.thread-header-title`, `.thread-header-count`, `.thread-message-item`, `.thread-message-note`, `.thread-message-student`, `.thread-message-agent`, `.thread-meta-header`, `.thread-meta-email`, `.thread-meta-date`, `.thread-message-body`, `.thread-empty-state`) removing inline string duplication across thread elements.
+- **Visual Distinction & Roles**: Applies distinct color palettes for sender types (`amber` border/background for internal notes, `indigo` for Support Agents, `slate` for Customers/Students).
+- **Customization & State Handling**:
+  - `showHeader`: Boolean toggle (defaults to `true`) displaying thread icon, message count badge, and header.
+  - `emptyMessage`: Customizable fallback text (defaults to `"No messages in thread yet."`) shown when message list is empty.
+  - `className`: Custom style merging support via `cn`.
+  - Also re-exports alias `ReplyThread`.
+
+### 6.10 Reusable Ticket Update Component (`client/src/components/UpdateTicket.tsx`)
+- **Centralized Status & Property Management**: Reusable `<UpdateTicket ticket={...} />` component encapsulating the right column ticket actions and properties.
+- **Status Quick Action Buttons**: Provides quick action buttons (Open, Resolved, Closed) disabling the active status and updating ticket status via `useUpdateTicket`.
+- **Properties Dropdown Lists**: Houses Category (`GENERAL_QUESTION`, `TECHNICAL_QUESTION`, `REFUND_REQUEST`), Assignee (Agent selector with automatic `useAgents` hook integration or optional `agents` prop), and Priority (`LOW`, `MEDIUM`, `HIGH`, `URGENT`) selectors.
+- **Styling Variants & Error Handling**: Supports `'white'` (default) and `'slate'` container variants, customizable `idPrefix` (e.g. `'ticket'` or `'modal'`), optional `onError` callback for bubbling action errors up to parent banner, and standalone `showErrorBanner` support.
 
 ---
 
 ## 7. Testing Architecture (Component-First: Vitest + React Testing Library & Selective Playwright E2E)
 
-The project enforces a **Component-First Testing Philosophy**: The vast majority of test coverage (**134/134 tests, 100% pass rate**) is maintained via fast, deterministic Vitest + React Testing Library tests in jsdom, reserving Playwright E2E tests strictly for critical full-stack integration validation.
+The project enforces a **Component-First Testing Philosophy**: The vast majority of test coverage (**252/252 tests, 100% pass rate**) is maintained via fast, deterministic Vitest + React Testing Library tests in jsdom, reserving Playwright E2E tests strictly for critical full-stack integration validation.
 
 ### 7.1 Client Component & Unit Test Suite (Vitest + RTL)
 - **Test Framework**: Vitest (`vitest`), React Testing Library (`@testing-library/react`, `@testing-library/user-event`), `@testing-library/jest-dom`, and jsdom.
 - **Test Directory**: `client/src/**/__tests__/*.test.tsx` and `client/src/test/*.test.ts`.
-- **Current Coverage**: **134/134 tests passing (100%)** across 10 test suites:
-  1. `client/src/components/__tests__/TicketDetailModal.test.tsx` (16 tests): Modal open/close, ticket metadata rendering, status updates (`OPEN`, `RESOLVED`, `CLOSED`), category & assignee updates, conversation thread rendering with role badges, public reply vs. internal note composer, submission whitespace trimming, and API error alerts.
-  2. `client/src/components/__tests__/CreateTicketModal.test.tsx` (11 tests): Modal visibility, input validations, form submission with whitespace trimming, category mapping, and API error banners.
-  3. `client/src/components/__tests__/TicketsPage.test.tsx` (12 tests): Table rows rendering, default newest-first sorting, server-side TanStack column sorting, search query filtering, status/category/priority/assignee filtering, filter reset with active count, and ticket modal interactions.
-  4. `client/src/components/__tests__/TicketsTable.test.tsx` (8 tests): Skeleton loading, sorting, badge rendering, filter empty state, and row selection callbacks.
-  5. `client/src/components/__tests__/TicketBadges.test.tsx` (11 tests): Status, Priority, and Category badge styling and labels.
-  6. `client/src/components/__tests__/UserForm.test.tsx` (23 tests): Create and edit user form validations, role selection, password requirements, and submission.
-  7. `client/src/components/__tests__/UsersPage.test.tsx` (23 tests): Admin user directory listing, create user modal trigger, delete confirmation, and edit user workflows.
-  8. `client/src/components/__tests__/UsersTable.test.tsx` (6 tests): User list rendering, role badges, action buttons, and empty state.
-  9. `client/src/components/__tests__/Navbar.test.tsx` (5 tests): Navigation links, session user display, and sign-out handler.
-  10. `client/src/test/email-parser.test.ts` (19 tests): RFC 2822 header parsing, subject ticket tag extraction, and anti-loop detection.
+- **Current Coverage**: **252/252 tests passing (100%)** across 19 test suites:
+  1. `client/src/components/__tests__/UpdateTicket.test.tsx` (9 tests): Dedicated unit tests covering initial rendering, active status disable, status transitions (`OPEN`, `RESOLVED`, `CLOSED`), category changes & uncategorized reset, agent assignment & unassignment, priority changes, error callbacks, standalone error banner display, and custom variant/idPrefix styling.
+  2. `client/src/components/__tests__/TicketReplyForm.test.tsx` (12 tests): Dedicated reply composer unit tests across 4 suites covering layout modes (header toggle, card wrapper, className propagation), empty/whitespace validations with dynamic error clearing, Agent reply submission with whitespace trimming, loading state spinner, input clearing, and modal close action.
+  3. `client/src/components/__tests__/ErrorMessage.test.tsx` (10 tests): Dedicated error banner unit tests for null handling, alert role, text rendering, children rendering, rose/amber/red variants, sm/md sizing, dismiss callback, and custom className merging.
+  4. `client/src/components/__tests__/ReplyThred.test.tsx` (7 tests): Dedicated conversation thread unit tests covering empty state fallback, custom empty text, message list rendering, sender role badge mapping, timestamp formatting, header toggling, and custom className merging.
+  5. `client/src/test/utils.test.ts` (15 tests): `cn` class merging, explicit title formatters (`formatStatusTitle`, `formatCategoryTitle`, `formatPriorityTitle`, `formatRoleTitle`, `formatSenderTypeTitle`), date formatters (`formatDateTime`, `formatDateMedium`, `formatDateShort`, `formatDateCompact`, `formatDateOnly`), and `getInitials` avatar helper.
+  6. `client/src/components/__tests__/TicketDetailModal.test.tsx` (16 tests): Modal open/close, ticket metadata rendering, status updates (`OPEN`, `RESOLVED`, `CLOSED`), category, assignee, and priority updates, conversation thread rendering with role badges, public reply composer, submission whitespace trimming, and API error alerts.
+  7. `client/src/components/__tests__/TicketDetailPage.test.tsx` (15 tests): 2-column layout, standalone ticket details view, navigation return callbacks, status updates (`OPEN`, `RESOLVED`, `CLOSED`), category modifications and uncategorized resets, priority updates, assignee updates, conversation/reply thread rendering, public reply composer, clear textarea action, and API error alerts.
+  8. `client/src/components/__tests__/CreateTicketModal.test.tsx` (11 tests): Modal visibility, input validations, form submission with whitespace trimming, category mapping, and API error banners.
+  9. `client/src/components/__tests__/TicketsPage.test.tsx` (13 tests): Table rows rendering, default newest-first sorting, server-side TanStack column sorting, search query filtering, status/category/priority/assignee filtering, filter reset with active count, and ticket modal interactions.
+  10. `client/src/components/__tests__/TicketsTable.test.tsx` (11 tests): Skeleton loading, sorting callbacks, badge rendering, pagination integration, filter empty state, and row selection callbacks.
+  11. `client/src/components/__tests__/Pagination.test.tsx` (9 tests): Page navigation, edge buttons disabling on first/last pages, page size dropdown selections, and range summary calculations.
+  12. `client/src/components/__tests__/TicketBadges.test.tsx` (15 tests): Status, Priority, Category, and SenderType badge styling and labels (Student, Support Agent, Internal Note, System).
+  13. `client/src/components/__tests__/UserForm.test.tsx` (23 tests): Create and edit user form validations, role selection, password requirements, and submission.
+  14. `client/src/components/__tests__/UsersPage.test.tsx` (23 tests): Admin user directory listing, create user modal trigger, delete confirmation, and edit user workflows.
+  15. `client/src/components/__tests__/UsersTable.test.tsx` (6 tests): User list rendering, role badges, action buttons, and empty state.
+  16. `client/src/components/__tests__/Navbar.test.tsx` (5 tests): Navigation links, session user display, and sign-out handler.
+  17. `client/src/test/ticket-schema.test.ts` (14 tests): Zod validation schema tests for `createTicketSchema`, `updateTicketSchema`, `getTicketsQuerySchema`, and `createTicketMessageSchema` with `senderType` validation, defaults, nullability, and input constraints.
+  18. `client/src/test/tickets-api.test.ts` (19 tests): Typed `ticketsApi` service methods unit tests (`listTickets`, `getTicket`, `listAgents`, `createTicket`, `updateTicket`, `addTicketMessage` with `senderType`), query param serializations, array response normalizations, and API error extractions.
+  19. `client/src/test/email-parser.test.ts` (19 tests): RFC 2822 header parsing, subject ticket tag extraction, and anti-loop detection.
 - **Testing Utilities & Standards**:
   - `renderWithQuery`: Custom test helper wrapping components with `QueryClientProvider` configured with zero retries.
   - Typed Mocking: Mock API modules using `vi.mock('../../lib/tickets-api')` and `vi.mock('../../lib/users-api')`.

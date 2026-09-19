@@ -410,24 +410,30 @@ app.post('/api/tickets/:id/messages', requireAuth, async (req: Request, res: Res
     return res.status(400).json({ error: validationResult.error.issues[0].message });
   }
 
-  const { body, isInternalNote } = validationResult.data;
+  const { body, isInternalNote, senderType, senderEmail: customSenderEmail } = validationResult.data;
 
   const existingTicket = await prisma.ticket.findUnique({ where: { id } });
   if (!existingTicket) {
     return res.status(404).json({ error: 'Ticket not found' });
   }
 
-  // Securely derive sender email and role from verified authenticated session
-  const senderEmail = req.user?.email || 'agent@example.com';
-  const senderType = 'AGENT';
+  // Derive senderType and senderEmail
+  const finalSenderType = senderType || 'AGENT';
+  let finalSenderEmail: string;
+
+  if (finalSenderType === 'STUDENT') {
+    finalSenderEmail = customSenderEmail || existingTicket.studentEmail;
+  } else {
+    finalSenderEmail = customSenderEmail || req.user?.email || 'agent@example.com';
+  }
 
   const newMessage = await prisma.ticketMessage.create({
     data: {
       ticketId: id,
-      senderType,
-      senderEmail,
+      senderType: finalSenderType,
+      senderEmail: finalSenderEmail,
       body,
-      isInternalNote: Boolean(isInternalNote),
+      isInternalNote: finalSenderType === 'AGENT' ? Boolean(isInternalNote) : false,
     },
   });
 

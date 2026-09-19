@@ -100,7 +100,7 @@ describe('TicketDetailModal Component', () => {
 
       // Badges
       expect(screen.getAllByText('Open').length).toBeGreaterThanOrEqual(1);
-      expect(screen.getByText('High')).toBeInTheDocument();
+      expect(screen.getAllByText('High').length).toBeGreaterThanOrEqual(1);
 
       // Category and Assignee selectors
       expect(screen.getByDisplayValue('Technical Question')).toBeInTheDocument();
@@ -288,6 +288,27 @@ describe('TicketDetailModal Component', () => {
         });
       });
     });
+
+    it('updates ticket priority when selecting a different priority', async () => {
+      const user = userEvent.setup();
+      vi.mocked(ticketsApi.updateTicket).mockResolvedValue({
+        ...mockTicket,
+        priority: 'URGENT',
+      });
+
+      renderWithQuery(
+        <TicketDetailModal ticket={mockTicket} isOpen={true} onClose={handleClose} />
+      );
+
+      const prioritySelect = screen.getByLabelText('Priority selector');
+      await user.selectOptions(prioritySelect, 'URGENT');
+
+      await waitFor(() => {
+        expect(ticketsApi.updateTicket).toHaveBeenCalledWith(42, {
+          priority: 'URGENT',
+        });
+      });
+    });
   });
 
   describe('4. Conversation Thread Display', () => {
@@ -307,7 +328,7 @@ describe('TicketDetailModal Component', () => {
       expect(screen.getByText('Internal check: Firewall rule might be blocking subnet.')).toBeInTheDocument();
 
       // Verify Agent reply
-      expect(screen.getByText('Support Agent')).toBeInTheDocument();
+      expect(screen.getAllByText('Support Agent').length).toBeGreaterThanOrEqual(1);
       expect(screen.getByText('Hi Maya, please reconnect to the campus VPN.')).toBeInTheDocument();
     });
 
@@ -326,7 +347,7 @@ describe('TicketDetailModal Component', () => {
     });
   });
 
-  describe('5. Reply & Internal Note Composer', () => {
+  describe('5. Reply Composer', () => {
     it('submits a public reply to student and resets textarea upon success', async () => {
       const user = userEvent.setup();
       vi.mocked(ticketsApi.addTicketMessage).mockResolvedValue({
@@ -352,6 +373,7 @@ describe('TicketDetailModal Component', () => {
       await waitFor(() => {
         expect(ticketsApi.addTicketMessage).toHaveBeenCalledWith(42, {
           body: 'Your port 22 access has been whitelist approved.',
+          senderType: 'AGENT',
           isInternalNote: false,
         });
       });
@@ -359,43 +381,7 @@ describe('TicketDetailModal Component', () => {
       expect(textarea).toHaveValue('');
     });
 
-    it('submits an internal note when checkbox is checked', async () => {
-      const user = userEvent.setup();
-      vi.mocked(ticketsApi.addTicketMessage).mockResolvedValue({
-        id: 'msg-5',
-        ticketId: 42,
-        senderType: 'AGENT',
-        senderEmail: 'smith@helpdesk.com',
-        body: 'Escalated to NetOps team on Slack.',
-        isInternalNote: true,
-        createdAt: '2026-03-01T11:05:00.000Z',
-      });
 
-      renderWithQuery(
-        <TicketDetailModal ticket={mockTicket} isOpen={true} onClose={handleClose} />
-      );
-
-      const internalCheckbox = screen.getByRole('checkbox');
-      await user.click(internalCheckbox);
-
-      expect(screen.getByPlaceholderText('Write a private note visible only to support staff...')).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /save note/i })).toBeInTheDocument();
-
-      const textarea = screen.getByPlaceholderText('Write a private note visible only to support staff...');
-      await user.type(textarea, 'Escalated to NetOps team on Slack.');
-
-      const saveNoteBtn = screen.getByRole('button', { name: /save note/i });
-      await user.click(saveNoteBtn);
-
-      await waitFor(() => {
-        expect(ticketsApi.addTicketMessage).toHaveBeenCalledWith(42, {
-          body: 'Escalated to NetOps team on Slack.',
-          isInternalNote: true,
-        });
-      });
-
-      expect(textarea).toHaveValue('');
-    });
 
     it('displays error banner if addTicketMessage mutation rejects', async () => {
       const user = userEvent.setup();

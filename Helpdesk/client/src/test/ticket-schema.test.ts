@@ -3,6 +3,7 @@ import {
   createTicketSchema,
   updateTicketSchema,
   getTicketsQuerySchema,
+  createTicketMessageSchema,
 } from '@helpdesk/core';
 
 describe('Ticket Validation Schemas & Assigned User Validation', () => {
@@ -155,6 +156,37 @@ describe('Ticket Validation Schemas & Assigned User Validation', () => {
       if (result2.success) {
         expect(result2.data.assignedToId).toBe('agent-456');
       }
+    });
+  });
+
+  describe('createTicketMessageSchema', () => {
+    it('validates a message reply with default senderType AGENT', () => {
+      const result = createTicketMessageSchema.safeParse({
+        body: 'Here is our answer to your query.',
+      });
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.senderType).toBe('AGENT');
+        expect(result.data.isInternalNote).toBe(false);
+      }
+    });
+
+    it('accepts senderType STUDENT for customer replies', () => {
+      const result = createTicketMessageSchema.safeParse({
+        body: 'Thanks for the answer!',
+        senderType: 'STUDENT',
+      });
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.senderType).toBe('STUDENT');
+      }
+    });
+
+    it('rejects empty or whitespace-only message body', () => {
+      const result = createTicketMessageSchema.safeParse({
+        body: '   ',
+      });
+      expect(result.success).toBe(false);
     });
   });
 });

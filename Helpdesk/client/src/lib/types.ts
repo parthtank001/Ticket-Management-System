@@ -10,6 +10,14 @@ export type {
   SenderType,
 } from '@helpdesk/core';
 
+export {
+  STATUS_LABELS,
+  CATEGORY_LABELS,
+  PRIORITY_LABELS,
+  ROLE_LABELS,
+  SENDER_TYPE_LABELS,
+} from '@helpdesk/core';
+
 export type {
   Ticket,
   TicketAgent,

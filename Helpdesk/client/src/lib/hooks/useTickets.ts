@@ -80,8 +80,9 @@ export function useUpdateTicket() {
   return useMutation({
     mutationFn: ({ id, payload }: { id: number; payload: UpdateTicketPayload }) =>
       ticketsApi.updateTicket(id, payload),
-    onSuccess: () => {
+    onSuccess: (_, { id }) => {
       queryClient.invalidateQueries({ queryKey: TICKETS_QUERY_KEY });
+      queryClient.invalidateQueries({ queryKey: ['tickets', id] });
     },
   });
 }
@@ -99,8 +100,9 @@ export function useAddTicketMessage() {
       ticketId: number;
       payload: AddTicketMessagePayload;
     }) => ticketsApi.addTicketMessage(ticketId, payload),
-    onSuccess: () => {
+    onSuccess: (_, { ticketId }) => {
       queryClient.invalidateQueries({ queryKey: TICKETS_QUERY_KEY });
+      queryClient.invalidateQueries({ queryKey: ['tickets', ticketId] });
     },
   });
 }

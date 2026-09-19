@@ -92,6 +92,8 @@ export const createTicketMessageSchema = z.object({
     .string({ message: 'Message body is required.' })
     .trim()
     .min(1, 'Message body is required.'),
+  senderType: z.enum(['STUDENT', 'AGENT', 'SYSTEM']).optional().default('AGENT'),
+  senderEmail: z.string().email('Valid sender email is required.').optional(),
   isInternalNote: z.boolean().optional().default(false),
   messageId: z.string().optional(),
   inReplyTo: z.string().optional(),

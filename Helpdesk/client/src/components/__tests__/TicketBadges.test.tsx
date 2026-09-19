@@ -4,6 +4,7 @@ import {
   TicketStatusBadge,
   TicketPriorityBadge,
   TicketCategoryBadge,
+  TicketSenderBadge,
 } from '../TicketBadges';
 
 describe('TicketBadges Components', () => {
@@ -65,6 +66,28 @@ describe('TicketBadges Components', () => {
     it('renders Uncategorized when category is null', () => {
       render(<TicketCategoryBadge category={null} />);
       expect(screen.getByText('Uncategorized')).toBeInTheDocument();
+    });
+  });
+
+  describe('TicketSenderBadge', () => {
+    it('renders Student badge for STUDENT senderType', () => {
+      render(<TicketSenderBadge senderType="STUDENT" />);
+      expect(screen.getByText('Student')).toBeInTheDocument();
+    });
+
+    it('renders Support Agent badge for AGENT senderType', () => {
+      render(<TicketSenderBadge senderType="AGENT" />);
+      expect(screen.getByText('Support Agent')).toBeInTheDocument();
+    });
+
+    it('renders Internal Note badge when isInternalNote is true', () => {
+      render(<TicketSenderBadge senderType="AGENT" isInternalNote={true} />);
+      expect(screen.getByText('Internal Note')).toBeInTheDocument();
+    });
+
+    it('renders System badge for SYSTEM senderType', () => {
+      render(<TicketSenderBadge senderType="SYSTEM" />);
+      expect(screen.getByText('System')).toBeInTheDocument();
     });
   });
 });

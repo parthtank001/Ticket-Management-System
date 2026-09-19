@@ -100,7 +100,7 @@ describe('TicketDetailPage Component', () => {
 
       // Badges
       expect(screen.getAllByText('Open').length).toBeGreaterThanOrEqual(1);
-      expect(screen.getByText('High')).toBeInTheDocument();
+      expect(screen.getAllByText('High').length).toBeGreaterThanOrEqual(1);
 
       // Category and Assignee selectors
       expect(screen.getByDisplayValue('Technical Question')).toBeInTheDocument();
@@ -122,7 +122,7 @@ describe('TicketDetailPage Component', () => {
       expect(screen.getByText('Internal Note')).toBeInTheDocument();
       expect(screen.getByText('Internal check: Firewall rule might be blocking subnet.')).toBeInTheDocument();
 
-      expect(screen.getByText('Support Agent')).toBeInTheDocument();
+      expect(screen.getAllByText('Support Agent').length).toBeGreaterThanOrEqual(1);
       expect(screen.getByText('Hi Maya, please reconnect to the campus VPN.')).toBeInTheDocument();
     });
   });
@@ -201,6 +201,31 @@ describe('TicketDetailPage Component', () => {
       });
     });
 
+    it('allows updating ticket status to Closed', async () => {
+      const user = userEvent.setup();
+      vi.mocked(ticketsApi.updateTicket).mockResolvedValue({
+        ...mockTicket,
+        status: 'CLOSED',
+      });
+
+      renderWithQuery(
+        <TicketDetailPage ticketId={42} user={mockUser} onNavigate={handleNavigate} />
+      );
+
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: /^closed$/i })).toBeInTheDocument();
+      });
+
+      const closedBtn = screen.getByRole('button', { name: /^closed$/i });
+      await user.click(closedBtn);
+
+      await waitFor(() => {
+        expect(ticketsApi.updateTicket).toHaveBeenCalledWith(42, {
+          status: 'CLOSED',
+        });
+      });
+    });
+
     it('displays error message banner when status update fails', async () => {
       const user = userEvent.setup();
       vi.mocked(ticketsApi.updateTicket).mockRejectedValueOnce(
@@ -250,6 +275,53 @@ describe('TicketDetailPage Component', () => {
       });
     });
 
+    it('sets category to null when selecting Uncategorized', async () => {
+      const user = userEvent.setup();
+      vi.mocked(ticketsApi.updateTicket).mockResolvedValue({
+        ...mockTicket,
+        category: null,
+      });
+
+      renderWithQuery(
+        <TicketDetailPage ticketId={42} user={mockUser} onNavigate={handleNavigate} />
+      );
+
+      await waitFor(() => {
+        expect(screen.getByLabelText('Category selector')).toBeInTheDocument();
+      });
+
+      const categorySelect = screen.getByLabelText('Category selector');
+      await user.selectOptions(categorySelect, '');
+
+      await waitFor(() => {
+        expect(ticketsApi.updateTicket).toHaveBeenCalledWith(42, {
+          category: null,
+        });
+      });
+    });
+
+    it('displays error message banner when category update fails', async () => {
+      const user = userEvent.setup();
+      vi.mocked(ticketsApi.updateTicket).mockRejectedValueOnce(
+        new Error('Failed to update category')
+      );
+
+      renderWithQuery(
+        <TicketDetailPage ticketId={42} user={mockUser} onNavigate={handleNavigate} />
+      );
+
+      await waitFor(() => {
+        expect(screen.getByLabelText('Category selector')).toBeInTheDocument();
+      });
+
+      const categorySelect = screen.getByLabelText('Category selector');
+      await user.selectOptions(categorySelect, 'REFUND_REQUEST');
+
+      await waitFor(() => {
+        expect(screen.getByText('Failed to update category')).toBeInTheDocument();
+      });
+    });
+
     it('updates assigned agent when selecting a different agent', async () => {
       const user = userEvent.setup();
       vi.mocked(ticketsApi.updateTicket).mockResolvedValue({
@@ -275,9 +347,34 @@ describe('TicketDetailPage Component', () => {
         });
       });
     });
+
+    it('updates ticket priority when selecting a different priority', async () => {
+      const user = userEvent.setup();
+      vi.mocked(ticketsApi.updateTicket).mockResolvedValue({
+        ...mockTicket,
+        priority: 'URGENT',
+      });
+
+      renderWithQuery(
+        <TicketDetailPage ticketId={42} user={mockUser} onNavigate={handleNavigate} />
+      );
+
+      await waitFor(() => {
+        expect(screen.getByLabelText('Priority selector')).toBeInTheDocument();
+      });
+
+      const prioritySelect = screen.getByLabelText('Priority selector');
+      await user.selectOptions(prioritySelect, 'URGENT');
+
+      await waitFor(() => {
+        expect(ticketsApi.updateTicket).toHaveBeenCalledWith(42, {
+          priority: 'URGENT',
+        });
+      });
+    });
   });
 
-  describe('6. Reply & Internal Note Composer', () => {
+  describe('6. Reply Composer', () => {
     it('submits a public reply to student and resets textarea upon success', async () => {
       const user = userEvent.setup();
       vi.mocked(ticketsApi.addTicketMessage).mockResolvedValue({
@@ -307,6 +404,7 @@ describe('TicketDetailPage Component', () => {
       await waitFor(() => {
         expect(ticketsApi.addTicketMessage).toHaveBeenCalledWith(42, {
           body: 'Your port 22 access has been whitelist approved.',
+          senderType: 'AGENT',
           isInternalNote: false,
         });
       });
@@ -314,46 +412,51 @@ describe('TicketDetailPage Component', () => {
       expect(textarea).toHaveValue('');
     });
 
-    it('submits an internal note when checkbox is checked', async () => {
+
+
+    it('clears reply body when clicking Clear button', async () => {
       const user = userEvent.setup();
-      vi.mocked(ticketsApi.addTicketMessage).mockResolvedValue({
-        id: 'msg-5',
-        ticketId: 42,
-        senderType: 'AGENT',
-        senderEmail: 'smith@helpdesk.com',
-        body: 'Escalated to NetOps team on Slack.',
-        isInternalNote: true,
-        createdAt: '2026-03-01T11:05:00.000Z',
+      renderWithQuery(
+        <TicketDetailPage ticketId={42} user={mockUser} onNavigate={handleNavigate} />
+      );
+
+      await waitFor(() => {
+        expect(screen.getByPlaceholderText('Write a reply to the student...')).toBeInTheDocument();
       });
+
+      const textarea = screen.getByPlaceholderText('Write a reply to the student...');
+      await user.type(textarea, 'Draft reply that will be cleared');
+      expect(textarea).toHaveValue('Draft reply that will be cleared');
+
+      const clearBtn = screen.getByRole('button', { name: /clear/i });
+      await user.click(clearBtn);
+
+      expect(textarea).toHaveValue('');
+    });
+
+    it('displays error banner when addTicketMessage mutation rejects', async () => {
+      const user = userEvent.setup();
+      vi.mocked(ticketsApi.addTicketMessage).mockRejectedValueOnce(
+        new Error('Network error: Failed to post message reply')
+      );
 
       renderWithQuery(
         <TicketDetailPage ticketId={42} user={mockUser} onNavigate={handleNavigate} />
       );
 
       await waitFor(() => {
-        expect(screen.getByRole('checkbox')).toBeInTheDocument();
+        expect(screen.getByPlaceholderText('Write a reply to the student...')).toBeInTheDocument();
       });
 
-      const internalCheckbox = screen.getByRole('checkbox');
-      await user.click(internalCheckbox);
+      const textarea = screen.getByPlaceholderText('Write a reply to the student...');
+      await user.type(textarea, 'Will fail to deliver');
 
-      expect(screen.getByPlaceholderText('Write a private note visible only to support staff...')).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /save note/i })).toBeInTheDocument();
-
-      const textarea = screen.getByPlaceholderText('Write a private note visible only to support staff...');
-      await user.type(textarea, 'Escalated to NetOps team on Slack.');
-
-      const saveNoteBtn = screen.getByRole('button', { name: /save note/i });
-      await user.click(saveNoteBtn);
+      const sendBtn = screen.getByRole('button', { name: /send reply/i });
+      await user.click(sendBtn);
 
       await waitFor(() => {
-        expect(ticketsApi.addTicketMessage).toHaveBeenCalledWith(42, {
-          body: 'Escalated to NetOps team on Slack.',
-          isInternalNote: true,
-        });
+        expect(screen.getByText('Network error: Failed to post message reply')).toBeInTheDocument();
       });
-
-      expect(textarea).toHaveValue('');
     });
   });
 });

@@ -68,3 +68,59 @@
     color: hsl(var(--foreground));
   }
 }
+
+@layer components {
+  /* Conversation Thread Styles */
+  .thread-container {
+    @apply bg-white border border-slate-200/80 rounded-xl p-4 shadow-xs space-y-3;
+  }
+
+  .thread-header {
+    @apply flex items-center justify-between border-b border-slate-100 pb-2;
+  }
+
+  .thread-header-title {
+    @apply text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center space-x-1.5;
+  }
+
+  .thread-header-count {
+    @apply text-[10px] text-slate-400 font-medium;
+  }
+
+  .thread-message-item {
+    @apply p-3 rounded-lg border transition-all;
+  }
+
+  .thread-message-note {
+    @apply bg-amber-50/70 border-amber-200 text-amber-950;
+  }
+
+  .thread-message-student {
+    @apply bg-slate-50 border-slate-200 text-slate-900;
+  }
+
+  .thread-message-agent {
+    @apply bg-indigo-50/60 border-indigo-200 text-indigo-950;
+  }
+
+  .thread-meta-header {
+    @apply flex items-center justify-between text-[10px] mb-1.5;
+  }
+
+  .thread-meta-email {
+    @apply text-slate-500 font-medium truncate max-w-[140px];
+  }
+
+  .thread-meta-date {
+    @apply text-slate-400 text-[10px];
+  }
+
+  .thread-message-body {
+    @apply text-[11px] leading-relaxed whitespace-pre-wrap font-sans;
+  }
+
+  .thread-empty-state {
+    @apply text-center py-5 text-slate-400 text-[11px];
+  }
+}
+

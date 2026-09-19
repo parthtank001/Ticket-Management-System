@@ -65,6 +65,8 @@ export interface UpdateTicketPayload {
 
 export interface AddTicketMessagePayload {
   body: string;
+  senderType?: SenderType;
+  senderEmail?: string;
   isInternalNote?: boolean;
 }
 

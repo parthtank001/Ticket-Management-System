@@ -18,6 +18,7 @@ import {
   TicketStatusBadge,
   TicketCategoryBadge,
 } from './TicketBadges';
+import { formatDateCompact } from '../lib/utils';
 import { Skeleton } from './ui/skeleton';
 import { Pagination } from './Pagination';
 import {
@@ -146,15 +147,7 @@ export const TicketsTable: React.FC<TicketsTableProps> = ({
         accessorKey: 'createdAt',
         header: 'Created',
         cell: ({ row }) => {
-          const formattedDate = new Date(row.original.createdAt).toLocaleString(
-            undefined,
-            {
-              month: 'short',
-              day: 'numeric',
-              hour: '2-digit',
-              minute: '2-digit',
-            }
-          );
+          const formattedDate = formatDateCompact(row.original.createdAt);
           return (
             <div className="text-right text-[10px] text-slate-400 whitespace-nowrap">
               {formattedDate}

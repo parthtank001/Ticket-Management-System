@@ -12,6 +12,7 @@ import {
   Pencil,
 } from 'lucide-react';
 import { Skeleton } from './ui/skeleton';
+import { getInitials, formatDateOnly as formatDate } from '../lib/utils';
 
 export interface UsersTableProps {
   users: ManagedUser[];
@@ -28,27 +29,6 @@ export const UsersTable: React.FC<UsersTableProps> = ({
   onEditUser,
   onDeleteUser,
 }) => {
-  // Avatar Initials
-  const getInitials = (name: string) => {
-    if (!name) return 'U';
-    const parts = name.trim().split(' ');
-    if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
-    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-  };
-
-  // Format creation timestamp
-  const formatDate = (dateString: string) => {
-    try {
-      const date = new Date(dateString);
-      return date.toLocaleDateString('en-US', {
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric',
-      });
-    } catch {
-      return dateString;
-    }
-  };
 
   return (
     <div className="bg-white border border-slate-200/80 rounded-lg shadow-xs overflow-hidden">
