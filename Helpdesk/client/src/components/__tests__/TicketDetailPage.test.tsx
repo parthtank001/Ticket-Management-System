@@ -107,6 +107,19 @@ describe('TicketDetailPage Component', () => {
       expect(screen.getByDisplayValue('Agent Smith (AGENT)')).toBeInTheDocument();
     });
 
+    it('renders ticket details when ticket is passed directly as a prop', async () => {
+      renderWithQuery(
+        <TicketDetailPage ticket={mockTicket} user={mockUser} onNavigate={handleNavigate} />
+      );
+
+      await waitFor(() => {
+        expect(screen.getByRole('heading', { name: 'Cannot access laboratory server' })).toBeInTheDocument();
+      });
+
+      expect(screen.getByText('Ticket #42')).toBeInTheDocument();
+      expect(screen.getByText('Maya Lin')).toBeInTheDocument();
+    });
+
     it('renders the conversation thread with appropriate message roles', async () => {
       renderWithQuery(
         <TicketDetailPage ticketId={42} user={mockUser} onNavigate={handleNavigate} />

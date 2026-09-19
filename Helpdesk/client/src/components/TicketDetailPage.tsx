@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { AuthUser } from '../lib/auth-client';
+import type { Ticket } from '../lib/types';
 import { useTicket, useAgents } from '../lib/hooks/useTickets';
 import {
   TicketStatusBadge,
@@ -19,20 +20,24 @@ import {
   Inbox,
 } from 'lucide-react';
 
-interface TicketDetailPageProps {
-  ticketId: number;
+export interface TicketDetailPageProps {
+  ticketId?: number;
+  ticket?: Ticket;
   user?: AuthUser;
   onNavigate: (path: string) => void;
 }
 
 export const TicketDetailPage: React.FC<TicketDetailPageProps> = ({
-  ticketId,
+  ticketId: propTicketId,
+  ticket: propTicket,
   user,
   onNavigate,
 }) => {
   const [actionError, setActionError] = useState<string | null>(null);
+  const activeTicketId = propTicket?.id ?? propTicketId;
 
-  const { data: ticket, isLoading, error } = useTicket(ticketId);
+  const { data: queryTicket, isLoading, error } = useTicket(activeTicketId);
+  const ticket = queryTicket ?? propTicket;
   const { data: agents = [] } = useAgents();
 
   // Loading skeleton state (only when we have no ticket data yet)
@@ -52,7 +57,7 @@ export const TicketDetailPage: React.FC<TicketDetailPageProps> = ({
             Ticket Not Found
           </h2>
           <p className="text-[11px] text-slate-500 max-w-xs mx-auto mb-4">
-            The requested ticket #{ticketId} could not be found, or you may not have permission to view it.
+            The requested ticket {activeTicketId ? `#${activeTicketId} ` : ''}could not be found, or you may not have permission to view it.
           </p>
           <button
             type="button"
