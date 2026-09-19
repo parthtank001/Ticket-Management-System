@@ -31,6 +31,50 @@ describe('TicketReplyForm Component', () => {
       expect(screen.queryByRole('button', { name: /customer \/ student/i })).not.toBeInTheDocument();
     });
 
+    it('renders and functions when passing ticket object directly as a prop', async () => {
+      const user = userEvent.setup();
+      const mockTicket = {
+        id: 77,
+        subject: 'Test Subject',
+        studentName: 'Student Name',
+        studentEmail: 'student@test.com',
+        category: null,
+        priority: 'MEDIUM' as const,
+        status: 'OPEN' as const,
+        summary: null,
+        aiDraftResponse: null,
+        assignedAgentId: null,
+        messages: [],
+        createdAt: '2026-01-01',
+        updatedAt: '2026-01-01',
+      };
+
+      vi.mocked(ticketsApi.addTicketMessage).mockResolvedValueOnce({
+        id: 'msg-1',
+        ticketId: 77,
+        senderType: 'AGENT',
+        senderEmail: 'agent@helpdesk.com',
+        body: 'Reply message',
+        isInternalNote: false,
+        createdAt: '2026-01-01',
+      });
+
+      renderWithQuery(<TicketReplyForm ticket={mockTicket} />);
+
+      const textarea = screen.getByPlaceholderText('Write a reply to the student...');
+      await user.type(textarea, 'Reply message');
+      const sendBtn = screen.getByRole('button', { name: /send reply/i });
+      await user.click(sendBtn);
+
+      await waitFor(() => {
+        expect(ticketsApi.addTicketMessage).toHaveBeenCalledWith(77, {
+          body: 'Reply message',
+          senderType: 'AGENT',
+          isInternalNote: false,
+        });
+      });
+    });
+
     it('hides header when showHeader is set to false', () => {
       renderWithQuery(<TicketReplyForm ticketId={42} showHeader={false} />);
 

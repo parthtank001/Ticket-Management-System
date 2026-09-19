@@ -91,7 +91,8 @@
      - Initialize forms using `useForm<T>({ resolver: zodResolver(schema) })` to guarantee 100% type safety and identical validation logic across frontend and backend.
 
 ### 1.6 Mandatory Testing Hierarchy: Component-First Testing Standard
-> **CRITICAL INSTRUCTION**: All UI features, user interactions, form validation rules, modal lifecycles, filters, tabs, tables, badge styling, and client hooks **MUST** primarily and preferentially be tested using **Vitest + React Testing Library (`@testing-library/react`)** as **Component/Unit Tests**. End-to-End (E2E) tests with **Playwright** must **ONLY** be written when strictly necessary.
+> **CRITICAL INSTRUCTION**: All UI features, user interactions, form validation rules, modal lifecycles, filters, tabs, tables, badge styling, and client hooks **MUST** primarily and preferentially be tested using **Vitest + React Testing Library (`@testing-library/react`)** as **Component/Unit Tests**. End-to-End (E2E) tests with **Playwright** must **ONLY** be written when strictly necessary for behaviors that *cannot* be verified in unit tests.
+> - **Strict Ban on Redundant E2E Tests**: Never author, create, or retain Playwright E2E tests for UI behaviors, modals, form inputs, button clicks, dropdown changes, or rendering logic that are already covered by RTL component tests.
 
 - **Strict Prioritization Standard**:
   - 🥇 **Primary / Default Testing Approach**: **Component & Unit Tests** (`client/src/**/__tests__/*.test.tsx`).
@@ -105,7 +106,8 @@
       3. Critical multi-page RBAC route security navigation (ensuring unauthorized users are redirected at the HTTP/browser routing layer).
       4. End-to-end inbound email webhook delivery pipelines (real HTTP webhook ingest -> database persistence).
   - ❌ **Strict Prohibitions**:
-    - Do NOT write E2E tests for basic form validation, modal toggling, filter dropdown changes, button clicks, table sorting, or individual UI rendering logic that can be tested rapidly and deterministically via RTL component tests.
+    - ❌ **NO Redundant UI E2E Tests**: Do NOT write or keep E2E tests for basic form validation, modal toggling, filter dropdown changes, button clicks, table sorting, reply forms, or individual UI rendering logic that is tested rapidly and deterministically via RTL component tests.
+    - ❌ **NO Duplicated Coverage**: Always delete or omit E2E tests when equivalent component unit tests exist. Keep E2E focused purely on full-stack integration boundaries.
 
 ---
 

@@ -148,7 +148,7 @@ export const TicketDetailPage: React.FC<TicketDetailPageProps> = ({
 
           {/* Form to submit new replies */}
           <TicketReplyForm
-            ticketId={ticket.id}
+            ticket={ticket}
             showCardWrapper={true}
             showHeader={true}
           />

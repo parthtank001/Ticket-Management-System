@@ -111,7 +111,7 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({
         {/* Reply Composer Footer */}
         <div className="p-3.5 border-t border-slate-200 bg-slate-50/70">
           <TicketReplyForm
-            ticketId={ticket.id}
+            ticket={ticket}
             showHeader={false}
             showCardWrapper={false}
             onClose={onClose}

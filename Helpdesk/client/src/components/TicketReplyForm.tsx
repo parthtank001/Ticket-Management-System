@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import type { Ticket } from '../lib/types';
 import { useAddTicketMessage } from '../lib/hooks/useTickets';
 import {
   Send,
@@ -8,7 +9,8 @@ import {
 import { ErrorMessage } from './ErrorMessage';
 
 export interface TicketReplyFormProps {
-  ticketId: number;
+  ticketId?: number;
+  ticket?: Ticket;
   showHeader?: boolean;
   showCardWrapper?: boolean;
   onSuccess?: () => void;
@@ -18,7 +20,8 @@ export interface TicketReplyFormProps {
 }
 
 export const TicketReplyForm: React.FC<TicketReplyFormProps> = ({
-  ticketId,
+  ticketId: propTicketId,
+  ticket: propTicket,
   showHeader = true,
   showCardWrapper = false,
   onSuccess,
@@ -29,6 +32,7 @@ export const TicketReplyForm: React.FC<TicketReplyFormProps> = ({
   const [replyBody, setReplyBody] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
 
+  const activeTicketId = propTicket?.id ?? propTicketId;
   const addMessageMutation = useAddTicketMessage();
 
   const handleSendReply = async (e: React.FormEvent) => {
@@ -38,10 +42,15 @@ export const TicketReplyForm: React.FC<TicketReplyFormProps> = ({
       return;
     }
 
+    if (!activeTicketId) {
+      setFormError('No valid ticket ID provided.');
+      return;
+    }
+
     setFormError(null);
     try {
       await addMessageMutation.mutateAsync({
-        ticketId,
+        ticketId: activeTicketId,
         payload: {
           body: replyBody.trim(),
           senderType: 'AGENT',

@@ -1,3 +1,4 @@
+import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderWithQuery, screen, waitFor, userEvent } from '../../test/test-utils';
 import { TicketDetailPage } from '../TicketDetailPage';
@@ -85,7 +86,7 @@ describe('TicketDetailPage Component', () => {
   });
 
   describe('1. Initial Rendering & Details Display', () => {
-    it('renders ticket details, subject heading, sender info, and badges', async () => {
+    it('renders ticket details, subject heading, sender info, badges, and AI summary', async () => {
       renderWithQuery(
         <TicketDetailPage ticketId={42} user={mockUser} onNavigate={handleNavigate} />
       );
@@ -97,6 +98,10 @@ describe('TicketDetailPage Component', () => {
       expect(screen.getByText('Ticket #42')).toBeInTheDocument();
       expect(screen.getByText('Maya Lin')).toBeInTheDocument();
       expect(screen.getAllByText('maya@student.edu')[0]).toBeInTheDocument();
+
+      // Issue Summary
+      expect(screen.getByText('Issue Summary')).toBeInTheDocument();
+      expect(screen.getByText('SSH connection timeout on port 22')).toBeInTheDocument();
 
       // Badges
       expect(screen.getAllByText('Open').length).toBeGreaterThanOrEqual(1);
@@ -118,6 +123,24 @@ describe('TicketDetailPage Component', () => {
 
       expect(screen.getByText('Ticket #42')).toBeInTheDocument();
       expect(screen.getByText('Maya Lin')).toBeInTheDocument();
+    });
+
+    it('does not render AI issue summary section when ticket.summary is null', async () => {
+      const ticketWithoutSummary: Ticket = {
+        ...mockTicket,
+        summary: null,
+      };
+      vi.mocked(ticketsApi.getTicket).mockResolvedValueOnce(ticketWithoutSummary);
+
+      renderWithQuery(
+        <TicketDetailPage ticketId={42} user={mockUser} onNavigate={handleNavigate} />
+      );
+
+      await waitFor(() => {
+        expect(screen.getByRole('heading', { name: 'Cannot access laboratory server' })).toBeInTheDocument();
+      });
+
+      expect(screen.queryByText(/issue summary/i)).not.toBeInTheDocument();
     });
 
     it('renders the conversation thread with appropriate message roles', async () => {
@@ -178,6 +201,17 @@ describe('TicketDetailPage Component', () => {
       const backBtn = screen.getByRole('button', { name: /back to tickets/i });
       await user.click(backBtn);
       expect(handleNavigate).toHaveBeenCalledWith('/tickets');
+    });
+
+    it('renders loading skeleton while query is initially loading', () => {
+      vi.mocked(ticketsApi.getTicket).mockImplementationOnce(() => new Promise(() => {}));
+
+      const { container } = renderWithQuery(
+        <TicketDetailPage ticketId={100} user={mockUser} onNavigate={handleNavigate} />
+      );
+
+      // Skeletons are rendered while loading
+      expect(container.querySelector('.animate-pulse')).toBeInTheDocument();
     });
   });
 
@@ -387,7 +421,7 @@ describe('TicketDetailPage Component', () => {
     });
   });
 
-  describe('6. Reply Composer', () => {
+  describe('6. Reply Composer Integration', () => {
     it('submits a public reply to student and resets textarea upon success', async () => {
       const user = userEvent.setup();
       vi.mocked(ticketsApi.addTicketMessage).mockResolvedValue({
@@ -424,8 +458,6 @@ describe('TicketDetailPage Component', () => {
 
       expect(textarea).toHaveValue('');
     });
-
-
 
     it('clears reply body when clicking Clear button', async () => {
       const user = userEvent.setup();
