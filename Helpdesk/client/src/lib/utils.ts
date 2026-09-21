@@ -1,5 +1,6 @@
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
+import DOMPurify from "dompurify"
 import {
   STATUS_LABELS,
   CATEGORY_LABELS,
@@ -15,6 +16,24 @@ import {
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
+}
+
+/**
+ * Sanitize HTML strings using DOMPurify to protect against XSS (Cross-Site Scripting) attacks.
+ * Strips dangerous executable scripts, harmful event handlers (e.g. onerror, onload),
+ * unsafe protocols (e.g. javascript:), and malicious DOM clobbering vectors.
+ */
+export function sanitizeHtml(
+  dirty?: string | null,
+  config?: DOMPurify.Config
+): string {
+  if (!dirty || typeof dirty !== 'string') return '';
+  if (config) {
+    return DOMPurify.sanitize(dirty, config) as string;
+  }
+  return DOMPurify.sanitize(dirty, {
+    USE_PROFILES: { html: true },
+  }) as string;
 }
 
 /**

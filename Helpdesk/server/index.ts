@@ -410,7 +410,7 @@ app.post('/api/tickets/:id/messages', requireAuth, async (req: Request, res: Res
     return res.status(400).json({ error: validationResult.error.issues[0].message });
   }
 
-  const { body, isInternalNote, senderType, senderEmail: customSenderEmail } = validationResult.data;
+  const { body, bodyHtml, isInternalNote, senderType, senderEmail: customSenderEmail } = validationResult.data;
 
   const existingTicket = await prisma.ticket.findUnique({ where: { id } });
   if (!existingTicket) {
@@ -433,6 +433,7 @@ app.post('/api/tickets/:id/messages', requireAuth, async (req: Request, res: Res
       senderType: finalSenderType,
       senderEmail: finalSenderEmail,
       body,
+      bodyHtml: bodyHtml ?? null,
       isInternalNote: finalSenderType === 'AGENT' ? Boolean(isInternalNote) : false,
     },
   });

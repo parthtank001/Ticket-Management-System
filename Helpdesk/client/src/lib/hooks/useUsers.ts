@@ -38,6 +38,8 @@ export function useDeleteUser() {
     mutationFn: (id: string) => usersApi.deleteUser(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: USERS_QUERY_KEY });
+      queryClient.invalidateQueries({ queryKey: ['tickets'] });
+      queryClient.invalidateQueries({ queryKey: ['agents'] });
     },
   });
 }

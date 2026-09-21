@@ -20,6 +20,7 @@ export interface TicketMessage {
   senderType: SenderType;
   senderEmail: string;
   body: string;
+  bodyHtml?: string | null;
   isInternalNote: boolean;
   messageId?: string | null;
   inReplyTo?: string | null;
@@ -65,6 +66,7 @@ export interface UpdateTicketPayload {
 
 export interface AddTicketMessagePayload {
   body: string;
+  bodyHtml?: string | null;
   senderType?: SenderType;
   senderEmail?: string;
   isInternalNote?: boolean;

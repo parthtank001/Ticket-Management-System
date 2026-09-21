@@ -12,6 +12,7 @@ import {
   formatDateCompact,
   formatDateOnly,
   getInitials,
+  sanitizeHtml,
 } from '../lib/utils';
 
 describe('Utility Functions (client/src/lib/utils.ts)', () => {
@@ -132,6 +133,62 @@ describe('Utility Functions (client/src/lib/utils.ts)', () => {
       expect(getInitials(undefined)).toBe('U');
       expect(getInitials('')).toBe('U');
       expect(getInitials('   ')).toBe('U');
+    });
+  });
+
+  describe('sanitizeHtml Utility (DOMPurify XSS Sanitizer)', () => {
+    it('returns empty string for null, undefined, empty, or non-string inputs', () => {
+      expect(sanitizeHtml(null)).toBe('');
+      expect(sanitizeHtml(undefined)).toBe('');
+      expect(sanitizeHtml('')).toBe('');
+      expect(sanitizeHtml(false as any)).toBe('');
+    });
+
+    it('strips <script> tags and executable JavaScript payloads', () => {
+      const malicious = '<script>alert("XSS")</script><p>Hello World</p>';
+      const sanitized = sanitizeHtml(malicious);
+      expect(sanitized).not.toContain('<script>');
+      expect(sanitized).not.toContain('alert("XSS")');
+      expect(sanitized).toContain('<p>Hello World</p>');
+    });
+
+    it('strips inline event handlers (onerror, onload, onclick, onmouseover)', () => {
+      const malicious = '<img src="invalid.jpg" onerror="alert(\'XSS\')" alt="Test" />';
+      const sanitized = sanitizeHtml(malicious);
+      expect(sanitized).not.toContain('onerror');
+      expect(sanitized).not.toContain('alert');
+      expect(sanitized).toContain('<img');
+    });
+
+    it('strips javascript: pseudo-protocols from href and src attributes', () => {
+      const malicious = '<a href="javascript:alert(document.cookie)">Click here</a>';
+      const sanitized = sanitizeHtml(malicious);
+      expect(sanitized).not.toContain('javascript:');
+      expect(sanitized).toContain('Click here');
+    });
+
+    it('strips dangerous iframe, embed, and object tags', () => {
+      const malicious = '<iframe src="http://attacker.com"></iframe><embed src="malware.swf" /><object data="exploit.pdf"></object>';
+      const sanitized = sanitizeHtml(malicious);
+      expect(sanitized).not.toContain('<iframe');
+      expect(sanitized).not.toContain('<embed');
+      expect(sanitized).not.toContain('<object');
+    });
+
+    it('preserves benign and safe formatting HTML tags', () => {
+      const safeHtml = '<p>This is <strong>bold</strong>, <em>italic</em>, and <a href="https://example.com">a valid link</a>.</p><ul><li>Item 1</li><li>Item 2</li></ul>';
+      const sanitized = sanitizeHtml(safeHtml);
+      expect(sanitized).toContain('<strong>bold</strong>');
+      expect(sanitized).toContain('<em>italic</em>');
+      expect(sanitized).toContain('<a href="https://example.com">a valid link</a>');
+      expect(sanitized).toContain('<li>Item 1</li>');
+    });
+
+    it('supports custom configuration overrides', () => {
+      const dirty = '<p>Paragraph</p><b>Bold</b>';
+      const customSanitized = sanitizeHtml(dirty, { ALLOWED_TAGS: ['b'] });
+      expect(customSanitized).not.toContain('<p>');
+      expect(customSanitized).toContain('<b>Bold</b>');
     });
   });
 });

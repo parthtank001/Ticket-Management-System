@@ -14,6 +14,7 @@ export interface TicketMessage {
   senderType: SenderType;
   senderEmail: string;
   body: string;
+  bodyHtml?: string | null;
   isInternalNote: boolean;
   messageId?: string | null;
   inReplyTo?: string | null;
@@ -46,16 +47,19 @@ export const createTicketSchema = z.object({
   studentName: z
     .string({ message: 'Sender name is required.' })
     .trim()
-    .min(1, 'Sender name cannot be empty.'),
+    .min(1, 'Sender name cannot be empty.')
+    .max(100, 'Sender name cannot exceed 100 characters.'),
   studentEmail: z
     .string({ message: 'Student email is required.' })
     .trim()
     .min(1, 'Student email cannot be empty.')
+    .max(255, 'Student email cannot exceed 255 characters.')
     .email('A valid student email address is required.'),
   subject: z
     .string({ message: 'Subject is required.' })
     .trim()
-    .min(1, 'Subject cannot be empty.'),
+    .min(1, 'Subject cannot be empty.')
+    .max(255, 'Subject cannot exceed 255 characters.'),
   category: z
     .enum(['GENERAL_QUESTION', 'TECHNICAL_QUESTION', 'REFUND_REQUEST'])
     .optional(),
@@ -66,7 +70,8 @@ export const createTicketSchema = z.object({
   message: z
     .string({ message: 'Message body is required.' })
     .trim()
-    .min(1, 'Message body cannot be empty.'),
+    .min(1, 'Message body cannot be empty.')
+    .max(5000, 'Message body cannot exceed 5000 characters.'),
   assignedAgentId: z.string().nullable().optional(),
   assignedToId: z.string().nullable().optional(),
 });
@@ -92,6 +97,7 @@ export const createTicketMessageSchema = z.object({
     .string({ message: 'Message body is required.' })
     .trim()
     .min(1, 'Message body is required.'),
+  bodyHtml: z.string().nullable().optional(),
   senderType: z.enum(['STUDENT', 'AGENT', 'SYSTEM']).optional().default('AGENT'),
   senderEmail: z.string().email('Valid sender email is required.').optional(),
   isInternalNote: z.boolean().optional().default(false),

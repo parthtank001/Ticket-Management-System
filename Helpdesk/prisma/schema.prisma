@@ -9,7 +9,7 @@ generator client {
 }
 
 enum Role {
-  ADMIN
+  ADMIN  
   AGENT
 }
 
@@ -114,7 +114,7 @@ model Ticket {
   assignedAgentId String?
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
-  assignedAgent   User?           @relation("AssignedAgent", fields: [assignedAgentId], references: [id])
+  assignedAgent   User?           @relation("AssignedAgent", fields: [assignedAgentId], references: [id], onDelete: SetNull)
   messages        TicketMessage[]
 }
 
@@ -124,6 +124,7 @@ model TicketMessage {
   senderType     SenderType
   senderEmail    String
   body           String
+  bodyHtml       String?
   isInternalNote Boolean    @default(false)
   messageId      String?    @unique
   inReplyTo      String?

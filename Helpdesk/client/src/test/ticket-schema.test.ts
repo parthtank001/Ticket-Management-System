@@ -83,6 +83,44 @@ describe('Ticket Validation Schemas & Assigned User Validation', () => {
       });
       expect(result.success).toBe(false);
     });
+
+    it('rejects fields exceeding maximum character lengths', () => {
+      // studentName > 100
+      const nameResult = createTicketSchema.safeParse({
+        studentName: 'A'.repeat(101),
+        studentEmail: 'maya@student.edu',
+        subject: 'Cannot login',
+        message: 'Need help',
+      });
+      expect(nameResult.success).toBe(false);
+
+      // studentEmail > 255
+      const emailResult = createTicketSchema.safeParse({
+        studentName: 'Maya Lin',
+        studentEmail: `${'a'.repeat(245)}@student.edu`,
+        subject: 'Cannot login',
+        message: 'Need help',
+      });
+      expect(emailResult.success).toBe(false);
+
+      // subject > 255
+      const subjectResult = createTicketSchema.safeParse({
+        studentName: 'Maya Lin',
+        studentEmail: 'maya@student.edu',
+        subject: 'S'.repeat(256),
+        message: 'Need help',
+      });
+      expect(subjectResult.success).toBe(false);
+
+      // message > 5000
+      const messageResult = createTicketSchema.safeParse({
+        studentName: 'Maya Lin',
+        studentEmail: 'maya@student.edu',
+        subject: 'Cannot login',
+        message: 'M'.repeat(5001),
+      });
+      expect(messageResult.success).toBe(false);
+    });
   });
 
   describe('updateTicketSchema', () => {
@@ -187,6 +225,28 @@ describe('Ticket Validation Schemas & Assigned User Validation', () => {
         body: '   ',
       });
       expect(result.success).toBe(false);
+    });
+
+    it('accepts optional bodyHtml for formatted rich replies', () => {
+      const resultWithHtml = createTicketMessageSchema.safeParse({
+        body: 'Here is the response with HTML.',
+        bodyHtml: '<p>Here is the response with <strong>HTML</strong>.</p>',
+      });
+      expect(resultWithHtml.success).toBe(true);
+      if (resultWithHtml.success) {
+        expect(resultWithHtml.data.bodyHtml).toBe(
+          '<p>Here is the response with <strong>HTML</strong>.</p>'
+        );
+      }
+
+      const resultWithNull = createTicketMessageSchema.safeParse({
+        body: 'Plain text reply',
+        bodyHtml: null,
+      });
+      expect(resultWithNull.success).toBe(true);
+      if (resultWithNull.success) {
+        expect(resultWithNull.data.bodyHtml).toBeNull();
+      }
     });
   });
 });

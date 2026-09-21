@@ -225,24 +225,27 @@ router.delete('/:id', requireAuth, requireRole('ADMIN'), async (req: Request, re
     return res.status(400).json({ error: 'Administrator accounts cannot be deleted.' });
   }
 
-  // Unassign tickets assigned to this agent before deletion
-  await prisma.ticket.updateMany({
-    where: { assignedAgentId: id },
-    data: { assignedAgentId: null },
-  });
+  // Execute atomically in a transaction:
+  // 1. Unassign tickets assigned to this agent before deletion
+  // 2. Revoke all active sessions for this user immediately
+  // 3. Soft delete user record by updating deletedAt timestamp and setting isActive to false
+  await prisma.$transaction(async (tx) => {
+    await tx.ticket.updateMany({
+      where: { assignedAgentId: id },
+      data: { assignedAgentId: null },
+    });
 
-  // Revoke all active sessions for this user immediately
-  await prisma.session.deleteMany({
-    where: { userId: id },
-  });
+    await tx.session.deleteMany({
+      where: { userId: id },
+    });
 
-  // Soft delete user record by updating deletedAt timestamp and setting isActive to false
-  await prisma.user.update({
-    where: { id },
-    data: {
-      deletedAt: new Date(),
-      isActive: false,
-    },
+    await tx.user.update({
+      where: { id },
+      data: {
+        deletedAt: new Date(),
+        isActive: false,
+      },
+    });
   });
 
   res.json({ message: 'User deleted successfully', id });

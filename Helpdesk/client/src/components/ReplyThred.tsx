@@ -1,7 +1,7 @@
 import React from 'react';
 import type { TicketMessage } from '../lib/types';
 import { TicketSenderBadge } from './TicketBadges';
-import { formatDateShort, cn } from '../lib/utils';
+import { formatDateShort, cn, sanitizeHtml } from '../lib/utils';
 import { MessageSquare } from 'lucide-react';
 
 export interface ReplyThredProps {
@@ -68,7 +68,15 @@ export const ReplyThred: React.FC<ReplyThredProps> = ({
                   <span className="thread-meta-date">{msgDate}</span>
                 </div>
                 <div className="thread-message-body">
-                  {msg.body}
+                  {msg.bodyHtml ? (
+                    <div
+                      data-testid="message-body-html"
+                      className="prose prose-sm max-w-none text-slate-800 break-words"
+                      dangerouslySetInnerHTML={{ __html: sanitizeHtml(msg.bodyHtml) }}
+                    />
+                  ) : (
+                    <div className="whitespace-pre-wrap">{msg.body}</div>
+                  )}
                 </div>
               </div>
             );

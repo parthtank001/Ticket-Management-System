@@ -150,4 +150,72 @@ describe('ReplyThred Component', () => {
       expect(ReplyThread).toBe(ReplyThred);
     });
   });
+
+  describe('5. Rich HTML Body Rendering & DOMPurify XSS Sanitization', () => {
+    it('renders sanitized bodyHtml when present in a message', () => {
+      const messagesWithHtml: TicketMessage[] = [
+        {
+          id: 'msg-html-1',
+          ticketId: 42,
+          senderType: 'STUDENT',
+          senderEmail: 'student@example.edu',
+          body: 'Plain text fallback',
+          bodyHtml: '<p>Hello from <strong>rich text</strong> formatted email!</p>',
+          isInternalNote: false,
+          createdAt: '2026-03-01T11:00:00.000Z',
+        },
+      ];
+
+      const { container } = render(<ReplyThred messages={messagesWithHtml} />);
+      const strongElement = container.querySelector('strong');
+      expect(strongElement).toBeInTheDocument();
+      expect(strongElement?.textContent).toBe('rich text');
+      expect(screen.getByText(/rich text/)).toBeInTheDocument();
+    });
+
+    it('sanitizes and strips malicious <script> tags from bodyHtml', () => {
+      const messagesWithXss: TicketMessage[] = [
+        {
+          id: 'msg-xss-1',
+          ticketId: 42,
+          senderType: 'STUDENT',
+          senderEmail: 'attacker@example.edu',
+          body: 'Plain text body',
+          bodyHtml: '<p>Safe intro</p><script>alert("XSS")</script><p>Safe outro</p>',
+          isInternalNote: false,
+          createdAt: '2026-03-01T11:00:00.000Z',
+        },
+      ];
+
+      const { container } = render(<ReplyThred messages={messagesWithXss} />);
+      expect(container.querySelector('script')).toBeNull();
+      expect(container.innerHTML).not.toContain('alert("XSS")');
+      expect(screen.getByText('Safe intro')).toBeInTheDocument();
+      expect(screen.getByText('Safe outro')).toBeInTheDocument();
+    });
+
+    it('sanitizes and strips dangerous onerror event handlers and javascript: URLs from bodyHtml', () => {
+      const messagesWithEventHandlers: TicketMessage[] = [
+        {
+          id: 'msg-xss-2',
+          ticketId: 42,
+          senderType: 'STUDENT',
+          senderEmail: 'attacker@example.edu',
+          body: 'Plain text body',
+          bodyHtml: '<img src="invalid.png" onerror="alert(\'XSS\')" /><a href="javascript:stealData()">Click here</a>',
+          isInternalNote: false,
+          createdAt: '2026-03-01T11:00:00.000Z',
+        },
+      ];
+
+      const { container } = render(<ReplyThred messages={messagesWithEventHandlers} />);
+      const img = container.querySelector('img');
+      expect(img).toBeInTheDocument();
+      expect(img?.getAttribute('onerror')).toBeNull();
+
+      const anchor = container.querySelector('a');
+      expect(anchor).toBeInTheDocument();
+      expect(anchor?.getAttribute('href')).toBeNull();
+    });
+  });
 });

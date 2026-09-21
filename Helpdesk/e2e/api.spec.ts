@@ -262,6 +262,46 @@ test.describe('Backend REST API & Authorization Suite', () => {
       expect(foundInList).toBeUndefined();
     });
 
+    test('DELETE /api/users/:id unassigns all tickets assigned to that user', async () => {
+      const timestamp = Date.now();
+      // 1. Create an Agent
+      const createRes = await adminContext.post(USERS_ENDPOINT, {
+        data: {
+          name: `Unassign Test Agent ${timestamp}`,
+          email: `unassign.agent.${timestamp}@example.com`,
+          password: 'password12345',
+          role: 'AGENT',
+        },
+      });
+      expect(createRes.status()).toBe(201);
+      const agent: UserDirectoryItem = await createRes.json();
+
+      // 2. Create a ticket assigned to this Agent
+      const createTicketRes = await adminContext.post('/api/tickets', {
+        data: {
+          studentName: 'Test Student',
+          studentEmail: `student.${timestamp}@example.com`,
+          subject: `Test Ticket for User Deletion ${timestamp}`,
+          message: 'Initial inquiry message',
+          assignedAgentId: agent.id,
+        },
+      });
+      expect(createTicketRes.status()).toBe(201);
+      const createdTicket = await createTicketRes.json();
+      expect(createdTicket.assignedAgentId).toBe(agent.id);
+
+      // 3. Delete the Agent
+      const deleteRes = await adminContext.delete(`${USERS_ENDPOINT}/${agent.id}`);
+      expect(deleteRes.status()).toBe(200);
+
+      // 4. Fetch the ticket and verify it is now unassigned
+      const getTicketRes = await adminContext.get(`/api/tickets/${createdTicket.id}`);
+      expect(getTicketRes.status()).toBe(200);
+      const fetchedTicket = await getTicketRes.json();
+      expect(fetchedTicket.assignedAgentId).toBeNull();
+      expect(fetchedTicket.assignedAgent).toBeNull();
+    });
+
     test('Agent role receives 403 Forbidden on DELETE /api/users/:id', async () => {
       const response = await agentContext.delete(`${USERS_ENDPOINT}/some-user-id`);
       expect(response.status()).toBe(403);
