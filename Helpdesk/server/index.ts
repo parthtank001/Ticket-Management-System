@@ -13,7 +13,9 @@ import {
   createTicketSchema,
   updateTicketSchema,
   createTicketMessageSchema,
+  polishReplySchema,
 } from './schemas';
+import { polishReplyWithAi } from './services/ai';
 
 dotenv.config();
 
@@ -439,6 +441,32 @@ app.post('/api/tickets/:id/messages', requireAuth, async (req: Request, res: Res
   });
 
   res.status(201).json(newMessage);
+});
+
+// Polish draft reply using Vercel AI SDK and gpt-5-nano (Authenticated support staff only)
+app.post('/api/tickets/polish-reply', requireAuth, async (req: Request, res: Response) => {
+  const validationResult = polishReplySchema.safeParse(req.body);
+  if (!validationResult.success) {
+    return res.status(400).json({ error: validationResult.error.issues[0].message });
+  }
+
+  const { text, studentName, category } = validationResult.data;
+
+  try {
+    const polishedReply = await polishReplyWithAi({
+      replyText: text,
+      studentName,
+      category,
+    });
+
+    res.json({
+      polishedReply,
+      originalText: text,
+    });
+  } catch (err: any) {
+    console.error('Error polishing reply with AI:', err);
+    res.status(500).json({ error: err.message || 'Failed to polish reply' });
+  }
 });
 
 // Centralized Error Handling Middleware (Express 5 automatically forwards async promise rejections here)

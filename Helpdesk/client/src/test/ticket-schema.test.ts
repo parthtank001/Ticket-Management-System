@@ -4,6 +4,7 @@ import {
   updateTicketSchema,
   getTicketsQuerySchema,
   createTicketMessageSchema,
+  polishReplySchema,
 } from '@helpdesk/core';
 
 describe('Ticket Validation Schemas & Assigned User Validation', () => {
@@ -247,6 +248,35 @@ describe('Ticket Validation Schemas & Assigned User Validation', () => {
       if (resultWithNull.success) {
         expect(resultWithNull.data.bodyHtml).toBeNull();
       }
+    });
+  });
+
+  describe('polishReplySchema (AI Reply Polish)', () => {
+    it('validates valid draft text with optional context', () => {
+      const result = polishReplySchema.safeParse({
+        text: 'Hello, your refund will be processed in 2 days.',
+        studentName: 'John Doe',
+        category: 'REFUND_REQUEST',
+      });
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.text).toBe('Hello, your refund will be processed in 2 days.');
+        expect(result.data.studentName).toBe('John Doe');
+      }
+    });
+
+    it('rejects empty or whitespace-only draft text', () => {
+      const result = polishReplySchema.safeParse({
+        text: '   ',
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it('validates draft text without optional fields', () => {
+      const result = polishReplySchema.safeParse({
+        text: 'Valid draft reply text',
+      });
+      expect(result.success).toBe(true);
     });
   });
 });

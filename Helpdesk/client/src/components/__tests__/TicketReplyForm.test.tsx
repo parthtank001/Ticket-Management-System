@@ -9,6 +9,7 @@ import { ticketsApi } from '../../lib/tickets-api';
 vi.mock('../../lib/tickets-api', () => ({
   ticketsApi: {
     addTicketMessage: vi.fn(),
+    polishReply: vi.fn(),
   },
 }));
 
@@ -18,14 +19,14 @@ describe('TicketReplyForm Component', () => {
   });
 
   describe('1. Rendering & Layout Options', () => {
-    it('renders default reply form with header, textarea, and submit button', () => {
+    it('renders default reply form with header, textarea, and submit button (disabled by default when empty)', () => {
       renderWithQuery(<TicketReplyForm ticketId={42} />);
 
       expect(screen.getByText('Submit a Reply')).toBeInTheDocument();
       expect(screen.getByPlaceholderText('Write a reply to the student...')).toBeInTheDocument();
       const sendBtn = screen.getByRole('button', { name: /send reply/i });
       expect(sendBtn).toBeInTheDocument();
-      expect(sendBtn).toBeEnabled();
+      expect(sendBtn).toBeDisabled();
       expect(screen.queryByRole('button', { name: /use ai draft/i })).not.toBeInTheDocument();
       expect(screen.queryByRole('button', { name: /support agent/i })).not.toBeInTheDocument();
       expect(screen.queryByRole('button', { name: /customer \/ student/i })).not.toBeInTheDocument();
@@ -103,19 +104,15 @@ describe('TicketReplyForm Component', () => {
   });
 
   describe('2. Validation & Error Handling', () => {
-    it('displays validation error message when submitting an empty reply', async () => {
-      const user = userEvent.setup();
+    it('disables the Send Reply button when the draft reply is empty', () => {
       renderWithQuery(<TicketReplyForm ticketId={42} />);
 
       const sendBtn = screen.getByRole('button', { name: /send reply/i });
-      expect(sendBtn).toBeEnabled();
-      await user.click(sendBtn);
-
-      expect(screen.getByText('Please enter a reply message.')).toBeInTheDocument();
+      expect(sendBtn).toBeDisabled();
       expect(ticketsApi.addTicketMessage).not.toHaveBeenCalled();
     });
 
-    it('displays validation error message when submitting whitespace-only reply', async () => {
+    it('disables the Send Reply button when the draft reply is only whitespace', async () => {
       const user = userEvent.setup();
       renderWithQuery(<TicketReplyForm ticketId={42} />);
 
@@ -123,41 +120,37 @@ describe('TicketReplyForm Component', () => {
       await user.type(textarea, '     ');
 
       const sendBtn = screen.getByRole('button', { name: /send reply/i });
-      await user.click(sendBtn);
-
-      expect(screen.getByText('Please enter a reply message.')).toBeInTheDocument();
+      expect(sendBtn).toBeDisabled();
       expect(ticketsApi.addTicketMessage).not.toHaveBeenCalled();
     });
 
-    it('clears validation error when user types into the textarea', async () => {
+    it('enables the Send Reply button when user types a valid reply into the textarea', async () => {
       const user = userEvent.setup();
       renderWithQuery(<TicketReplyForm ticketId={42} />);
 
       const sendBtn = screen.getByRole('button', { name: /send reply/i });
-      await user.click(sendBtn);
-      expect(screen.getByText('Please enter a reply message.')).toBeInTheDocument();
+      expect(sendBtn).toBeDisabled();
 
       const textarea = screen.getByPlaceholderText('Write a reply to the student...');
-      await user.type(textarea, 'A');
-      expect(screen.queryByText('Please enter a reply message.')).not.toBeInTheDocument();
+      await user.type(textarea, 'Here is the solution to your inquiry.');
+      expect(sendBtn).toBeEnabled();
     });
 
-    it('clears validation error when clicking the Clear button', async () => {
+    it('clears the textarea and disables the Send button when clicking the Clear button', async () => {
       const user = userEvent.setup();
       renderWithQuery(<TicketReplyForm ticketId={42} />);
 
       const textarea = screen.getByPlaceholderText('Write a reply to the student...');
-      await user.type(textarea, '   ');
+      await user.type(textarea, 'Temporary text');
 
       const sendBtn = screen.getByRole('button', { name: /send reply/i });
-      await user.click(sendBtn);
-      expect(screen.getByText('Please enter a reply message.')).toBeInTheDocument();
+      expect(sendBtn).toBeEnabled();
 
       const clearBtn = screen.getByRole('button', { name: /clear/i });
       await user.click(clearBtn);
 
-      expect(screen.queryByText('Please enter a reply message.')).not.toBeInTheDocument();
       expect(textarea).toHaveValue('');
+      expect(sendBtn).toBeDisabled();
     });
 
     it('displays error banner and calls onError when addTicketMessage mutation rejects', async () => {
@@ -260,6 +253,88 @@ describe('TicketReplyForm Component', () => {
       await user.click(closeBtn);
 
       expect(handleClose).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('5. AI Reply Polish (gpt-5-nano via Vercel AI SDK)', () => {
+    it('renders Polish button disabled when textarea is empty and enables when user writes text', async () => {
+      const user = userEvent.setup();
+      renderWithQuery(<TicketReplyForm ticketId={42} />);
+
+      const polishBtn = screen.getByRole('button', { name: /polish/i });
+      expect(polishBtn).toBeInTheDocument();
+      expect(polishBtn).toBeDisabled();
+
+      const textarea = screen.getByPlaceholderText('Write a reply to the student...');
+      await user.type(textarea, 'Draft reply for student');
+      expect(polishBtn).toBeEnabled();
+    });
+
+    it('successfully calls polishReply API and updates textarea with the improved text', async () => {
+      const user = userEvent.setup();
+      const mockTicket = {
+        id: 42,
+        subject: 'Course refund query',
+        studentName: 'Alice Student',
+        studentEmail: 'alice@example.com',
+        category: 'REFUND_REQUEST' as const,
+        priority: 'HIGH' as const,
+        status: 'OPEN' as const,
+        summary: null,
+        aiDraftResponse: null,
+        assignedAgentId: null,
+        messages: [],
+        createdAt: '2026-01-01',
+        updatedAt: '2026-01-01',
+      };
+
+      vi.mocked(ticketsApi.polishReply).mockResolvedValueOnce({
+        originalText: 'i will refund you',
+        polishedReply: 'Hello Alice,\n\nI will process your refund request promptly.\n\nBest regards,\nHelpdesk Support Team',
+      });
+
+      renderWithQuery(<TicketReplyForm ticket={mockTicket} />);
+
+      const textarea = screen.getByPlaceholderText('Write a reply to the student...');
+      await user.type(textarea, 'i will refund you');
+
+      const polishBtn = screen.getByRole('button', { name: /polish/i });
+      await user.click(polishBtn);
+
+      await waitFor(() => {
+        expect(ticketsApi.polishReply).toHaveBeenCalledWith({
+          text: 'i will refund you',
+          studentName: 'Alice Student',
+          category: 'REFUND_REQUEST',
+        });
+      });
+
+      await waitFor(() => {
+        expect(textarea).toHaveValue(
+          'Hello Alice,\n\nI will process your refund request promptly.\n\nBest regards,\nHelpdesk Support Team'
+        );
+      });
+
+      expect(screen.getByText(/polished with ai \(gemini\)/i)).toBeInTheDocument();
+    });
+
+    it('displays error banner when polishReply API fails', async () => {
+      const user = userEvent.setup();
+      vi.mocked(ticketsApi.polishReply).mockRejectedValueOnce(
+        new Error('AI service rate limit exceeded')
+      );
+
+      renderWithQuery(<TicketReplyForm ticketId={42} />);
+
+      const textarea = screen.getByPlaceholderText('Write a reply to the student...');
+      await user.type(textarea, 'Rough response');
+
+      const polishBtn = screen.getByRole('button', { name: /polish/i });
+      await user.click(polishBtn);
+
+      await waitFor(() => {
+        expect(screen.getByText('AI service rate limit exceeded')).toBeInTheDocument();
+      });
     });
   });
 });

@@ -6,6 +6,7 @@ import {
   CreateTicketPayload,
   UpdateTicketPayload,
   AddTicketMessagePayload,
+  PolishReplyPayload,
   ListTicketsParams,
   PaginatedTicketsResponse,
 } from '../tickets-api';
@@ -106,3 +107,13 @@ export function useAddTicketMessage() {
     },
   });
 }
+
+/**
+ * Mutation hook to polish a draft reply with AI (gpt-5-nano via Vercel AI SDK)
+ */
+export function usePolishReply() {
+  return useMutation({
+    mutationFn: (payload: PolishReplyPayload) => ticketsApi.polishReply(payload),
+  });
+}
+

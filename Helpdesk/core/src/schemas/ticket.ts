@@ -145,6 +145,22 @@ export type InboundEmailInput = z.input<typeof inboundEmailSchema>;
 export type InboundEmailOutput = z.output<typeof inboundEmailSchema>;
 
 /**
+ * Zod validation schema for polishing draft replies using AI (gpt-5-nano)
+ */
+export const polishReplySchema = z.object({
+  text: z
+    .string({ message: 'Draft text is required to polish.' })
+    .trim()
+    .min(1, 'Draft text cannot be empty.')
+    .max(10000, 'Draft text cannot exceed 10000 characters.'),
+  studentName: z.string().optional(),
+  category: z.string().optional(),
+});
+
+export type PolishReplyInput = z.input<typeof polishReplySchema>;
+export type PolishReplyOutput = z.output<typeof polishReplySchema>;
+
+/**
  * Zod validation schema for querying tickets with server-side sorting
  */
 export const ticketSortFieldSchema = z.enum([

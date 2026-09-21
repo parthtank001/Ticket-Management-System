@@ -24,6 +24,9 @@ export {
   type SortOrder,
   type GetTicketsQueryInput,
   type GetTicketsQueryOutput,
+  polishReplySchema,
+  type PolishReplyInput,
+  type PolishReplyOutput,
   type PaginatedTicketsResponse,
 } from '@helpdesk/core';
 

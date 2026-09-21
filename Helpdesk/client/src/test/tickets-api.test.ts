@@ -276,4 +276,34 @@ describe('Tickets API Service Unit Tests (ticketsApi)', () => {
       ).rejects.toThrow('Message body cannot be empty.');
     });
   });
+
+  describe('polishReply', () => {
+    it('sends POST request to polish reply with AI', async () => {
+      const payload = {
+        text: 'your request is accepted',
+        subject: 'Request Subject',
+        studentName: 'Alice',
+        category: 'REFUND_REQUEST',
+      };
+      const responseData = {
+        polishedReply: 'Hello Alice,\n\nYour request has been approved.\n\nBest regards,\nSupport Team',
+        originalText: 'your request is accepted',
+      };
+      vi.mocked(apiClient.post).mockResolvedValueOnce({ data: responseData });
+
+      const result = await ticketsApi.polishReply(payload);
+      expect(apiClient.post).toHaveBeenCalledWith('/api/tickets/polish-reply', payload);
+      expect(result).toEqual(responseData);
+    });
+
+    it('throws formatted error when polishReply fails', async () => {
+      vi.mocked(apiClient.post).mockRejectedValueOnce({
+        response: { data: { error: 'Failed to polish reply' } },
+      });
+
+      await expect(
+        ticketsApi.polishReply({ text: 'Draft' })
+      ).rejects.toThrow('Failed to polish reply');
+    });
+  });
 });

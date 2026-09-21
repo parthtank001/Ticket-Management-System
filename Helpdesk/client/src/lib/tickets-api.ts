@@ -72,6 +72,17 @@ export interface AddTicketMessagePayload {
   isInternalNote?: boolean;
 }
 
+export interface PolishReplyPayload {
+  text: string;
+  studentName?: string;
+  category?: string;
+}
+
+export interface PolishReplyResponse {
+  polishedReply: string;
+  originalText: string;
+}
+
 export interface PaginatedTicketsResponse {
   tickets: Ticket[];
   total: number;
@@ -228,6 +239,28 @@ export const ticketsApi = {
         error.response?.data?.message ||
         error.message ||
         'Failed to post message reply';
+      throw new Error(message);
+    }
+  },
+
+  /**
+   * Polish draft reply using AI (gpt-5-nano via Vercel AI SDK)
+   */
+  async polishReply(
+    payload: PolishReplyPayload
+  ): Promise<PolishReplyResponse> {
+    try {
+      const response = await apiClient.post<PolishReplyResponse>(
+        '/api/tickets/polish-reply',
+        payload
+      );
+      return response.data;
+    } catch (error: any) {
+      const message =
+        error.response?.data?.error ||
+        error.response?.data?.message ||
+        error.message ||
+        'Failed to polish reply';
       throw new Error(message);
     }
   },
