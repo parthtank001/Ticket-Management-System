@@ -153,6 +153,21 @@ describe('TicketReplyForm Component', () => {
       expect(sendBtn).toBeDisabled();
     });
 
+    it('disables the Send button when text is deleted back to empty', async () => {
+      const user = userEvent.setup();
+      renderWithQuery(<TicketReplyForm ticketId={42} />);
+
+      const textarea = screen.getByPlaceholderText('Write a reply to the student...');
+      const sendBtn = screen.getByRole('button', { name: /send reply/i });
+
+      expect(sendBtn).toBeDisabled();
+      await user.type(textarea, 'Hi');
+      expect(sendBtn).toBeEnabled();
+
+      await user.clear(textarea);
+      expect(sendBtn).toBeDisabled();
+    });
+
     it('displays error banner and calls onError when addTicketMessage mutation rejects', async () => {
       const user = userEvent.setup();
       const handleError = vi.fn();

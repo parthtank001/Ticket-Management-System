@@ -361,3 +361,187 @@ ${replyText}`;
     return heuristicPolishReply(replyText, studentName);
   }
 }
+
+export interface MessageSummaryContext {
+  id?: string;
+  senderType: string;
+  senderEmail?: string;
+  body: string;
+  isInternalNote?: boolean;
+  createdAt?: Date | string;
+}
+
+export interface TicketSummaryContext {
+  id?: number;
+  subject: string;
+  studentName?: string;
+  studentEmail?: string;
+  category?: string | null;
+  priority?: string | null;
+  status?: string | null;
+  createdAt?: Date | string;
+  messages: MessageSummaryContext[];
+}
+
+/**
+ * Heuristic summary generator for ticket and conversation history when offline or no API key.
+ */
+export function heuristicSummarizeTicketAndHistory(ticket: TicketSummaryContext): string {
+  const subject = ticket.subject?.trim() || 'Inquiry';
+  const student = ticket.studentName?.trim() || 'Student';
+  const category = ticket.category || 'General Question';
+  const priority = ticket.priority || 'MEDIUM';
+  const status = ticket.status || 'OPEN';
+  const messages = ticket.messages || [];
+
+  const bullets: string[] = [];
+
+  // Section 1: Initial Issue
+  bullets.push(`• Initial Issue:`);
+  bullets.push(`  - Customer (${student}) submitted inquiry regarding "${subject}" [Category: ${category}, Priority: ${priority}].`);
+  const initialMsg = messages.find((m) => m.senderType === 'STUDENT') || messages[0];
+  if (initialMsg?.body) {
+    const preview = initialMsg.body.trim().replace(/\s+/g, ' ').slice(0, 140);
+    bullets.push(`  - Problem statement: "${preview}${preview.length >= 140 ? '...' : ''}"`);
+  }
+
+  // Section 2: Conversation & Actions Taken
+  bullets.push(`• Conversation & Actions Taken:`);
+  if (messages.length <= 1) {
+    bullets.push(`  - Ticket logged in system. Awaiting support agent review and initial response.`);
+  } else {
+    const studentCount = messages.filter((m) => m.senderType === 'STUDENT').length;
+    const agentCount = messages.filter((m) => m.senderType === 'AGENT' && !m.isInternalNote).length;
+    const noteCount = messages.filter((m) => m.isInternalNote).length;
+
+    bullets.push(
+      `  - Thread contains ${messages.length} total message(s) (${studentCount} student message(s), ${agentCount} agent reply(ies)${
+        noteCount > 0 ? `, ${noteCount} internal note(s)` : ''
+      }).`
+    );
+
+    const latestAgentReply = [...messages].reverse().find((m) => m.senderType === 'AGENT' && !m.isInternalNote);
+    if (latestAgentReply) {
+      const replyPreview = latestAgentReply.body.trim().replace(/\s+/g, ' ').slice(0, 120);
+      bullets.push(`  - Latest agent response: "${replyPreview}${replyPreview.length >= 120 ? '...' : ''}"`);
+    }
+
+    const latestNote = [...messages].reverse().find((m) => m.isInternalNote);
+    if (latestNote) {
+      const notePreview = latestNote.body.trim().replace(/\s+/g, ' ').slice(0, 100);
+      bullets.push(`  - Staff note recorded: "${notePreview}${notePreview.length >= 100 ? '...' : ''}"`);
+    }
+  }
+
+  // Section 3: Current Status & Next Steps
+  bullets.push(`• Current Status & Next Steps:`);
+  if (status === 'RESOLVED') {
+    bullets.push(`  - Ticket is marked as RESOLVED. Support solutions have been communicated.`);
+  } else if (status === 'CLOSED') {
+    bullets.push(`  - Ticket is CLOSED.`);
+  } else {
+    const lastMsg = messages[messages.length - 1];
+    if (lastMsg && lastMsg.senderType === 'STUDENT') {
+      bullets.push(`  - Status is OPEN. Pending support agent review of latest student follow-up.`);
+    } else if (lastMsg && lastMsg.senderType === 'AGENT' && !lastMsg.isInternalNote) {
+      bullets.push(`  - Status is OPEN. Agent replied; awaiting student response or confirmation.`);
+    } else {
+      bullets.push(`  - Status is OPEN. Active in support queue.`);
+    }
+  }
+
+  return bullets.join('\n');
+}
+
+/**
+ * Summarizes the ticket details and full conversation history using Google Gemini AI.
+ * Falls back safely to heuristic rule-based summarization when offline or if API is unreachable.
+ */
+export async function summarizeTicketAndHistory(ticket: TicketSummaryContext): Promise<string> {
+  const apiKey =
+    process.env.GEMINI_API_KEY ||
+    process.env.GOOGLE_GENERATIVE_AI_API_KEY ||
+    process.env.GOOGLE_API_KEY;
+
+  if (
+    !apiKey ||
+    apiKey.trim() === '' ||
+    apiKey === '12345' ||
+    apiKey === 'mock-key' ||
+    apiKey.length < 10
+  ) {
+    return heuristicSummarizeTicketAndHistory(ticket);
+  }
+
+  try {
+    const googleProvider = createGoogleGenerativeAI({
+      apiKey: apiKey.trim(),
+    });
+
+    const messagesFormatted = (ticket.messages || [])
+      .map((m, idx) => {
+        const senderLabel = m.isInternalNote
+          ? 'INTERNAL NOTE (Agent)'
+          : m.senderType === 'STUDENT'
+          ? `STUDENT/CUSTOMER (${m.senderEmail || ticket.studentEmail || 'Student'})`
+          : `SUPPORT AGENT (${m.senderEmail || 'Support Agent'})`;
+        const time = m.createdAt ? ` [${new Date(m.createdAt).toISOString()}]` : '';
+        return `Message #${idx + 1} - ${senderLabel}${time}:\n${m.body.trim()}`;
+      })
+      .join('\n\n---\n\n');
+
+    const prompt = `You are an expert AI customer support lead. Summarize the following support ticket and its complete conversation history into a concise, professional executive summary.
+
+Ticket Details:
+- Ticket ID: ${ticket.id ? `#${ticket.id}` : 'N/A'}
+- Subject: ${ticket.subject}
+- Customer: ${ticket.studentName || 'Student'} (${ticket.studentEmail || 'No email'})
+- Category: ${ticket.category || 'General Question'}
+- Priority: ${ticket.priority || 'MEDIUM'}
+- Status: ${ticket.status || 'OPEN'}
+
+Conversation Timeline (${ticket.messages?.length || 0} messages):
+${messagesFormatted || '(No conversation messages yet)'}
+
+Instructions:
+Format the output clearly under these three bulleted headings:
+• Initial Issue: 1-2 concise bullets summarizing what the student requested or reported.
+• Conversation & Actions Taken: 1-3 bullets summarizing key agent responses, troubleshooting steps, notes, and back-and-forth timeline.
+• Current Status & Next Steps: 1-2 bullets summarizing the current state, resolution, or who is currently waiting on whom.
+
+Return ONLY the structured summary text without conversational prefixes or meta commentary.`;
+
+    try {
+      const { text } = await generateText({
+        model: googleProvider('gemini-2.5-flash'),
+        prompt,
+        maxRetries: 0,
+        abortSignal: AbortSignal.timeout(7000),
+      });
+
+      const cleaned = text?.trim();
+      if (cleaned && cleaned.length > 0) {
+        return cleaned;
+      }
+    } catch (primaryErr: any) {
+      console.warn('Gemini 2.5 Flash attempt failed for summarization, trying gemini-3.5-flash-lite fallback:', primaryErr?.message || primaryErr);
+      const { text } = await generateText({
+        model: googleProvider('gemini-3.5-flash-lite'),
+        prompt,
+        maxRetries: 0,
+        abortSignal: AbortSignal.timeout(7000),
+      });
+
+      const cleaned = text?.trim();
+      if (cleaned && cleaned.length > 0) {
+        return cleaned;
+      }
+    }
+
+    return heuristicSummarizeTicketAndHistory(ticket);
+  } catch (error: any) {
+    console.warn('AI Summarization failed or timed out, using fallback:', error?.message || error);
+    return heuristicSummarizeTicketAndHistory(ticket);
+  }
+}
+
