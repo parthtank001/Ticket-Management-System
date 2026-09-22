@@ -14,7 +14,7 @@ This document specifies the technical stack, architecture, database strategy, au
 | **Database** | **PostgreSQL 16+** | Relational data + `pgvector` vector extension |
 | **ORM** | **Prisma ORM** | Type-safe queries, migration management, and vector extensions |
 | **Authentication** | **NextAuth.js (Auth.js v5) with Database Sessions** | Database-backed session strategy stored in PostgreSQL (`Session` & `User` tables), supporting session revocation and role-based permissions (`ADMIN`, `AGENT`). Initial deployment includes a seeded primary Admin. |
-| **AI / LLM Engine** | **Google Gemini API** | `gemini-1.5-flash` for classification, ticket summaries & draft responses; `text-embedding-004` for RAG vector search |
+| **AI / LLM Engine** | **OpenAI API (`gpt-5-nano`)** | `gpt-5-nano` via Vercel AI SDK for classification, ticket summaries, draft responses & reply polishing |
 | **Email Gateway** | **SendGrid / Mailgun** | Inbound parse webhooks (`In-Reply-To`/`Message-ID` extraction) & outbound transactional email API |
 | **Containerization** | **Docker & Docker Compose** | Multi-stage `Dockerfile` + `docker-compose.yml` with `pgvector/pgvector` image |
 | **Hosting & Cloud** | **Cloud Provider (AWS / Render / Railway / GCP / VPS)** | Flexible cloud deployment options |
@@ -70,15 +70,15 @@ enum Role {
 ## 2. AI & RAG Knowledge Base Pipeline
 
 ### Single Category Classification
-- Every ticket is classified into **exactly one** of three categories by `gemini-1.5-flash`:
+- Every ticket is classified into **exactly one** of three categories by `gpt-5-nano`:
   1. `GENERAL_QUESTION`
   2. `TECHNICAL_QUESTION`
   3. `REFUND_REQUEST`
 
-### RAG (Retrieval-Augmented Generation) Strategy
-1. **Embedding Model**: `text-embedding-004` converts Knowledge Base articles and incoming emails into vector embeddings (768 dimensions).
-2. **Vector Storage**: Stored in PostgreSQL using the `pgvector` extension via Prisma raw queries (`cosine_distance` / `<=>`).
-3. **Context Injection & Draft Generation**: Top-$K$ relevant KB chunks are retrieved and passed into `gemini-1.5-flash` to craft a human-friendly draft response.
+### AI Draft & Summary Generation Strategy
+1. **Model**: `gpt-5-nano` via Vercel AI SDK (`@ai-sdk/openai`).
+2. **Classification & Summary**: Ingests inquiry subject and message body, categorizing priority and issue category with structured bullet points.
+3. **Context Injection & Draft Generation**: Uses prompt engineering to draft empathetic, first-name addressed responses ready for human agent review.
 
 ---
 

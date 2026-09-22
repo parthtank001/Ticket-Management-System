@@ -9,6 +9,7 @@ vi.mock('../../lib/tickets-api', () => ({
     updateTicket: vi.fn(),
     addTicketMessage: vi.fn(),
     listAgents: vi.fn(),
+    summarizeTicket: vi.fn(),
   },
 }));
 
@@ -402,6 +403,30 @@ describe('TicketDetailModal Component', () => {
       await waitFor(() => {
         expect(screen.getByText('Failed to send message: Server error 500')).toBeInTheDocument();
       });
+    });
+  });
+
+  describe('6. AI Summary & Conversation History Card Integration', () => {
+    it('renders the AI summary card and re-generates summary on button click', async () => {
+      const user = userEvent.setup();
+      const newSummary = '• Initial Issue: SSH port 22 blocked\n• Actions: Firewall unblocked\n• Status: Open';
+      vi.mocked(ticketsApi.summarizeTicket).mockResolvedValueOnce({
+        summary: newSummary,
+        ticket: { ...mockTicket, summary: newSummary },
+      });
+
+      renderWithQuery(
+        <TicketDetailModal ticket={mockTicket} isOpen={true} onClose={handleClose} />
+      );
+
+      expect(screen.getByRole('button', { name: /summarize ticket/i })).toBeInTheDocument();
+      expect(screen.getByText(/AI Summary & Conversation History/i)).toBeInTheDocument();
+      expect(screen.getByText('SSH connection timeout on port 22')).toBeInTheDocument();
+
+      const summarizeBtn = screen.getByRole('button', { name: /summarize ticket/i });
+      await user.click(summarizeBtn);
+
+      expect(ticketsApi.summarizeTicket).toHaveBeenCalledWith(42);
     });
   });
 });

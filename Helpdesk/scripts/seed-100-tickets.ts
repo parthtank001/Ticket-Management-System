@@ -1,7 +1,9 @@
-import { PrismaClient, Category, Priority, TicketStatus, SenderType } from '@prisma/client';
+import { PrismaClient, Category, Priority, TicketStatus } from '@prisma/client';
 import dotenv from 'dotenv';
 
 dotenv.config();
+
+type SenderType = 'STUDENT' | 'AGENT' | 'SYSTEM';
 
 const prisma = new PrismaClient();
 
@@ -924,7 +926,6 @@ async function seedTickets() {
 
   // Clear existing tickets first to guarantee a clean 100-ticket benchmark dataset
   console.log('🧹 Clearing old test tickets...');
-  await prisma.ticketMessage.deleteMany({});
   await prisma.ticket.deleteMany({});
 
   const allTicketsToInsert: TicketSeedData[] = [...rawTickets];
@@ -970,16 +971,6 @@ async function seedTickets() {
           body: `Hello Support Team,\n\nI am contacting you regarding ${subject.toLowerCase()}. Please assist me with the necessary steps to resolve this inquiry.\n\nThank you,\n${studentName}`,
           minutesAfterCreated: 0,
         },
-        ...(status !== 'OPEN'
-          ? [
-              {
-                senderType: 'AGENT' as SenderType,
-                senderEmail: 'agent@example.com',
-                body: `Hi ${fName},\n\nWe have reviewed your request regarding ${subject.toLowerCase()}. The appropriate adjustments have been applied to your student file.\n\nPlease let us know if you need anything else!\n\nBest regards,\nHelpdesk Support Team`,
-                minutesAfterCreated: 45,
-              },
-            ]
-          : []),
       ],
     });
 
@@ -994,11 +985,14 @@ async function seedTickets() {
     createdAtDate.setDate(createdAtDate.getDate() - tData.daysAgo);
     createdAtDate.setMinutes(createdAtDate.getMinutes() - tData.minutesAgo);
 
-    const ticket = await prisma.ticket.create({
+    const initialBody = tData.messages[0]?.body || `Inquiry regarding ${tData.subject}`;
+
+    await prisma.ticket.create({
       data: {
         subject: tData.subject,
         studentName: tData.studentName,
         studentEmail: tData.studentEmail,
+        body: initialBody,
         category: tData.category,
         priority: tData.priority,
         status: tData.status,
@@ -1009,20 +1003,6 @@ async function seedTickets() {
         updatedAt: createdAtDate,
       },
     });
-
-    for (const msg of tData.messages) {
-      const msgDate = new Date(createdAtDate.getTime() + msg.minutesAfterCreated * 60000);
-      await prisma.ticketMessage.create({
-        data: {
-          ticketId: ticket.id,
-          senderType: msg.senderType,
-          senderEmail: msg.senderEmail,
-          body: msg.body,
-          isInternalNote: msg.isInternalNote || false,
-          createdAt: msgDate,
-        },
-      });
-    }
 
     insertedCount++;
   }

@@ -100,7 +100,7 @@ export const TicketsTable: React.FC<TicketsTableProps> = ({
                 <div className="flex items-center space-x-2 text-[10px] text-slate-400 mt-0.5">
                   <span className="flex items-center space-x-1">
                     <MessageSquare className="h-3 w-3" />
-                    <span>{ticket.messages?.length || 0}</span>
+                    <span>{ticket.messages?.length || (ticket.body ? 1 : 0)}</span>
                   </span>
                 </div>
               </div>

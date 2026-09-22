@@ -27,6 +27,8 @@ export interface Ticket {
   subject: string;
   studentName: string;
   studentEmail: string;
+  body: string;
+  bodyHtml?: string | null;
   category: Category | null;
   priority: Priority;
   status: TicketStatus;
@@ -35,7 +37,7 @@ export interface Ticket {
   assignedAgentId: string | null;
   assignedToId?: string | null;
   assignedAgent?: TicketAgent | null;
-  messages: TicketMessage[];
+  messages?: TicketMessage[];
   createdAt: string | Date;
   updatedAt: string | Date;
 }
@@ -80,6 +82,7 @@ export const createTicketSchema = z.object({
  * Zod validation schema for updating an existing ticket
  */
 export const updateTicketSchema = z.object({
+  body: z.string().optional(),
   status: z.enum(['OPEN', 'RESOLVED', 'CLOSED']).optional(),
   category: z.enum(['GENERAL_QUESTION', 'TECHNICAL_QUESTION', 'REFUND_REQUEST']).nullable().optional(),
   priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'URGENT']).optional(),

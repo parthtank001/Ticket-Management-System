@@ -25,7 +25,7 @@ export function cn(...inputs: ClassValue[]) {
  */
 export function sanitizeHtml(
   dirty?: string | null,
-  config?: DOMPurify.Config
+  config?: Parameters<typeof DOMPurify.sanitize>[1]
 ): string {
   if (!dirty || typeof dirty !== 'string') return '';
   if (config) {

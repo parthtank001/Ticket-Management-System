@@ -3,6 +3,7 @@ import {
   extractFirstName,
   heuristicPolishReply,
   heuristicClassifyAndDraft,
+  heuristicSummarizeTicketAndHistory,
 } from '../../../server/services/ai';
 
 describe('AI Support Service Unit Tests', () => {
@@ -139,4 +140,89 @@ describe('AI Support Service Unit Tests', () => {
       expect(result.priority).toBe('URGENT');
     });
   });
+
+  describe('heuristicSummarizeTicketAndHistory Function', () => {
+    it('summarizes a single-message ticket awaiting initial response', () => {
+      const summary = heuristicSummarizeTicketAndHistory({
+        id: 101,
+        subject: 'Cannot login with 2FA token',
+        studentName: 'Alice Johnson',
+        studentEmail: 'alice@example.com',
+        category: 'TECHNICAL_QUESTION',
+        priority: 'HIGH',
+        status: 'OPEN',
+        messages: [
+          {
+            senderType: 'STUDENT',
+            senderEmail: 'alice@example.com',
+            body: 'My authenticator app generates codes that are rejected with error 401.',
+          },
+        ],
+      });
+
+      expect(summary).toContain('Initial Issue:');
+      expect(summary).toContain('Alice Johnson');
+      expect(summary).toContain('Cannot login with 2FA token');
+      expect(summary).toContain('TECHNICAL_QUESTION');
+      expect(summary).toContain('Conversation & Actions Taken:');
+      expect(summary).toContain('Awaiting support agent review');
+      expect(summary).toContain('Current Status & Next Steps:');
+      expect(summary).toContain('Status is OPEN');
+    });
+
+    it('summarizes multi-turn conversation with agent replies and internal notes', () => {
+      const summary = heuristicSummarizeTicketAndHistory({
+        id: 102,
+        subject: 'Double charge on subscription fee',
+        studentName: 'Lucas Vance',
+        studentEmail: 'lucas@example.com',
+        category: 'REFUND_REQUEST',
+        priority: 'HIGH',
+        status: 'RESOLVED',
+        messages: [
+          {
+            senderType: 'STUDENT',
+            senderEmail: 'lucas@example.com',
+            body: 'I was charged twice for the monthly membership.',
+          },
+          {
+            senderType: 'AGENT',
+            senderEmail: 'agent@example.com',
+            body: 'We verified the transaction ID and processed a refund for the second charge.',
+            isInternalNote: false,
+          },
+          {
+            senderType: 'AGENT',
+            senderEmail: 'agent@example.com',
+            body: 'Stripe refund reference #ref_9921 issued successfully.',
+            isInternalNote: true,
+          },
+        ],
+      });
+
+      expect(summary).toContain('Initial Issue:');
+      expect(summary).toContain('Lucas Vance');
+      expect(summary).toContain('REFUND_REQUEST');
+      expect(summary).toContain('Conversation & Actions Taken:');
+      expect(summary).toContain('3 total message(s)');
+      expect(summary).toContain('1 internal note(s)');
+      expect(summary).toContain('processed a refund');
+      expect(summary).toContain('Stripe refund reference');
+      expect(summary).toContain('Current Status & Next Steps:');
+      expect(summary).toContain('Ticket is marked as RESOLVED');
+    });
+
+    it('handles empty messages array and fallback defaults gracefully', () => {
+      const summary = heuristicSummarizeTicketAndHistory({
+        subject: '',
+        messages: [],
+      });
+
+      expect(summary).toContain('Initial Issue:');
+      expect(summary).toContain('Student');
+      expect(summary).toContain('Conversation & Actions Taken:');
+      expect(summary).toContain('Current Status & Next Steps:');
+    });
+  });
 });
+

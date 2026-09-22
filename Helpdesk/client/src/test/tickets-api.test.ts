@@ -306,4 +306,40 @@ describe('Tickets API Service Unit Tests (ticketsApi)', () => {
       ).rejects.toThrow('Failed to polish reply');
     });
   });
+
+  describe('summarizeTicket', () => {
+    it('sends POST request to summarize ticket and conversation history', async () => {
+      const responseData = {
+        summary: '• Initial Issue:\n  - Customer inquired about 2FA\n• Conversation & Actions Taken:\n  - 2 messages\n• Current Status:\n  - Open',
+        ticket: {
+          id: 42,
+          subject: '2FA issue',
+          studentName: 'Alice',
+          studentEmail: 'alice@example.com',
+          category: 'TECHNICAL_QUESTION' as const,
+          priority: 'HIGH' as const,
+          status: 'OPEN' as const,
+          summary: '• Initial Issue:\n  - Customer inquired about 2FA',
+          aiDraftResponse: null,
+          assignedAgentId: null,
+          messages: [],
+          createdAt: '2026-09-20T10:00:00.000Z',
+          updatedAt: '2026-09-20T10:00:00.000Z',
+        },
+      };
+      vi.mocked(apiClient.post).mockResolvedValueOnce({ data: responseData });
+
+      const result = await ticketsApi.summarizeTicket(42);
+      expect(apiClient.post).toHaveBeenCalledWith('/api/tickets/42/summarize');
+      expect(result).toEqual(responseData);
+    });
+
+    it('throws formatted error when summarizeTicket fails', async () => {
+      vi.mocked(apiClient.post).mockRejectedValueOnce({
+        response: { data: { error: 'Ticket not found' } },
+      });
+
+      await expect(ticketsApi.summarizeTicket(999)).rejects.toThrow('Ticket not found');
+    });
+  });
 });

@@ -65,7 +65,7 @@ Each ticket must belong to **exactly one** of the following categories:
 | **Framework & UI** | **Next.js 14+ (App Router)** + **Tailwind CSS** + **Lucide Icons** | Full-stack TypeScript framework with React Server Components, Server Actions, and responsive UI |
 | **Database & ORM** | **PostgreSQL** + **Prisma ORM** + **`pgvector`** | Relational DB for users, tickets, and messages + vector embeddings index for RAG search |
 | **Authentication** | **NextAuth.js (Auth.js) + Database Sessions** | Database-backed session strategy in PostgreSQL (`Session` table). Admin & Support Agent roles, seeded admin on deployment. See [tech-stack.md](file:///e:/claude_ai/Ticket%20Management%20System/Helpdesk/tech-stack.md) |
-| **AI & Embeddings** | **Google Gemini API** (`gemini-1.5-flash` + `text-embedding-004`) | AI ticket classification, RAG context search, ticket bullet summaries, & response drafting |
+| **AI & Embeddings** | **OpenAI API (`gpt-5-nano`)** | AI ticket classification, ticket bullet summaries, response drafting & reply polishing |
 | **Email Gateway** | **SendGrid / Mailgun** | Inbound email webhook parsing (`In-Reply-To`/`Message-ID` extraction) & outbound transactional email API |
 | **Deployment** | **Docker + Cloud Provider** | Multi-stage Docker container (`Dockerfile` & `docker-compose.yml`) deployable to AWS, Render, Railway, DigitalOcean, or GCP |
 | **File Storage** | **Local / Cloud Storage (UploadThing / S3)** | Storing Knowledge Base document uploads (PDFs, TXT, Markdown) |

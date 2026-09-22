@@ -27,6 +27,7 @@ export type {
   AddTicketMessagePayload,
   PolishReplyPayload,
   PolishReplyResponse,
+  SummarizeTicketResponse,
   PaginatedTicketsResponse,
   ListTicketsParams,
 } from './tickets-api';

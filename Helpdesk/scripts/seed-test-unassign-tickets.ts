@@ -124,18 +124,16 @@ async function seedTestTickets() {
         subject: item.subject,
         studentName: item.studentName,
         studentEmail: item.studentEmail,
+        body: item.messages[0]?.body || item.subject,
+        bodyHtml: item.messages[0]?.bodyHtml || null,
         category: item.category,
         priority: item.priority,
         status: item.status,
         summary: item.summary,
         assignedAgentId: testAgent.id,
-        messages: {
-          create: item.messages,
-        },
       },
       include: {
         assignedAgent: true,
-        messages: true,
       },
     });
 

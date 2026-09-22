@@ -15,7 +15,7 @@ import {
   createTicketMessageSchema,
   polishReplySchema,
 } from './schemas';
-import { polishReplyWithAi } from './services/ai';
+import { polishReplyWithAi, summarizeTicketAndHistory } from './services/ai';
 
 dotenv.config();
 
@@ -202,9 +202,6 @@ app.get('/api/tickets', requireAuth, async (req: Request, res: Response) => {
               role: true,
             },
           },
-          messages: {
-            orderBy: { createdAt: 'asc' },
-          },
         },
         orderBy,
         skip: skipNum,
@@ -237,9 +234,6 @@ app.get('/api/tickets', requireAuth, async (req: Request, res: Response) => {
           email: true,
           role: true,
         },
-      },
-      messages: {
-        orderBy: { createdAt: 'asc' },
       },
     },
     orderBy,
@@ -282,36 +276,29 @@ app.post('/api/tickets', ticketCreationLimiter, async (req: Request, res: Respon
     finalAssignedAgentId = assignedUser.id;
   }
 
-  // Create Ticket and initial TicketMessage transaction (plain ticket without AI processing)
+  // Create Ticket with body directly on Ticket table
   const ticket = await prisma.ticket.create({
     data: {
       subject: trimmedSubject,
       studentEmail: trimmedEmail,
       studentName: trimmedName,
+      body: trimmedMessage,
       category: selectedCategory,
       priority: selectedPriority,
       status: 'OPEN',
       summary: null,
       aiDraftResponse: null,
       assignedAgentId: finalAssignedAgentId,
-      messages: {
-        create: {
-          senderType: 'STUDENT',
-          senderEmail: trimmedEmail,
-          body: trimmedMessage,
-        },
-      },
     },
     include: {
       assignedAgent: true,
-      messages: true,
     },
   });
 
   res.status(201).json(ticket);
 });
 
-// Get a single ticket by ID with messages and assigned agent (Authenticated support staff only)
+// Get a single ticket by ID with assigned agent (Authenticated support staff only)
 app.get('/api/tickets/:id', requireAuth, async (req: Request, res: Response) => {
   const id = parseInt(req.params.id as string, 10);
   if (isNaN(id)) {
@@ -328,9 +315,6 @@ app.get('/api/tickets/:id', requireAuth, async (req: Request, res: Response) => 
           email: true,
           role: true,
         },
-      },
-      messages: {
-        orderBy: { createdAt: 'asc' },
       },
     },
   });
@@ -354,7 +338,7 @@ app.patch('/api/tickets/:id', requireAuth, async (req: Request, res: Response) =
     return res.status(400).json({ error: validationResult.error.issues[0].message });
   }
 
-  const { status, category, priority, assignedAgentId, assignedToId } = validationResult.data;
+  const { body, status, category, priority, assignedAgentId, assignedToId } = validationResult.data;
 
   const existingTicket = await prisma.ticket.findUnique({ where: { id } });
   if (!existingTicket) {
@@ -362,6 +346,7 @@ app.patch('/api/tickets/:id', requireAuth, async (req: Request, res: Response) =
   }
 
   const dataToUpdate: any = {};
+  if (body !== undefined) dataToUpdate.body = body;
   if (status) dataToUpdate.status = status;
   if (category !== undefined) dataToUpdate.category = category;
   if (priority !== undefined) dataToUpdate.priority = priority;
@@ -393,14 +378,13 @@ app.patch('/api/tickets/:id', requireAuth, async (req: Request, res: Response) =
       assignedAgent: {
         select: { id: true, name: true, email: true, role: true },
       },
-      messages: { orderBy: { createdAt: 'asc' } },
     },
   });
 
   res.json(updatedTicket);
 });
 
-// Add message reply to ticket (Authenticated support staff only - identity derived from session)
+// Add message reply / append note to ticket
 app.post('/api/tickets/:id/messages', requireAuth, async (req: Request, res: Response) => {
   const id = parseInt(req.params.id as string, 10);
   if (isNaN(id)) {
@@ -429,16 +413,26 @@ app.post('/api/tickets/:id/messages', requireAuth, async (req: Request, res: Res
     finalSenderEmail = customSenderEmail || req.user?.email || 'agent@example.com';
   }
 
-  const newMessage = await prisma.ticketMessage.create({
-    data: {
-      ticketId: id,
-      senderType: finalSenderType,
-      senderEmail: finalSenderEmail,
-      body,
-      bodyHtml: bodyHtml ?? null,
-      isInternalNote: finalSenderType === 'AGENT' ? Boolean(isInternalNote) : false,
-    },
+  const replyPrefix = isInternalNote ? '[INTERNAL NOTE]' : `[Reply from ${finalSenderType}]`;
+  const appendedBody = existingTicket.body
+    ? `${existingTicket.body}\n\n--- ${replyPrefix} (${finalSenderEmail}) ---\n${body}`
+    : body;
+
+  await prisma.ticket.update({
+    where: { id },
+    data: { body: appendedBody },
   });
+
+  const newMessage = {
+    id: `msg-${Date.now()}`,
+    ticketId: id,
+    senderType: finalSenderType,
+    senderEmail: finalSenderEmail,
+    body,
+    bodyHtml: bodyHtml ?? null,
+    isInternalNote: finalSenderType === 'AGENT' ? Boolean(isInternalNote) : false,
+    createdAt: new Date().toISOString(),
+  };
 
   res.status(201).json(newMessage);
 });
@@ -467,6 +461,64 @@ app.post('/api/tickets/polish-reply', requireAuth, async (req: Request, res: Res
     console.error('Error polishing reply with AI:', err);
     res.status(500).json({ error: err.message || 'Failed to polish reply' });
   }
+});
+
+// Summarize ticket details and body using AI (Authenticated support staff only)
+app.post('/api/tickets/:id/summarize', requireAuth, async (req: Request, res: Response) => {
+  const id = parseInt(req.params.id as string, 10);
+  if (isNaN(id) || id <= 0) {
+    return res.status(400).json({ error: 'Invalid ticket ID' });
+  }
+
+  const existingTicket = await prisma.ticket.findUnique({
+    where: { id },
+    include: {
+      assignedAgent: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          role: true,
+        },
+      },
+    },
+  });
+
+  if (!existingTicket) {
+    return res.status(404).json({ error: 'Ticket not found' });
+  }
+
+  const summary = await summarizeTicketAndHistory({
+    id: existingTicket.id,
+    subject: existingTicket.subject,
+    studentName: existingTicket.studentName,
+    studentEmail: existingTicket.studentEmail,
+    category: existingTicket.category,
+    priority: existingTicket.priority,
+    status: existingTicket.status,
+    createdAt: existingTicket.createdAt,
+    body: existingTicket.body,
+  });
+
+  const updatedTicket = await prisma.ticket.update({
+    where: { id },
+    data: { summary },
+    include: {
+      assignedAgent: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          role: true,
+        },
+      },
+    },
+  });
+
+  res.json({
+    summary,
+    ticket: updatedTicket,
+  });
 });
 
 // Centralized Error Handling Middleware (Express 5 automatically forwards async promise rejections here)

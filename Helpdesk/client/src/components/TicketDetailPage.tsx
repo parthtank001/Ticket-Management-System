@@ -11,6 +11,7 @@ import { TicketReplyForm } from './TicketReplyForm';
 import { ReplyThred } from './ReplyThred';
 import { ErrorMessage } from './ErrorMessage';
 import { UpdateTicket } from './UpdateTicket';
+import { TicketSummaryCard } from './TicketSummaryCard';
 import { TicketDetailSkeleton } from './ui/skeleton';
 import {
   ArrowLeft,
@@ -132,19 +133,25 @@ export const TicketDetailPage: React.FC<TicketDetailPageProps> = ({
               </div>
             </div>
 
-            {/* AI Summary Banner if present */}
-            {ticket.summary && (
-              <div className="p-2.5 bg-indigo-50/60 border border-indigo-100 rounded-lg text-[11px] space-y-0.5">
-                <span className="font-bold text-indigo-900 uppercase tracking-wider text-[9px]">
-                  Issue Summary
-                </span>
-                <p className="text-indigo-950 leading-relaxed text-[11px]">{ticket.summary}</p>
+            {/* Ticket Initial Inquiry Body */}
+            {ticket.body && (
+              <div className="text-xs text-slate-700 leading-relaxed whitespace-pre-wrap bg-slate-50/60 p-3 rounded-lg border border-slate-100/90 font-normal">
+                {ticket.body.split(/\n\n---\s*\[/)[0]}
               </div>
             )}
           </div>
 
+          {/* AI Issue & Conversation Summary Card */}
+          <TicketSummaryCard ticket={ticket} onError={setActionError} />
+
           {/* Conversation & Reply Thread */}
-          <ReplyThred messages={ticket.messages} />
+          <ReplyThred
+            messages={ticket.messages}
+            ticketBody={ticket.body}
+            studentEmail={ticket.studentEmail}
+            createdAt={ticket.createdAt}
+            ticketId={ticket.id}
+          />
 
           {/* Form to submit new replies */}
           <TicketReplyForm

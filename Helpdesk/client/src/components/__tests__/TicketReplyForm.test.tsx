@@ -330,7 +330,7 @@ describe('TicketReplyForm Component', () => {
         );
       });
 
-      expect(screen.getByText(/polished with ai \(gemini\)/i)).toBeInTheDocument();
+      expect(screen.getByText(/polished with ai \(gpt-5-nano\)/i)).toBeInTheDocument();
     });
 
     it('displays error banner when polishReply API fails', async () => {

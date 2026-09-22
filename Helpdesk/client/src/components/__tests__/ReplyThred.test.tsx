@@ -1,8 +1,17 @@
 import React from 'react';
-import { describe, it, expect } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { renderWithQuery } from '../../test/renderWithQuery';
 import { ReplyThred, ReplyThread } from '../ReplyThred';
+import { ticketsApi } from '../../lib/tickets-api';
 import type { TicketMessage } from '../../lib/types';
+
+vi.mock('../../lib/tickets-api', () => ({
+  ticketsApi: {
+    summarizeTicket: vi.fn(),
+  },
+}));
 
 const mockMessages: TicketMessage[] = [
   {
@@ -44,9 +53,13 @@ const mockMessages: TicketMessage[] = [
 ];
 
 describe('ReplyThred Component', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   describe('1. Empty Thread States', () => {
     it('renders empty thread state when messages array is empty or undefined', () => {
-      const { rerender } = render(<ReplyThred messages={[]} />);
+      const { rerender } = renderWithQuery(<ReplyThred messages={[]} />);
 
       expect(screen.getByText('Conversation Thread (0)')).toBeInTheDocument();
       expect(screen.getByText('No messages in thread yet.')).toBeInTheDocument();
@@ -57,7 +70,7 @@ describe('ReplyThred Component', () => {
     });
 
     it('renders custom empty message when specified', () => {
-      render(<ReplyThred messages={[]} emptyMessage="No ticket conversation history recorded." />);
+      renderWithQuery(<ReplyThred messages={[]} emptyMessage="No ticket conversation history recorded." />);
 
       expect(screen.getByText('No ticket conversation history recorded.')).toBeInTheDocument();
     });
@@ -65,7 +78,7 @@ describe('ReplyThred Component', () => {
 
   describe('2. Thread Rendering & Header Count Pluralization', () => {
     it('renders conversation thread with all messages and correct pluralized count header', () => {
-      render(<ReplyThred messages={mockMessages} />);
+      renderWithQuery(<ReplyThred messages={mockMessages} />);
 
       expect(screen.getByText('Conversation Thread (4)')).toBeInTheDocument();
       expect(screen.getByText('4 messages')).toBeInTheDocument();
@@ -83,14 +96,14 @@ describe('ReplyThred Component', () => {
     });
 
     it('renders singular "1 message" count when exactly 1 message is in thread', () => {
-      render(<ReplyThred messages={[mockMessages[0]]} />);
+      renderWithQuery(<ReplyThred messages={[mockMessages[0]]} />);
 
       expect(screen.getByText('Conversation Thread (1)')).toBeInTheDocument();
       expect(screen.getByText('1 message')).toBeInTheDocument();
     });
 
     it('hides header bar when showHeader is false', () => {
-      render(<ReplyThred messages={mockMessages} showHeader={false} />);
+      renderWithQuery(<ReplyThred messages={mockMessages} showHeader={false} />);
 
       expect(screen.queryByText(/conversation thread/i)).not.toBeInTheDocument();
       expect(screen.getByText('I cannot connect to the internal VPN from campus dorms.')).toBeInTheDocument();
@@ -99,7 +112,7 @@ describe('ReplyThred Component', () => {
 
   describe('3. Sender Badges & Styling Variants', () => {
     it('renders appropriate sender role badges (Student, Internal Note, Support Agent, System)', () => {
-      render(<ReplyThred messages={mockMessages} />);
+      renderWithQuery(<ReplyThred messages={mockMessages} />);
 
       expect(screen.getByText('Student')).toBeInTheDocument();
       expect(screen.getByText('Internal Note')).toBeInTheDocument();
@@ -108,7 +121,7 @@ describe('ReplyThred Component', () => {
     });
 
     it('applies corresponding variant styling classes to message items', () => {
-      const { container } = render(<ReplyThred messages={mockMessages} />);
+      const { container } = renderWithQuery(<ReplyThred messages={mockMessages} />);
 
       const studentMsg = container.querySelector('.thread-message-student');
       expect(studentMsg).toBeInTheDocument();
@@ -123,7 +136,7 @@ describe('ReplyThred Component', () => {
 
   describe('4. Custom Attributes, Fallbacks & Aliases', () => {
     it('applies custom className to the wrapper container', () => {
-      const { container } = render(<ReplyThred messages={mockMessages} className="custom-thread-class" />);
+      const { container } = renderWithQuery(<ReplyThred messages={mockMessages} className="custom-thread-class" />);
 
       expect(container.querySelector('.custom-thread-class')).toBeInTheDocument();
     });
@@ -141,7 +154,7 @@ describe('ReplyThred Component', () => {
         },
       ];
 
-      render(<ReplyThred messages={messagesWithoutId} />);
+      renderWithQuery(<ReplyThred messages={messagesWithoutId} />);
       expect(screen.getByText('Fallback index test body')).toBeInTheDocument();
       expect(screen.getByText('test@student.edu')).toBeInTheDocument();
     });
@@ -166,7 +179,7 @@ describe('ReplyThred Component', () => {
         },
       ];
 
-      const { container } = render(<ReplyThred messages={messagesWithHtml} />);
+      const { container } = renderWithQuery(<ReplyThred messages={messagesWithHtml} />);
       const strongElement = container.querySelector('strong');
       expect(strongElement).toBeInTheDocument();
       expect(strongElement?.textContent).toBe('rich text');
@@ -187,7 +200,7 @@ describe('ReplyThred Component', () => {
         },
       ];
 
-      const { container } = render(<ReplyThred messages={messagesWithXss} />);
+      const { container } = renderWithQuery(<ReplyThred messages={messagesWithXss} />);
       expect(container.querySelector('script')).toBeNull();
       expect(container.innerHTML).not.toContain('alert("XSS")');
       expect(screen.getByText('Safe intro')).toBeInTheDocument();
@@ -208,7 +221,7 @@ describe('ReplyThred Component', () => {
         },
       ];
 
-      const { container } = render(<ReplyThred messages={messagesWithEventHandlers} />);
+      const { container } = renderWithQuery(<ReplyThred messages={messagesWithEventHandlers} />);
       const img = container.querySelector('img');
       expect(img).toBeInTheDocument();
       expect(img?.getAttribute('onerror')).toBeNull();
@@ -216,6 +229,15 @@ describe('ReplyThred Component', () => {
       const anchor = container.querySelector('a');
       expect(anchor).toBeInTheDocument();
       expect(anchor?.getAttribute('href')).toBeNull();
+    });
+  });
+
+  describe('6. Message Stream Presentation', () => {
+    it('does not render summarize action buttons in conversation thread items', () => {
+      renderWithQuery(<ReplyThred messages={mockMessages} ticketId={42} />);
+
+      const summarizeButtons = screen.queryAllByRole('button', { name: /summarize/i });
+      expect(summarizeButtons).toHaveLength(0);
     });
   });
 });

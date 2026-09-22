@@ -6,6 +6,10 @@ import { MessageSquare } from 'lucide-react';
 
 export interface ReplyThredProps {
   messages?: TicketMessage[];
+  ticketBody?: string | null;
+  studentEmail?: string;
+  createdAt?: string | Date;
+  ticketId?: number;
   showHeader?: boolean;
   className?: string;
   emptyMessage?: string;
@@ -17,13 +21,87 @@ const getMessageVariantClass = (isNote?: boolean, isStudent?: boolean): string =
   return 'thread-message-agent';
 };
 
+export function parseBodyToMessages(
+  body?: string | null,
+  studentEmail?: string,
+  fallbackDate?: string | Date
+): TicketMessage[] {
+  if (!body || !body.trim()) return [];
+
+  const delimiterRegex = /\n*---\s*\[(.*?)\]\s*(?:\((.*?)\))?\s*---\n*/g;
+  const matches = [...body.matchAll(delimiterRegex)];
+
+  if (matches.length === 0) {
+    return [
+      {
+        id: 'initial-msg',
+        ticketId: 0,
+        senderType: 'STUDENT',
+        senderEmail: studentEmail || 'student@example.com',
+        body: body.trim(),
+        isInternalNote: false,
+        createdAt: fallbackDate ? new Date(fallbackDate).toISOString() : new Date().toISOString(),
+      },
+    ];
+  }
+
+  const messages: TicketMessage[] = [];
+  const baseDate = fallbackDate ? new Date(fallbackDate).getTime() : Date.now();
+
+  const firstMatchIndex = matches[0].index ?? 0;
+  const initialText = body.slice(0, firstMatchIndex).trim();
+  if (initialText) {
+    messages.push({
+      id: 'msg-0',
+      ticketId: 0,
+      senderType: 'STUDENT',
+      senderEmail: studentEmail || 'student@example.com',
+      body: initialText,
+      isInternalNote: false,
+      createdAt: new Date(baseDate).toISOString(),
+    });
+  }
+
+  for (let i = 0; i < matches.length; i++) {
+    const match = matches[i];
+    const headerType = match[1] || '';
+    const email = match[2] || '';
+    const contentStart = (match.index ?? 0) + match[0].length;
+    const contentEnd = i + 1 < matches.length ? (matches[i + 1].index ?? body.length) : body.length;
+    const content = body.slice(contentStart, contentEnd).trim();
+
+    const isInternalNote = headerType.toUpperCase().includes('INTERNAL NOTE') || headerType.toUpperCase().includes('NOTE');
+    const isStudent = headerType.toUpperCase().includes('STUDENT') || headerType.toUpperCase().includes('CUSTOMER');
+    const senderType = isStudent ? 'STUDENT' : 'AGENT';
+    const senderEmail = email || (isStudent ? (studentEmail || 'student@example.com') : 'agent@example.com');
+    const turnDate = new Date(baseDate + (i + 1) * 35 * 60 * 1000).toISOString();
+
+    messages.push({
+      id: `msg-${i + 1}`,
+      ticketId: 0,
+      senderType,
+      senderEmail,
+      body: content,
+      isInternalNote,
+      createdAt: turnDate,
+    });
+  }
+
+  return messages;
+}
+
 export const ReplyThred: React.FC<ReplyThredProps> = ({
   messages = [],
+  ticketBody,
+  studentEmail,
+  createdAt,
+  ticketId: _ticketId,
   showHeader = true,
   className = '',
   emptyMessage = 'No messages in thread yet.',
 }) => {
-  const messageList = messages || [];
+  const parsedFromParsedBody = !messages || messages.length === 0 ? parseBodyToMessages(ticketBody, studentEmail, createdAt) : [];
+  const messageList = (messages && messages.length > 0) ? messages : parsedFromParsedBody;
   const messageCount = messageList.length;
 
   return (
@@ -75,7 +153,7 @@ export const ReplyThred: React.FC<ReplyThredProps> = ({
                       dangerouslySetInnerHTML={{ __html: sanitizeHtml(msg.bodyHtml) }}
                     />
                   ) : (
-                    <div className="whitespace-pre-wrap">{msg.body}</div>
+                    <div className="whitespace-pre-wrap leading-relaxed">{msg.body}</div>
                   )}
                 </div>
               </div>

@@ -117,3 +117,18 @@ export function usePolishReply() {
   });
 }
 
+/**
+ * Mutation hook to summarize ticket and complete conversation history with AI
+ */
+export function useSummarizeTicket() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (ticketId: number) => ticketsApi.summarizeTicket(ticketId),
+    onSuccess: (data, ticketId) => {
+      queryClient.setQueryData(['tickets', ticketId], data.ticket);
+      queryClient.invalidateQueries({ queryKey: TICKETS_QUERY_KEY });
+      queryClient.invalidateQueries({ queryKey: ['tickets', ticketId] });
+    },
+  });
+}
+

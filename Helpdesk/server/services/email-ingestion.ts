@@ -64,72 +64,36 @@ export async function ingestInboundEmail(rawPayload: any): Promise<EmailIngestio
     };
   }
 
-  // Check for duplicate Message-ID across existing messages
+  // Check for duplicate Message-ID via webhook logs
   if (parsed.messageId) {
-    const existingMessage = await prisma.ticketMessage.findUnique({
-      where: { messageId: parsed.messageId },
-      include: { ticket: true },
+    const existingLog = await prisma.webhookLog.findFirst({
+      where: {
+        payload: {
+          contains: parsed.messageId,
+        },
+      },
     });
 
-    if (existingMessage) {
-      try {
-        await prisma.webhookLog.create({
-          data: {
-            source: 'inbound_email',
-            payload: JSON.stringify(rawPayload),
-            status: 'duplicate',
-            ticketId: existingMessage.ticketId,
-            reason: 'Message with this Message-ID has already been ingested',
-          },
-        });
-      } catch (logErr) {
-        console.error('Failed to write webhook log:', logErr);
-      }
+    if (existingLog && existingLog.ticketId) {
       return {
         status: 'duplicate',
         isThreadReply: true,
-        ticketId: existingMessage.ticketId,
-        ticketNumber: existingMessage.ticket.id,
-        messageId: existingMessage.id,
+        ticketId: existingLog.ticketId,
+        ticketNumber: existingLog.ticketId,
         reason: 'Message with this Message-ID has already been ingested',
-        ticket: existingMessage.ticket,
       };
     }
   }
 
   // Thread Matching:
-  // 1. Check References & In-Reply-To headers against existing TicketMessages
+  // 1. Check ticket number tag in subject (e.g., "[Ticket #1005]")
   let existingTicket: any = null;
 
-  if (parsed.references.length > 0) {
-    const matchedMessage = await prisma.ticketMessage.findFirst({
-      where: {
-        messageId: {
-          in: parsed.references,
-        },
-      },
-      include: {
-        ticket: {
-          include: {
-            assignedAgent: true,
-            messages: { orderBy: { createdAt: 'asc' } },
-          },
-        },
-      },
-    });
-
-    if (matchedMessage?.ticket) {
-      existingTicket = matchedMessage.ticket;
-    }
-  }
-
-  // 2. Check ticket number tag in subject (e.g., "[Ticket #1005]") if not matched by headers
-  if (!existingTicket && parsed.ticketNumberFromSubject) {
+  if (parsed.ticketNumberFromSubject) {
     const ticketById = await prisma.ticket.findUnique({
       where: { id: parsed.ticketNumberFromSubject },
       include: {
         assignedAgent: true,
-        messages: { orderBy: { createdAt: 'asc' } },
       },
     });
 
@@ -138,19 +102,11 @@ export async function ingestInboundEmail(rawPayload: any): Promise<EmailIngestio
     }
   }
 
-  // Case A: Existing ticket matched -> Append student reply to thread
+  // Case A: Existing ticket matched -> Append student reply to ticket body
   if (existingTicket) {
-    const newMessage = await prisma.ticketMessage.create({
-      data: {
-        ticketId: existingTicket.id,
-        senderType: 'STUDENT',
-        senderEmail: parsed.senderEmail,
-        body: parsed.body,
-        messageId: parsed.messageId,
-        inReplyTo: parsed.inReplyTo,
-        isInternalNote: false,
-      },
-    });
+    const updatedBody = existingTicket.body
+      ? `${existingTicket.body}\n\n--- [Reply from ${parsed.senderName} (${parsed.senderEmail})] ---\n${parsed.body}`
+      : parsed.body;
 
     // Determine if ticket status should be reopened or updated
     const shouldReopen = [
@@ -161,17 +117,16 @@ export async function ingestInboundEmail(rawPayload: any): Promise<EmailIngestio
     let nextStatus = existingTicket.status;
     if (shouldReopen) {
       nextStatus = 'OPEN';
-      await prisma.ticket.update({
-        where: { id: existingTicket.id },
-        data: { status: nextStatus },
-      });
     }
 
-    const updatedTicket = await prisma.ticket.findUnique({
+    const updatedTicket = await prisma.ticket.update({
       where: { id: existingTicket.id },
+      data: {
+        body: updatedBody,
+        status: nextStatus,
+      },
       include: {
         assignedAgent: true,
-        messages: { orderBy: { createdAt: 'asc' } },
       },
     });
 
@@ -194,9 +149,7 @@ export async function ingestInboundEmail(rawPayload: any): Promise<EmailIngestio
       isThreadReply: true,
       ticketId: existingTicket.id,
       ticketNumber: existingTicket.id,
-      messageId: newMessage.id,
       ticket: updatedTicket,
-      message: newMessage,
     };
   }
 
@@ -208,25 +161,15 @@ export async function ingestInboundEmail(rawPayload: any): Promise<EmailIngestio
       subject: subjectToUse,
       studentEmail: parsed.senderEmail,
       studentName: parsed.senderName.trim(),
+      body: parsed.body,
       category: null,
       priority: 'MEDIUM',
       status: 'OPEN',
       summary: null,
       aiDraftResponse: null,
-      messages: {
-        create: {
-          senderType: 'STUDENT',
-          senderEmail: parsed.senderEmail,
-          body: parsed.body,
-          messageId: parsed.messageId,
-          inReplyTo: parsed.inReplyTo,
-          isInternalNote: false,
-        },
-      },
     },
     include: {
       assignedAgent: true,
-      messages: true,
     },
   });
 
@@ -250,6 +193,5 @@ export async function ingestInboundEmail(rawPayload: any): Promise<EmailIngestio
     ticketId: newTicket.id,
     ticketNumber: newTicket.id,
     ticket: newTicket,
-    message: newTicket.messages[0],
   };
 }

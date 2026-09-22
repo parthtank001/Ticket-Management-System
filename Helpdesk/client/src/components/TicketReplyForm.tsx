@@ -112,7 +112,7 @@ export const TicketReplyForm: React.FC<TicketReplyFormProps> = ({
           {isPolished && (
             <span className="inline-flex items-center gap-1 text-[10px] font-bold text-violet-700 bg-violet-50 border border-violet-200/80 px-2 py-0.5 rounded-full transition-all">
               <Check className="h-2.5 w-2.5 text-violet-600" />
-              <span>Polished with AI (Gemini)</span>
+              <span>Polished with AI (gpt-5-nano)</span>
             </span>
           )}
         </div>
@@ -166,7 +166,7 @@ export const TicketReplyForm: React.FC<TicketReplyFormProps> = ({
               type="button"
               onClick={handlePolishReply}
               disabled={isBusy || !replyBody.trim()}
-              title="Polish draft reply with AI (Gemini)"
+              title="Polish draft reply with AI (gpt-5-nano)"
               className="inline-flex items-center space-x-1.5 px-3 py-1.5 bg-violet-50 hover:bg-violet-100 text-violet-700 border border-violet-200/80 rounded-lg text-[11px] font-bold transition-all shadow-2xs disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
             >
               {polishReplyMutation.isPending ? (

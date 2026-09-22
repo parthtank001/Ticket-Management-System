@@ -1,6 +1,5 @@
-import { GoogleGenAI } from '@google/genai';
 import { generateText } from 'ai';
-import { createGoogleGenerativeAI, google } from '@ai-sdk/google';
+import { createOpenAI, openai } from '@ai-sdk/openai';
 import { Category, Priority } from '@helpdesk/core';
 
 export interface AIClassificationResult {
@@ -127,7 +126,7 @@ export function heuristicClassifyAndDraft(
 }
 
 /**
- * Classifies an incoming inquiry and generates a summary & draft response using Google Gemini API.
+ * Classifies an incoming inquiry and generates a summary & draft response using gpt-5-nano via Vercel AI SDK (@ai-sdk/openai).
  * Falls back safely to rule-based heuristics if the API key is not configured or errors.
  */
 export async function classifyAndDraftInquiry(
@@ -135,17 +134,22 @@ export async function classifyAndDraftInquiry(
   body: string,
   studentName?: string
 ): Promise<AIClassificationResult> {
-  const apiKey = process.env.GEMINI_API_KEY;
+  const apiKey =
+    process.env.OPENAI_API_KEY ||
+    process.env.AI_API_KEY;
 
   // Fallback if no real API key configured or in test environments
-  if (!apiKey || apiKey === '12345' || apiKey.length < 10) {
+  if (!apiKey || apiKey === '12345' || apiKey === 'test-openai-key' || apiKey === 'mock-openai-key' || apiKey.length < 10) {
     return heuristicClassifyAndDraft(subject, body, studentName);
   }
 
   const firstName = extractFirstName(studentName);
 
   try {
-    const ai = new GoogleGenAI({ apiKey });
+    const openaiProvider = createOpenAI({
+      apiKey: apiKey.trim(),
+    });
+
     const prompt = `You are an AI customer support triage assistant for a student helpdesk system.
 Analyze the following student support inquiry and provide a JSON response with:
 1. "category": EXACTLY one of ["GENERAL_QUESTION", "TECHNICAL_QUESTION", "REFUND_REQUEST"]
@@ -166,15 +170,26 @@ Respond ONLY with valid JSON in this exact structure:
   "aiDraftResponse": "string"
 }`;
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: prompt,
-    }).catch(() => ai.models.generateContent({
-      model: 'gemini-3.1-flash-lite',
-      contents: prompt,
-    }));
+    let responseText = '';
+    try {
+      const { text } = await generateText({
+        model: openaiProvider('gpt-5-nano'),
+        prompt,
+        maxRetries: 0,
+        abortSignal: AbortSignal.timeout(6000),
+      });
+      responseText = text?.trim() || '';
+    } catch (primaryErr: any) {
+      console.warn('gpt-5-nano attempt failed for classification, trying gpt-4o-mini fallback:', primaryErr?.message || primaryErr);
+      const { text } = await generateText({
+        model: openaiProvider('gpt-4o-mini'),
+        prompt,
+        maxRetries: 0,
+        abortSignal: AbortSignal.timeout(6000),
+      });
+      responseText = text?.trim() || '';
+    }
 
-    const responseText = response.text?.trim() || '';
     // Extract JSON block if enclosed in markdown backticks
     const jsonMatch = responseText.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
@@ -213,7 +228,7 @@ Respond ONLY with valid JSON in this exact structure:
 
     return heuristicClassifyAndDraft(subject, body, studentName);
   } catch (error) {
-    console.warn('Gemini AI classification failed, using heuristic fallback:', error);
+    console.warn('gpt-5-nano AI classification failed, using heuristic fallback:', error);
     return heuristicClassifyAndDraft(subject, body, studentName);
   }
 }
@@ -276,7 +291,7 @@ export function heuristicPolishReply(
 }
 
 /**
- * Polishes and improves a support agent's draft reply using Google Gemini via Vercel AI SDK (@ai-sdk/google).
+ * Polishes and improves a support agent's draft reply using gpt-5-nano via Vercel AI SDK (@ai-sdk/openai).
  */
 export async function polishReplyWithAi(options: PolishReplyOptions): Promise<string> {
   const { replyText, studentName, category } = options;
@@ -288,22 +303,22 @@ export async function polishReplyWithAi(options: PolishReplyOptions): Promise<st
   const firstName = extractFirstName(studentName);
 
   const apiKey =
-    process.env.GEMINI_API_KEY ||
-    process.env.GOOGLE_GENERATIVE_AI_API_KEY ||
-    process.env.GOOGLE_API_KEY;
+    process.env.OPENAI_API_KEY ||
+    process.env.AI_API_KEY;
 
   if (
     !apiKey ||
     apiKey.trim() === '' ||
     apiKey === '12345' ||
-    apiKey === 'mock-key' ||
+    apiKey === 'test-openai-key' ||
+    apiKey === 'mock-openai-key' ||
     apiKey.length < 10
   ) {
     return heuristicPolishReply(replyText, studentName);
   }
 
   try {
-    const googleProvider = createGoogleGenerativeAI({
+    const openaiProvider = createOpenAI({
       apiKey: apiKey.trim(),
     });
 
@@ -326,10 +341,10 @@ ${category ? `- Ticket Category: ${category}` : ''}
 Agent's Draft:
 ${replyText}`;
 
-    // Primary attempt with gemini-3.5-flash-lite
+    // Primary attempt with gpt-5-nano
     try {
       const { text } = await generateText({
-        model: googleProvider('gemini-3.5-flash-lite'),
+        model: openaiProvider('gpt-5-nano'),
         prompt,
         maxRetries: 0,
         abortSignal: AbortSignal.timeout(6000),
@@ -340,10 +355,10 @@ ${replyText}`;
         return polished;
       }
     } catch (primaryErr: any) {
-      console.warn('Gemini 3.5 Flash Lite attempt failed, trying gemini-3.1-flash-lite fallback:', primaryErr?.message || primaryErr);
-      // Secondary attempt with gemini-3.1-flash-lite
+      console.warn('gpt-5-nano attempt failed, trying gpt-4o-mini fallback:', primaryErr?.message || primaryErr);
+      // Secondary attempt with gpt-4o-mini
       const { text } = await generateText({
-        model: googleProvider('gemini-3.1-flash-lite'),
+        model: openaiProvider('gpt-4o-mini'),
         prompt,
         maxRetries: 0,
         abortSignal: AbortSignal.timeout(6000),
@@ -357,7 +372,7 @@ ${replyText}`;
 
     return heuristicPolishReply(replyText, studentName);
   } catch (error: any) {
-    console.warn('AI Polish with Gemini failed or timed out, using fallback:', error?.message || error);
+    console.warn('AI Polish with gpt-5-nano failed or timed out, using fallback:', error?.message || error);
     return heuristicPolishReply(replyText, studentName);
   }
 }
@@ -380,7 +395,8 @@ export interface TicketSummaryContext {
   priority?: string | null;
   status?: string | null;
   createdAt?: Date | string;
-  messages: MessageSummaryContext[];
+  body?: string;
+  messages?: MessageSummaryContext[];
 }
 
 /**
@@ -393,6 +409,7 @@ export function heuristicSummarizeTicketAndHistory(ticket: TicketSummaryContext)
   const priority = ticket.priority || 'MEDIUM';
   const status = ticket.status || 'OPEN';
   const messages = ticket.messages || [];
+  const ticketBody = ticket.body?.trim() || '';
 
   const bullets: string[] = [];
 
@@ -400,8 +417,9 @@ export function heuristicSummarizeTicketAndHistory(ticket: TicketSummaryContext)
   bullets.push(`• Initial Issue:`);
   bullets.push(`  - Customer (${student}) submitted inquiry regarding "${subject}" [Category: ${category}, Priority: ${priority}].`);
   const initialMsg = messages.find((m) => m.senderType === 'STUDENT') || messages[0];
-  if (initialMsg?.body) {
-    const preview = initialMsg.body.trim().replace(/\s+/g, ' ').slice(0, 140);
+  const problemText = ticketBody || initialMsg?.body || '';
+  if (problemText) {
+    const preview = problemText.trim().replace(/\s+/g, ' ').slice(0, 140);
     bullets.push(`  - Problem statement: "${preview}${preview.length >= 140 ? '...' : ''}"`);
   }
 
@@ -454,27 +472,27 @@ export function heuristicSummarizeTicketAndHistory(ticket: TicketSummaryContext)
 }
 
 /**
- * Summarizes the ticket details and full conversation history using Google Gemini AI.
+ * Summarizes the ticket details and full conversation history using gpt-5-nano via Vercel AI SDK (@ai-sdk/openai).
  * Falls back safely to heuristic rule-based summarization when offline or if API is unreachable.
  */
 export async function summarizeTicketAndHistory(ticket: TicketSummaryContext): Promise<string> {
   const apiKey =
-    process.env.GEMINI_API_KEY ||
-    process.env.GOOGLE_GENERATIVE_AI_API_KEY ||
-    process.env.GOOGLE_API_KEY;
+    process.env.OPENAI_API_KEY ||
+    process.env.AI_API_KEY;
 
   if (
     !apiKey ||
     apiKey.trim() === '' ||
     apiKey === '12345' ||
-    apiKey === 'mock-key' ||
+    apiKey === 'test-openai-key' ||
+    apiKey === 'mock-openai-key' ||
     apiKey.length < 10
   ) {
     return heuristicSummarizeTicketAndHistory(ticket);
   }
 
   try {
-    const googleProvider = createGoogleGenerativeAI({
+    const openaiProvider = createOpenAI({
       apiKey: apiKey.trim(),
     });
 
@@ -490,7 +508,11 @@ export async function summarizeTicketAndHistory(ticket: TicketSummaryContext): P
       })
       .join('\n\n---\n\n');
 
-    const prompt = `You are an expert AI customer support lead. Summarize the following support ticket and its complete conversation history into a concise, professional executive summary.
+    const ticketContent = ticket.body
+      ? `Ticket Body:\n${ticket.body}\n\n${messagesFormatted ? `Additional Messages:\n${messagesFormatted}` : ''}`
+      : messagesFormatted || '(No conversation content yet)';
+
+    const prompt = `You are an expert AI customer support lead. Summarize the following support ticket into a concise, professional executive summary.
 
 Ticket Details:
 - Ticket ID: ${ticket.id ? `#${ticket.id}` : 'N/A'}
@@ -500,8 +522,8 @@ Ticket Details:
 - Priority: ${ticket.priority || 'MEDIUM'}
 - Status: ${ticket.status || 'OPEN'}
 
-Conversation Timeline (${ticket.messages?.length || 0} messages):
-${messagesFormatted || '(No conversation messages yet)'}
+Content:
+${ticketContent}
 
 Instructions:
 Format the output clearly under these three bulleted headings:
@@ -513,7 +535,7 @@ Return ONLY the structured summary text without conversational prefixes or meta 
 
     try {
       const { text } = await generateText({
-        model: googleProvider('gemini-2.5-flash'),
+        model: openaiProvider('gpt-5-nano'),
         prompt,
         maxRetries: 0,
         abortSignal: AbortSignal.timeout(7000),
@@ -524,9 +546,9 @@ Return ONLY the structured summary text without conversational prefixes or meta 
         return cleaned;
       }
     } catch (primaryErr: any) {
-      console.warn('Gemini 2.5 Flash attempt failed for summarization, trying gemini-3.5-flash-lite fallback:', primaryErr?.message || primaryErr);
+      console.warn('gpt-5-nano attempt failed for summarization, trying gpt-4o-mini fallback:', primaryErr?.message || primaryErr);
       const { text } = await generateText({
-        model: googleProvider('gemini-3.5-flash-lite'),
+        model: openaiProvider('gpt-4o-mini'),
         prompt,
         maxRetries: 0,
         abortSignal: AbortSignal.timeout(7000),

@@ -12,6 +12,7 @@ import { TicketReplyForm } from './TicketReplyForm';
 import { ReplyThred } from './ReplyThred';
 import { ErrorMessage } from './ErrorMessage';
 import { UpdateTicket } from './UpdateTicket';
+import { TicketSummaryCard } from './TicketSummaryCard';
 import {
   X,
   User,
@@ -89,10 +90,27 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({
                     <span>Created {formattedDate}</span>
                   </div>
                 </div>
+
+                {/* Ticket Initial Inquiry Body */}
+                {ticket.body && (
+                  <div className="text-xs text-slate-700 leading-relaxed whitespace-pre-wrap bg-white p-3 rounded-lg border border-slate-100/90 font-normal">
+                    {ticket.body.split(/\n\n---\s*\[/)[0]}
+                  </div>
+                )}
               </div>
 
+              {/* AI Issue & Conversation Summary Card */}
+              <TicketSummaryCard ticket={ticket} onError={setActionError} />
+
               {/* Conversation Thread */}
-              <ReplyThred messages={ticket.messages} className="p-3.5" />
+              <ReplyThred
+                messages={ticket.messages}
+                ticketBody={ticket.body}
+                studentEmail={ticket.studentEmail}
+                createdAt={ticket.createdAt}
+                ticketId={ticket.id}
+                className="p-3.5"
+              />
             </div>
 
             {/* RIGHT COLUMN: Status & All Drop-down Lists */}

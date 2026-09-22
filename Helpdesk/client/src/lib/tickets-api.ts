@@ -33,6 +33,8 @@ export interface Ticket {
   subject: string;
   studentName: string;
   studentEmail: string;
+  body: string;
+  bodyHtml?: string | null;
   category: Category | null;
   priority: Priority;
   status: TicketStatus;
@@ -40,7 +42,7 @@ export interface Ticket {
   aiDraftResponse: string | null;
   assignedAgentId: string | null;
   assignedAgent?: TicketAgent | null;
-  messages: TicketMessage[];
+  messages?: TicketMessage[];
   createdAt: string;
   updatedAt: string;
 }
@@ -57,6 +59,7 @@ export interface CreateTicketPayload {
 }
 
 export interface UpdateTicketPayload {
+  body?: string;
   status?: TicketStatus;
   category?: Category | null;
   priority?: Priority;
@@ -81,6 +84,11 @@ export interface PolishReplyPayload {
 export interface PolishReplyResponse {
   polishedReply: string;
   originalText: string;
+}
+
+export interface SummarizeTicketResponse {
+  summary: string;
+  ticket: Ticket;
 }
 
 export interface PaginatedTicketsResponse {
@@ -261,6 +269,25 @@ export const ticketsApi = {
         error.response?.data?.message ||
         error.message ||
         'Failed to polish reply';
+      throw new Error(message);
+    }
+  },
+
+  /**
+   * Summarize ticket details and full conversation history using AI
+   */
+  async summarizeTicket(ticketId: number): Promise<SummarizeTicketResponse> {
+    try {
+      const response = await apiClient.post<SummarizeTicketResponse>(
+        `/api/tickets/${ticketId}/summarize`
+      );
+      return response.data;
+    } catch (error: any) {
+      const message =
+        error.response?.data?.error ||
+        error.response?.data?.message ||
+        error.message ||
+        'Failed to summarize ticket';
       throw new Error(message);
     }
   },

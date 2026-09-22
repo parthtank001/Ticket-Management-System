@@ -12,6 +12,7 @@ vi.mock('../../lib/tickets-api', () => ({
     updateTicket: vi.fn(),
     addTicketMessage: vi.fn(),
     listAgents: vi.fn(),
+    summarizeTicket: vi.fn(),
   },
 }));
 
@@ -86,7 +87,8 @@ describe('TicketDetailPage Component', () => {
   });
 
   describe('1. Initial Rendering & Details Display', () => {
-    it('renders ticket details, subject heading, sender info, badges, and AI summary', async () => {
+    it('renders ticket details, subject heading, sender info, badges, and AI summary trigger', async () => {
+      const user = userEvent.setup();
       renderWithQuery(
         <TicketDetailPage ticketId={42} user={mockUser} onNavigate={handleNavigate} />
       );
@@ -99,8 +101,9 @@ describe('TicketDetailPage Component', () => {
       expect(screen.getByText('Maya Lin')).toBeInTheDocument();
       expect(screen.getAllByText('maya@student.edu')[0]).toBeInTheDocument();
 
-      // Issue Summary
-      expect(screen.getByText('Issue Summary')).toBeInTheDocument();
+      // Issue Summary button & content
+      expect(screen.getByRole('button', { name: /summarize ticket/i })).toBeInTheDocument();
+      expect(screen.getByText(/AI Summary & Conversation History/i)).toBeInTheDocument();
       expect(screen.getByText('SSH connection timeout on port 22')).toBeInTheDocument();
 
       // Badges
@@ -125,12 +128,17 @@ describe('TicketDetailPage Component', () => {
       expect(screen.getByText('Maya Lin')).toBeInTheDocument();
     });
 
-    it('does not render AI issue summary section when ticket.summary is null', async () => {
+    it('renders compact summarize button when ticket.summary is null and triggers AI summary on click', async () => {
+      const user = userEvent.setup();
       const ticketWithoutSummary: Ticket = {
         ...mockTicket,
         summary: null,
       };
       vi.mocked(ticketsApi.getTicket).mockResolvedValueOnce(ticketWithoutSummary);
+      vi.mocked(ticketsApi.summarizeTicket).mockResolvedValueOnce({
+        summary: 'Newly generated summary for ticket',
+        ticket: { ...ticketWithoutSummary, summary: 'Newly generated summary for ticket' },
+      });
 
       renderWithQuery(
         <TicketDetailPage ticketId={42} user={mockUser} onNavigate={handleNavigate} />
@@ -140,7 +148,11 @@ describe('TicketDetailPage Component', () => {
         expect(screen.getByRole('heading', { name: 'Cannot access laboratory server' })).toBeInTheDocument();
       });
 
-      expect(screen.queryByText(/issue summary/i)).not.toBeInTheDocument();
+      const summarizeBtn = screen.getByRole('button', { name: /summarize ticket/i });
+      expect(summarizeBtn).toBeInTheDocument();
+
+      await user.click(summarizeBtn);
+      expect(ticketsApi.summarizeTicket).toHaveBeenCalledWith(42);
     });
 
     it('renders the conversation thread with appropriate message roles', async () => {
