@@ -91,6 +91,16 @@ export interface SummarizeTicketResponse {
   ticket: Ticket;
 }
 
+export interface ClassifyTicketResponse {
+  classification: {
+    category: Category;
+    priority: Priority;
+    summary: string;
+    aiDraftResponse: string;
+  };
+  ticket: Ticket;
+}
+
 export interface PaginatedTicketsResponse {
   tickets: Ticket[];
   total: number;
@@ -288,6 +298,25 @@ export const ticketsApi = {
         error.response?.data?.message ||
         error.message ||
         'Failed to summarize ticket';
+      throw new Error(message);
+    }
+  },
+
+  /**
+   * Classify ticket and generate draft response using AI (gpt-5-nano)
+   */
+  async classifyTicket(ticketId: number): Promise<ClassifyTicketResponse> {
+    try {
+      const response = await apiClient.post<ClassifyTicketResponse>(
+        `/api/tickets/${ticketId}/classify`
+      );
+      return response.data;
+    } catch (error: any) {
+      const message =
+        error.response?.data?.error ||
+        error.response?.data?.message ||
+        error.message ||
+        'Failed to classify ticket';
       throw new Error(message);
     }
   },

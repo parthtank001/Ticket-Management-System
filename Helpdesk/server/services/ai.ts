@@ -1,6 +1,7 @@
 import { generateText } from 'ai';
 import { createOpenAI, openai } from '@ai-sdk/openai';
 import { Category, Priority } from '@helpdesk/core';
+import { prisma } from '../db';
 
 export interface AIClassificationResult {
   category: Category;
@@ -566,4 +567,91 @@ Return ONLY the structured summary text without conversational prefixes or meta 
     return heuristicSummarizeTicketAndHistory(ticket);
   }
 }
+
+export interface BackgroundClassifyOptions {
+  preserveCategoryIfSet?: boolean;
+  preservePriorityIfSet?: boolean;
+}
+
+/**
+ * Executes automatic GPT classification for a given ticket ID in the background
+ * and updates the ticket record in PostgreSQL with category, priority, bullet summary, and draft response.
+ */
+export async function classifyTicketInBackground(
+  ticketId: number,
+  options?: BackgroundClassifyOptions
+): Promise<any> {
+  try {
+    const ticket = await prisma.ticket.findUnique({
+      where: { id: ticketId },
+    });
+
+    if (!ticket) {
+      console.warn(`[AI Classification] Ticket #${ticketId} not found, skipping background classification.`);
+      return null;
+    }
+
+    console.info(`[AI Classification] Starting non-blocking GPT classification for Ticket #${ticketId} ("${ticket.subject}")...`);
+
+    const result = await classifyAndDraftInquiry(
+      ticket.subject,
+      ticket.body,
+      ticket.studentName
+    );
+
+    const updateData: {
+      category?: Category;
+      priority?: Priority;
+      summary?: string;
+      aiDraftResponse?: string;
+    } = {
+      summary: result.summary,
+      aiDraftResponse: result.aiDraftResponse,
+    };
+
+    if (!options?.preserveCategoryIfSet || !ticket.category) {
+      updateData.category = result.category;
+    }
+
+    if (!options?.preservePriorityIfSet) {
+      updateData.priority = result.priority;
+    }
+
+    const updatedTicket = await prisma.ticket.update({
+      where: { id: ticketId },
+      data: updateData,
+      include: {
+        assignedAgent: {
+          select: { id: true, name: true, email: true, role: true },
+        },
+      },
+    });
+
+    console.info(
+      `[AI Classification] Successfully classified Ticket #${ticketId} via GPT: Category=${updatedTicket.category}, Priority=${updatedTicket.priority}`
+    );
+
+    return updatedTicket;
+  } catch (error: any) {
+    console.error(`[AI Classification] Error during background classification for Ticket #${ticketId}:`, error?.message || error);
+    return null;
+  }
+}
+
+/**
+ * Schedules non-blocking automatic classification of a ticket using GPT.
+ * Dispatches asynchronously on the event loop so the initiating HTTP request (e.g. POST /api/tickets or email webhook)
+ * can respond immediately without waiting for OpenAI / LLM roundtrips.
+ */
+export function scheduleTicketClassification(
+  ticketId: number,
+  options?: BackgroundClassifyOptions
+): void {
+  setImmediate(() => {
+    classifyTicketInBackground(ticketId, options).catch((err) => {
+      console.error(`[AI Classification Background Exception for Ticket #${ticketId}]:`, err);
+    });
+  });
+}
+
 

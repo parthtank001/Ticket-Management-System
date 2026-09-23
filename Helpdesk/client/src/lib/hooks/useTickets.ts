@@ -132,3 +132,19 @@ export function useSummarizeTicket() {
   });
 }
 
+/**
+ * Mutation hook to classify a ticket and generate AI draft response
+ */
+export function useClassifyTicket() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (ticketId: number) => ticketsApi.classifyTicket(ticketId),
+    onSuccess: (data, ticketId) => {
+      queryClient.setQueryData(['tickets', ticketId], data.ticket);
+      queryClient.invalidateQueries({ queryKey: TICKETS_QUERY_KEY });
+      queryClient.invalidateQueries({ queryKey: ['tickets', ticketId] });
+    },
+  });
+}
+
+

@@ -15,7 +15,12 @@ import {
   createTicketMessageSchema,
   polishReplySchema,
 } from './schemas';
-import { polishReplyWithAi, summarizeTicketAndHistory } from './services/ai';
+import {
+  polishReplyWithAi,
+  summarizeTicketAndHistory,
+  classifyAndDraftInquiry,
+  scheduleTicketClassification,
+} from './services/ai';
 
 dotenv.config();
 
@@ -295,6 +300,12 @@ app.post('/api/tickets', ticketCreationLimiter, async (req: Request, res: Respon
     },
   });
 
+  // Non-blocking automatic GPT classification
+  scheduleTicketClassification(ticket.id, {
+    preserveCategoryIfSet: Boolean(selectedCategory),
+    preservePriorityIfSet: Boolean(category !== undefined && priority !== undefined),
+  });
+
   res.status(201).json(ticket);
 });
 
@@ -399,7 +410,7 @@ app.post('/api/tickets/:id/messages', requireAuth, async (req: Request, res: Res
   const { body, bodyHtml, isInternalNote, senderType, senderEmail: customSenderEmail } = validationResult.data;
 
   const existingTicket = await prisma.ticket.findUnique({ where: { id } });
-  if (!existingTicket) {
+    if (!existingTicket) {
     return res.status(404).json({ error: 'Ticket not found' });
   }
 
@@ -517,6 +528,63 @@ app.post('/api/tickets/:id/summarize', requireAuth, async (req: Request, res: Re
 
   res.json({
     summary,
+    ticket: updatedTicket,
+  });
+});
+
+// Classify ticket and generate draft response using GPT (Authenticated support staff only)
+app.post('/api/tickets/:id/classify', requireAuth, async (req: Request, res: Response) => {
+  const id = parseInt(req.params.id as string, 10);
+  if (isNaN(id) || id <= 0) {
+    return res.status(400).json({ error: 'Invalid ticket ID' });
+  }
+
+  const isAsync = req.query.async === 'true' || req.body?.async === true;
+
+  if (isAsync) {
+    scheduleTicketClassification(id);
+    return res.json({
+      message: 'Ticket classification queued in background',
+      ticketId: id,
+    });
+  }
+
+  const existingTicket = await prisma.ticket.findUnique({
+    where: { id },
+  });
+
+  if (!existingTicket) {
+    return res.status(404).json({ error: 'Ticket not found' });
+  }
+
+  const classification = await classifyAndDraftInquiry(
+    existingTicket.subject,
+    existingTicket.body,
+    existingTicket.studentName
+  );
+
+  const updatedTicket = await prisma.ticket.update({
+    where: { id },
+    data: {
+      category: classification.category,
+      priority: classification.priority,
+      summary: classification.summary,
+      aiDraftResponse: classification.aiDraftResponse,
+    },
+    include: {
+      assignedAgent: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          role: true,
+        },
+      },
+    },
+  });
+
+  res.json({
+    classification,
     ticket: updatedTicket,
   });
 });

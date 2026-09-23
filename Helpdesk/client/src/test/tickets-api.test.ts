@@ -342,4 +342,46 @@ describe('Tickets API Service Unit Tests (ticketsApi)', () => {
       await expect(ticketsApi.summarizeTicket(999)).rejects.toThrow('Ticket not found');
     });
   });
+
+  describe('classifyTicket', () => {
+    it('sends POST request to classify ticket using GPT and returns updated ticket and classification', async () => {
+      const responseData = {
+        classification: {
+          category: 'TECHNICAL_QUESTION' as const,
+          priority: 'HIGH' as const,
+          summary: '- Portal login error',
+          aiDraftResponse: 'Hello Alice,\n\nPlease clear your browser cache.\n\nBest regards,\nHelpdesk Technical Team',
+        },
+        ticket: {
+          id: 42,
+          subject: 'Cannot login to portal',
+          studentName: 'Alice',
+          studentEmail: 'alice@example.com',
+          category: 'TECHNICAL_QUESTION' as const,
+          priority: 'HIGH' as const,
+          status: 'OPEN' as const,
+          summary: '- Portal login error',
+          aiDraftResponse: 'Hello Alice,\n\nPlease clear your browser cache.\n\nBest regards,\nHelpdesk Technical Team',
+          assignedAgentId: null,
+          messages: [],
+          createdAt: '2026-09-20T10:00:00.000Z',
+          updatedAt: '2026-09-20T10:00:00.000Z',
+        },
+      };
+      vi.mocked(apiClient.post).mockResolvedValueOnce({ data: responseData });
+
+      const result = await ticketsApi.classifyTicket(42);
+      expect(apiClient.post).toHaveBeenCalledWith('/api/tickets/42/classify');
+      expect(result).toEqual(responseData);
+    });
+
+    it('throws formatted error when classifyTicket fails', async () => {
+      vi.mocked(apiClient.post).mockRejectedValueOnce({
+        response: { data: { error: 'Ticket not found' } },
+      });
+
+      await expect(ticketsApi.classifyTicket(999)).rejects.toThrow('Ticket not found');
+    });
+  });
 });
+

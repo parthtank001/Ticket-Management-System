@@ -1,10 +1,23 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   extractFirstName,
   heuristicPolishReply,
   heuristicClassifyAndDraft,
   heuristicSummarizeTicketAndHistory,
+  classifyTicketInBackground,
+  scheduleTicketClassification,
 } from '../../../server/services/ai';
+import { prisma } from '../../../server/db';
+
+vi.mock('../../../server/db', () => ({
+  prisma: {
+    ticket: {
+      findUnique: vi.fn(),
+      update: vi.fn(),
+    },
+  },
+  checkDatabaseConnection: vi.fn(),
+}));
 
 describe('AI Support Service Unit Tests', () => {
   describe('extractFirstName Helper', () => {
@@ -224,5 +237,114 @@ describe('AI Support Service Unit Tests', () => {
       expect(summary).toContain('Current Status & Next Steps:');
     });
   });
+
+  describe('classifyTicketInBackground Function', () => {
+    beforeEach(() => {
+      vi.clearAllMocks();
+    });
+
+    it('classifies ticket and updates database record with AI category, priority, summary, and draft', async () => {
+      const mockTicket = {
+        id: 105,
+        subject: 'Cannot login to portal - 403 error',
+        body: 'I cannot access the student portal and am blocked with error',
+        studentName: 'Alex Rivera',
+        studentEmail: 'alex@example.com',
+        category: null,
+        priority: 'MEDIUM',
+      };
+
+      vi.mocked(prisma.ticket.findUnique).mockResolvedValueOnce(mockTicket as any);
+      vi.mocked(prisma.ticket.update).mockResolvedValueOnce({
+        ...mockTicket,
+        category: 'TECHNICAL_QUESTION',
+        priority: 'HIGH',
+        summary: '- Student is experiencing a technical issue with portal or digital resources',
+        aiDraftResponse: 'Hello Alex,\n\nRegarding your technical issue...',
+      } as any);
+
+      const updated = await classifyTicketInBackground(105);
+
+      expect(prisma.ticket.findUnique).toHaveBeenCalledWith({ where: { id: 105 } });
+      expect(prisma.ticket.update).toHaveBeenCalledWith({
+        where: { id: 105 },
+        data: expect.objectContaining({
+          category: 'TECHNICAL_QUESTION',
+          priority: 'HIGH',
+          summary: expect.any(String),
+          aiDraftResponse: expect.any(String),
+        }),
+        include: {
+          assignedAgent: {
+            select: { id: true, name: true, email: true, role: true },
+          },
+        },
+      });
+      expect(updated?.category).toBe('TECHNICAL_QUESTION');
+    });
+
+    it('preserves existing category when preserveCategoryIfSet is true', async () => {
+      const mockTicket = {
+        id: 106,
+        subject: 'Double charge on course invoice',
+        body: 'Refund needed for second charge',
+        studentName: 'Elena Gilbert',
+        studentEmail: 'elena@example.com',
+        category: 'GENERAL_QUESTION',
+        priority: 'MEDIUM',
+      };
+
+      vi.mocked(prisma.ticket.findUnique).mockResolvedValueOnce(mockTicket as any);
+      vi.mocked(prisma.ticket.update).mockResolvedValueOnce({
+        ...mockTicket,
+        category: 'GENERAL_QUESTION',
+        priority: 'HIGH',
+      } as any);
+
+      await classifyTicketInBackground(106, { preserveCategoryIfSet: true });
+
+      expect(prisma.ticket.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.not.objectContaining({ category: 'REFUND_REQUEST' }),
+        })
+      );
+    });
+
+    it('returns null gracefully when ticket is not found in database', async () => {
+      vi.mocked(prisma.ticket.findUnique).mockResolvedValueOnce(null);
+
+      const result = await classifyTicketInBackground(999);
+      expect(result).toBeNull();
+      expect(prisma.ticket.update).not.toHaveBeenCalled();
+    });
+
+    it('catches and handles database update errors gracefully without throwing', async () => {
+      vi.mocked(prisma.ticket.findUnique).mockResolvedValueOnce({
+        id: 107,
+        subject: 'Billing issue',
+        body: 'Refund request',
+        studentName: 'John',
+      } as any);
+      vi.mocked(prisma.ticket.update).mockRejectedValueOnce(new Error('DB connection lost'));
+
+      const result = await classifyTicketInBackground(107);
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('scheduleTicketClassification Function', () => {
+    it('schedules background classification asynchronously without throwing', async () => {
+      vi.mocked(prisma.ticket.findUnique).mockResolvedValueOnce({
+        id: 108,
+        subject: 'Course question',
+        body: 'When does the lecture start?',
+        studentName: 'Maya',
+      } as any);
+      vi.mocked(prisma.ticket.update).mockResolvedValueOnce({ id: 108 } as any);
+
+      expect(() => scheduleTicketClassification(108)).not.toThrow();
+    });
+  });
 });
+
 

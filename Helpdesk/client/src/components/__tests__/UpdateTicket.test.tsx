@@ -25,6 +25,7 @@ describe('UpdateTicket Component', () => {
     subject: 'Cannot access laboratory server',
     studentName: 'Maya Lin',
     studentEmail: 'maya@student.edu',
+    body: 'SSH connection timeout on port 22',
     category: 'TECHNICAL_QUESTION',
     priority: 'HIGH',
     status: 'OPEN',

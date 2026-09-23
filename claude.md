@@ -350,16 +350,26 @@ From `e:\claude_ai\Ticket Management System\Helpdesk`:
   - Handles pending state with animated `Loader2` spinner and handles errors with `<ErrorMessage />`.
   - Mutation hook `useSummarizeTicket()` invalidates both `['tickets', id]` and `['tickets']` query keys on completion.
 
+### 6.12 Non-Blocking Automatic Ticket Classification using GPT (`server/services/ai.ts`)
+- **Non-Blocking Asynchronous Pipeline**: When a ticket is created via manual creation (`POST /api/tickets`) or inbound email ingestion (`ingestInboundEmail`), the HTTP endpoint immediately commits the ticket to PostgreSQL and responds to the client (`201 Created` or `200 OK`) without blocking for OpenAI network calls.
+- **Background Event Loop Scheduling**:
+  - `scheduleTicketClassification(ticketId, options)`: Schedules background classification using `setImmediate()` to ensure the initiating HTTP request lifecycle terminates promptly.
+  - `classifyTicketInBackground(ticketId, options)`: Asynchronously runs `classifyAndDraftInquiry()` using GPT-5-nano (`@ai-sdk/openai`) with automatic `gpt-4o-mini` and deterministic heuristic fallbacks.
+  - Automatically classifies `category` (`GENERAL_QUESTION`, `TECHNICAL_QUESTION`, `REFUND_REQUEST`), determines `priority` (`LOW`, `MEDIUM`, `HIGH`, `URGENT`), creates structured bullet `summary`, and writes `aiDraftResponse` addressed to student first name directly to PostgreSQL `Ticket` record.
+- **On-Demand Staff Classification Endpoint**:
+  - `POST /api/tickets/:id/classify`: Authenticated endpoint allowing support agents to trigger or re-run classification on demand (supports `?async=true` for background execution).
+  - Client API method `ticketsApi.classifyTicket(id)` and React Query mutation hook `useClassifyTicket()` with automatic cache invalidation.
+
 ---
 
 ## 7. Testing Architecture (Component-First: Vitest + React Testing Library & Selective Playwright E2E)
 
-The project enforces a **Component-First Testing Philosophy**: The vast majority of test coverage (**370/370 tests, 100% pass rate**) is maintained via fast, deterministic Vitest + React Testing Library tests in jsdom, reserving Playwright E2E tests strictly for critical full-stack integration validation.
+The project enforces a **Component-First Testing Philosophy**: The vast majority of test coverage (**378/378 tests, 100% pass rate**) is maintained via fast, deterministic Vitest + React Testing Library tests in jsdom, reserving Playwright E2E tests strictly for critical full-stack integration validation.
 
 ### 7.1 Client Component & Unit Test Suite (Vitest + RTL)
 - **Test Framework**: Vitest (`vitest`), React Testing Library (`@testing-library/react`, `@testing-library/user-event`), `@testing-library/jest-dom`, and jsdom.
 - **Test Directory**: `client/src/**/__tests__/*.test.tsx` and `client/src/test/*.test.ts`.
-- **Current Coverage**: **370/370 tests passing (100%)** across 27 test suites:
+- **Current Coverage**: **378/378 tests passing (100%)** across 27 test suites:
   1. `client/src/pages/__tests__/DashboardPage.test.tsx` (14 tests): Metric cards, volume statistics, category breakdowns, recent activity table, and navigation.
   2. `client/src/pages/__tests__/TicketsPage.test.tsx` (23 tests): Tickets dashboard, TanStack table sorting, search query filtering, category/priority/status filters, filter reset counters, pagination state, and modal triggers.
   3. `client/src/pages/__tests__/TicketDetailPage.test.tsx` (20 tests): 2-column layout, ticket metadata, status actions, category/priority/assignee updates, AI summary integration, conversation thread rendering, and reply composer.

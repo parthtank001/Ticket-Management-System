@@ -17,6 +17,7 @@ describe('TicketSummaryCard Component', () => {
     subject: 'VPN Connection failing with TLS error',
     studentName: 'Lucas Vance',
     studentEmail: 'lucas@example.com',
+    body: 'My VPN client gives TLS handshake timeout.',
     category: 'TECHNICAL_QUESTION',
     priority: 'HIGH',
     status: 'OPEN',

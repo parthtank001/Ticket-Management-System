@@ -11,6 +11,7 @@ import {
   useAddTicketMessage,
   usePolishReply,
   useSummarizeTicket,
+  useClassifyTicket,
 } from '../lib/hooks/useTickets';
 import {
   useUsers,
@@ -33,6 +34,7 @@ vi.mock('../lib/tickets-api', () => ({
     addTicketMessage: vi.fn(),
     polishReply: vi.fn(),
     summarizeTicket: vi.fn(),
+    classifyTicket: vi.fn(),
   },
 }));
 
@@ -74,7 +76,10 @@ describe('Custom React Query Hooks Unit Tests', () => {
     it('useTickets fetches and returns paginated tickets data', async () => {
       const mockResponse = {
         tickets: [{ id: 1, subject: 'Test' } as any],
-        pagination: { total: 1, page: 1, limit: 10, totalPages: 1 },
+        total: 1,
+        page: 1,
+        pageSize: 10,
+        totalPages: 1,
       };
       vi.mocked(ticketsApi.listTickets).mockResolvedValueOnce(mockResponse);
 
@@ -109,9 +114,9 @@ describe('Custom React Query Hooks Unit Tests', () => {
         studentName: 'Maya',
         studentEmail: 'maya@test.edu',
         subject: 'Help',
-        body: 'Need help',
+        message: 'Need help',
       };
-      const createdTicket = { id: 10, ...payload } as any;
+      const createdTicket = { id: 10, body: 'Need help', ...payload } as any;
       vi.mocked(ticketsApi.createTicket).mockResolvedValueOnce(createdTicket);
 
       const { result } = renderHook(() => useCreateTicket(), { wrapper: createWrapper() });
@@ -149,13 +154,14 @@ describe('Custom React Query Hooks Unit Tests', () => {
     it('usePolishReply calls polishReply mutation', async () => {
       vi.mocked(ticketsApi.polishReply).mockResolvedValueOnce({
         polishedReply: 'Hello Maya,\n\nPolished reply.\n\nBest regards,\nHelpdesk Support Team',
+        originalText: 'raw draft',
       });
 
       const { result } = renderHook(() => usePolishReply(), { wrapper: createWrapper() });
 
-      const res = await result.current.mutateAsync({ draftReply: 'raw draft', studentName: 'Maya' });
+      const res = await result.current.mutateAsync({ text: 'raw draft', studentName: 'Maya' });
       expect(res.polishedReply).toContain('Hello Maya');
-      expect(ticketsApi.polishReply).toHaveBeenCalledWith({ draftReply: 'raw draft', studentName: 'Maya' });
+      expect(ticketsApi.polishReply).toHaveBeenCalledWith({ text: 'raw draft', studentName: 'Maya' });
     });
 
     it('useSummarizeTicket calls summarizeTicket mutation', async () => {
@@ -170,6 +176,31 @@ describe('Custom React Query Hooks Unit Tests', () => {
       const res = await result.current.mutateAsync(42);
       expect(res).toEqual(summaryResult);
       expect(ticketsApi.summarizeTicket).toHaveBeenCalledWith(42);
+    });
+
+    it('useClassifyTicket triggers AI classification and updates ticket cache', async () => {
+      const classifyResult = {
+        classification: {
+          category: 'TECHNICAL_QUESTION' as const,
+          priority: 'HIGH' as const,
+          summary: '- Cannot login to portal',
+          aiDraftResponse: 'Hello Student,\n\nPlease clear cache.',
+        },
+        ticket: {
+          id: 42,
+          category: 'TECHNICAL_QUESTION',
+          priority: 'HIGH',
+          summary: '- Cannot login to portal',
+          aiDraftResponse: 'Hello Student,\n\nPlease clear cache.',
+        } as any,
+      };
+      vi.mocked(ticketsApi.classifyTicket).mockResolvedValueOnce(classifyResult);
+
+      const { result } = renderHook(() => useClassifyTicket(), { wrapper: createWrapper() });
+
+      const res = await result.current.mutateAsync(42);
+      expect(res).toEqual(classifyResult);
+      expect(ticketsApi.classifyTicket).toHaveBeenCalledWith(42);
     });
   });
 

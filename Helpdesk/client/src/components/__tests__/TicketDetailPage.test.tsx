@@ -40,6 +40,7 @@ describe('TicketDetailPage Component', () => {
     subject: 'Cannot access laboratory server',
     studentName: 'Maya Lin',
     studentEmail: 'maya@student.edu',
+    body: '',
     category: 'TECHNICAL_QUESTION',
     priority: 'HIGH',
     status: 'OPEN',

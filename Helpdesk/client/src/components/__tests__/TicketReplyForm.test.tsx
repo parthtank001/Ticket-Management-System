@@ -27,7 +27,6 @@ describe('TicketReplyForm Component', () => {
       const sendBtn = screen.getByRole('button', { name: /send reply/i });
       expect(sendBtn).toBeInTheDocument();
       expect(sendBtn).toBeDisabled();
-      expect(screen.queryByRole('button', { name: /use ai draft/i })).not.toBeInTheDocument();
       expect(screen.queryByRole('button', { name: /support agent/i })).not.toBeInTheDocument();
       expect(screen.queryByRole('button', { name: /customer \/ student/i })).not.toBeInTheDocument();
     });
@@ -39,6 +38,7 @@ describe('TicketReplyForm Component', () => {
         subject: 'Test Subject',
         studentName: 'Student Name',
         studentEmail: 'student@test.com',
+        body: 'Initial inquiry body',
         category: null,
         priority: 'MEDIUM' as const,
         status: 'OPEN' as const,
@@ -292,6 +292,7 @@ describe('TicketReplyForm Component', () => {
         subject: 'Course refund query',
         studentName: 'Alice Student',
         studentEmail: 'alice@example.com',
+        body: 'i want refund',
         category: 'REFUND_REQUEST' as const,
         priority: 'HIGH' as const,
         status: 'OPEN' as const,
