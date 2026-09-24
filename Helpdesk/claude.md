@@ -350,14 +350,19 @@ From `e:\claude_ai\Ticket Management System\Helpdesk`:
   - Handles pending state with animated `Loader2` spinner and handles errors with `<ErrorMessage />`.
   - Mutation hook `useSummarizeTicket()` invalidates both `['tickets', id]` and `['tickets']` query keys on completion.
 
-### 6.12 Non-Blocking Automatic Ticket Classification using GPT (`server/services/ai.ts`)
-- **Non-Blocking Asynchronous Pipeline**: When a ticket is created via manual creation (`POST /api/tickets`) or inbound email ingestion (`ingestInboundEmail`), the HTTP endpoint immediately commits the ticket to PostgreSQL and responds to the client (`201 Created` or `200 OK`) without blocking for OpenAI network calls.
-- **Background Event Loop Scheduling**:
-  - `scheduleTicketClassification(ticketId, options)`: Schedules background classification using `setImmediate()` to ensure the initiating HTTP request lifecycle terminates promptly.
+### 6.12 Non-Blocking Automatic Ticket Classification with pg-boss Job Queue (`server/services/queue.ts` & `server/services/ai.ts`)
+- **pg-boss PostgreSQL Job Queue Pipeline**: Asynchronous ticket classification is backed by `pg-boss`, a reliable PostgreSQL-native job queue for Node.js.
+  - When a ticket is created via manual creation (`POST /api/tickets`) or inbound email ingestion (`ingestInboundEmail`), the HTTP endpoint commits the ticket to PostgreSQL and dispatches a job to the `ticket-classification` queue via `enqueueTicketClassification()`, returning `201 Created` or `200 OK` instantly without blocking on OpenAI LLM roundtrips.
+- **pg-boss Queue Architecture & Worker (`server/services/queue.ts`)**:
+  - `initQueue()`: Starts the `PgBoss` instance on server startup, registers the `ticket-classification` queue with exponential backoff retries (`retryLimit: 3`, `retryDelay: 5`, `retryBackoff: true`), and registers the worker handler.
+  - `boss.work('ticket-classification')`: Dedicated worker that receives job payloads (`{ ticketId, options }`), executes `classifyTicketInBackground(ticketId, options)`, and resolves/retries jobs reliably.
+  - `enqueueTicketClassification(ticketId, options)`: Sends jobs to pg-boss with retry policies. If pg-boss is unavailable or disabled, gracefully falls back to non-blocking `setImmediate()` execution.
+  - `stopQueue()`: Performs graceful worker draining and disconnection on `SIGTERM`/`SIGINT`.
+- **Background GPT Classification Execution (`server/services/ai.ts`)**:
   - `classifyTicketInBackground(ticketId, options)`: Asynchronously runs `classifyAndDraftInquiry()` using GPT-5-nano (`@ai-sdk/openai`) with automatic `gpt-4o-mini` and deterministic heuristic fallbacks.
-  - Automatically classifies `category` (`GENERAL_QUESTION`, `TECHNICAL_QUESTION`, `REFUND_REQUEST`), determines `priority` (`LOW`, `MEDIUM`, `HIGH`, `URGENT`), creates structured bullet `summary`, and writes `aiDraftResponse` addressed to student first name directly to PostgreSQL `Ticket` record.
+  - Automatically classifies `category` (`GENERAL_QUESTION`, `TECHNICAL_QUESTION`, `REFUND_REQUEST`), determines `priority` (`LOW`, `MEDIUM`, `HIGH`, `URGENT`), creates structured bullet `summary`, and writes `aiDraftResponse` addressed to student first name directly to the PostgreSQL `Ticket` record.
 - **On-Demand Staff Classification Endpoint**:
-  - `POST /api/tickets/:id/classify`: Authenticated endpoint allowing support agents to trigger or re-run classification on demand (supports `?async=true` for background execution).
+  - `POST /api/tickets/:id/classify`: Authenticated endpoint allowing support agents to trigger or re-run classification on demand (supports `?async=true` to enqueue via pg-boss).
   - Client API method `ticketsApi.classifyTicket(id)` and React Query mutation hook `useClassifyTicket()` with automatic cache invalidation.
 
 ---

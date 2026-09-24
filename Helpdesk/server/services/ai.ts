@@ -2,6 +2,7 @@ import { generateText } from 'ai';
 import { createOpenAI, openai } from '@ai-sdk/openai';
 import { Category, Priority } from '@helpdesk/core';
 import { prisma } from '../db';
+import { enqueueTicketClassification } from './queue';
 
 export interface AIClassificationResult {
   category: Category;
@@ -639,17 +640,19 @@ export async function classifyTicketInBackground(
 }
 
 /**
- * Schedules non-blocking automatic classification of a ticket using GPT.
- * Dispatches asynchronously on the event loop so the initiating HTTP request (e.g. POST /api/tickets or email webhook)
- * can respond immediately without waiting for OpenAI / LLM roundtrips.
+ * Schedules non-blocking automatic classification of a ticket using GPT via pg-boss job queue.
+ * If pg-boss is unavailable, falls back to non-blocking event loop execution.
  */
 export function scheduleTicketClassification(
   ticketId: number,
   options?: BackgroundClassifyOptions
 ): void {
-  setImmediate(() => {
-    classifyTicketInBackground(ticketId, options).catch((err) => {
-      console.error(`[AI Classification Background Exception for Ticket #${ticketId}]:`, err);
+  enqueueTicketClassification(ticketId, options).catch((err) => {
+    console.error(`[Queue Error] Failed to enqueue classification for Ticket #${ticketId}:`, err);
+    setImmediate(() => {
+      classifyTicketInBackground(ticketId, options).catch((fallbackErr) => {
+        console.error(`[AI Classification Background Exception for Ticket #${ticketId}]:`, fallbackErr);
+      });
     });
   });
 }

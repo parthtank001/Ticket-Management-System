@@ -21,6 +21,7 @@ import {
   classifyAndDraftInquiry,
   scheduleTicketClassification,
 } from './services/ai';
+import { initQueue, stopQueue, isQueueReady } from './services/queue';
 
 dotenv.config();
 
@@ -55,6 +56,7 @@ app.get('/api/health', async (req: Request, res: Response) => {
     uptimeSeconds: Math.floor(process.uptime()),
     services: {
       database: dbStatus.connected ? 'connected' : `disconnected (${dbStatus.message})`,
+      jobQueue: isQueueReady() ? 'connected (pg-boss)' : 'fallback (event-loop)',
       aiEngine: 'ready',
     }
   });
@@ -597,6 +599,21 @@ app.use((err: any, req: Request, res: Response, next: NextFunction) => {
   res.status(status).json({ error: message });
 });
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, async () => {
   console.log(`🚀 Express server running at http://localhost:${PORT}`);
+  await initQueue();
 });
+
+// Graceful shutdown handling
+const gracefulShutdown = async (signal: string) => {
+  console.log(`\nReceived ${signal}. Shutting down gracefully...`);
+  await stopQueue();
+  server.close(() => {
+    console.log('HTTP server closed.');
+    process.exit(0);
+  });
+};
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+
