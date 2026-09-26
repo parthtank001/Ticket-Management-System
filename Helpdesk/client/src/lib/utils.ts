@@ -162,3 +162,20 @@ export function getInitials(name?: string | null): string {
   if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
+
+/**
+ * Format duration in milliseconds to clean human-readable representation
+ * (e.g. "12s", "4 mins", "1.5 hrs", "2.1 days")
+ */
+export function formatDuration(ms?: number | null): string {
+  if (!ms || ms <= 0 || isNaN(ms)) return '0s';
+  const totalSeconds = Math.round(ms / 1000);
+  if (totalSeconds < 60) return `${Math.max(1, totalSeconds)}s`;
+  const totalMinutes = Math.round(ms / 60000);
+  if (totalMinutes < 60) return `${totalMinutes} mins`;
+  const totalHours = ms / 3600000;
+  if (totalHours < 24) return `${totalHours.toFixed(1)} hrs`;
+  const totalDays = ms / 86400000;
+  return `${totalDays.toFixed(1)} days`;
+}
+

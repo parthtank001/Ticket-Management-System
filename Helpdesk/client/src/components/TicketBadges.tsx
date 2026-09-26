@@ -33,6 +33,24 @@ export const TicketStatusBadge: React.FC<StatusBadgeProps> = ({ status, size = '
   const label = STATUS_LABELS[status] || status;
 
   switch (status) {
+    case 'NEW':
+      return (
+        <span
+          className={`inline-flex items-center gap-1.5 font-semibold rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200/80 ${sizeClasses}`}
+        >
+          <span className="h-1.5 w-1.5 rounded-full bg-indigo-500 animate-pulse" />
+          <span>{label}</span>
+        </span>
+      );
+    case 'PROCESSING':
+      return (
+        <span
+          className={`inline-flex items-center gap-1.5 font-semibold rounded-full bg-amber-50 text-amber-800 border border-amber-200/80 ${sizeClasses}`}
+        >
+          <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
+          <span>{label}</span>
+        </span>
+      );
     case 'OPEN':
       return (
         <span
@@ -231,3 +249,9 @@ export const TicketSenderBadge: React.FC<SenderBadgeProps> = ({
       );
   }
 };
+
+// Aliases for flexible imports
+export const CategoryBadge = TicketCategoryBadge;
+export const PriorityBadge = TicketPriorityBadge;
+export const StatusBadge = TicketStatusBadge;
+export const SenderBadge = TicketSenderBadge;

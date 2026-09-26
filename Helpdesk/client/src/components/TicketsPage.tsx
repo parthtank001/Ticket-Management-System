@@ -5,9 +5,13 @@ import type { Ticket } from '../lib/types';
 import { useTickets } from '../lib/hooks/useTickets';
 import { TicketsTable } from './TicketsTable';
 import { TicketDetailModal } from './TicketDetailModal';
+import { BatchAutoResolveModal } from './BatchAutoResolveModal';
+import { BatchClassifyModal } from './BatchClassifyModal';
 import {
   Search,
   X,
+  Bot,
+  Brain,
 } from 'lucide-react';
 
 interface TicketsPageProps {
@@ -73,6 +77,8 @@ export const TicketsPage: React.FC<TicketsPageProps> = ({ user, onNavigate }) =>
   // Modals state
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
+  const [isBatchModalOpen, setIsBatchModalOpen] = useState(false);
+  const [isBatchClassifyOpen, setIsBatchClassifyOpen] = useState(false);
 
   // Active filters count
   const activeFiltersCount = useMemo(() => {
@@ -133,6 +139,24 @@ export const TicketsPage: React.FC<TicketsPageProps> = ({ user, onNavigate }) =>
         <h1 className="text-sm font-bold text-slate-900 tracking-tight">
           Ticket
         </h1>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setIsBatchClassifyOpen(true)}
+            className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 rounded-md text-[11px] font-bold transition-colors cursor-pointer"
+          >
+            <Brain className="w-3.5 h-3.5 text-indigo-600" />
+            <span>Batch Classify</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setIsBatchModalOpen(true)}
+            className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/60 rounded-md text-[11px] font-bold transition-colors cursor-pointer"
+          >
+            <Bot className="w-3.5 h-3.5 text-indigo-600" />
+            <span>Batch Auto-Resolve</span>
+          </button>
+        </div>
       </div>
 
       {/* Filter & Search Toolbar */}
@@ -174,6 +198,8 @@ export const TicketsPage: React.FC<TicketsPageProps> = ({ user, onNavigate }) =>
               <option value="OPEN">Open</option>
               <option value="RESOLVED">Resolved</option>
               <option value="CLOSED">Closed</option>
+              <option value="PROCESSING">Processing</option>
+              <option value="NEW">New</option>
             </select>
 
             {/* Category Filter */}
@@ -220,6 +246,18 @@ export const TicketsPage: React.FC<TicketsPageProps> = ({ user, onNavigate }) =>
           setIsDetailOpen(false);
           setSelectedTicket(null);
         }}
+      />
+
+      {/* Batch Auto-Resolve Modal */}
+      <BatchAutoResolveModal
+        isOpen={isBatchModalOpen}
+        onClose={() => setIsBatchModalOpen(false)}
+      />
+
+      {/* Batch Ticket Classification Modal */}
+      <BatchClassifyModal
+        isOpen={isBatchClassifyOpen}
+        onClose={() => setIsBatchClassifyOpen(false)}
       />
     </div>
   );

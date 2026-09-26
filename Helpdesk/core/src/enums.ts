@@ -14,7 +14,7 @@ export type Priority = 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
 export type TicketPriority = Priority;
 
 // TicketStatus Explicit Union
-export type TicketStatus = 'OPEN' | 'RESOLVED' | 'CLOSED';
+export type TicketStatus = 'NEW' | 'PROCESSING' | 'OPEN' | 'RESOLVED' | 'CLOSED';
 export type TicketStatusType = TicketStatus;
 
 // SenderType Explicit Union
@@ -22,6 +22,8 @@ export type SenderType = 'STUDENT' | 'AGENT' | 'SYSTEM';
 
 // Explicit Human-Readable Label Mappings
 export const STATUS_LABELS: Record<TicketStatus, string> = {
+  NEW: 'New',
+  PROCESSING: 'Processing',
   OPEN: 'Open',
   RESOLVED: 'Resolved',
   CLOSED: 'Closed',

@@ -1,10 +1,14 @@
 import { PgBoss } from 'pg-boss';
 import dotenv from 'dotenv';
+import { prisma } from '../db';
 import { classifyTicketInBackground, BackgroundClassifyOptions } from './ai';
+import { autoResolveSingleTicket } from './auto-resolve';
+import type { AutoResolveTicketInput } from '@helpdesk/core';
 
 dotenv.config();
 
 export const QUEUE_TICKET_CLASSIFICATION = 'ticket-classification';
+export const QUEUE_TICKET_AUTO_RESOLVE = 'ticket-auto-resolve';
 
 let bossInstance: PgBoss | null = null;
 let isStarted = false;
@@ -58,6 +62,14 @@ export async function initQueue(): Promise<PgBoss | null> {
       expireInSeconds: 180,
     });
 
+    // Create / ensure ticket-auto-resolve queue exists
+    await boss.createQueue(QUEUE_TICKET_AUTO_RESOLVE, {
+      retryLimit: 3,
+      retryDelay: 5,
+      retryBackoff: true,
+      expireInSeconds: 180,
+    });
+
     // Register worker for ticket classification
     await boss.work<{ ticketId: number; options?: BackgroundClassifyOptions }>(
       QUEUE_TICKET_CLASSIFICATION,
@@ -65,18 +77,52 @@ export async function initQueue(): Promise<PgBoss | null> {
       async (jobs) => {
         for (const job of jobs) {
           const { ticketId, options } = job.data;
-          console.info(`[pg-boss Worker] Processing job ${job.id} for Ticket #${ticketId}...`);
+          console.info(`[pg-boss Worker] Processing classification job ${job.id} for Ticket #${ticketId}...`);
           try {
             await classifyTicketInBackground(ticketId, options);
           } catch (jobErr) {
-            console.error(`[pg-boss Worker Error] Failed processing job ${job.id} for Ticket #${ticketId}:`, jobErr);
+            console.error(`[pg-boss Worker Error] Failed processing classification job ${job.id} for Ticket #${ticketId}:`, jobErr);
+            try {
+              await prisma.ticket.update({
+                where: { id: ticketId },
+                data: { status: 'OPEN' },
+              });
+            } catch (statusErr) {
+              console.error(`[pg-boss Worker] Failed to update ticket status to OPEN on error for Ticket #${ticketId}:`, statusErr);
+            }
             throw jobErr; // Re-throw to trigger pg-boss retry policy
           }
         }
       }
     );
 
-    console.info(`[pg-boss] Worker registered for queue "${QUEUE_TICKET_CLASSIFICATION}".`);
+    // Register worker for ticket auto-resolution
+    await boss.work<{ ticketId: number; options?: AutoResolveTicketInput }>(
+      QUEUE_TICKET_AUTO_RESOLVE,
+      { batchSize: 1 },
+      async (jobs) => {
+        for (const job of jobs) {
+          const { ticketId, options } = job.data;
+          console.info(`[pg-boss Worker] Processing auto-resolve job ${job.id} for Ticket #${ticketId}...`);
+          try {
+            await autoResolveSingleTicket(ticketId, options);
+          } catch (jobErr) {
+            console.error(`[pg-boss Worker Error] Failed processing auto-resolve job ${job.id} for Ticket #${ticketId}:`, jobErr);
+            try {
+              await prisma.ticket.update({
+                where: { id: ticketId },
+                data: { status: 'OPEN' },
+              });
+            } catch (statusErr) {
+              console.error(`[pg-boss Worker] Failed to update ticket status to OPEN on error for Ticket #${ticketId}:`, statusErr);
+            }
+            throw jobErr;
+          }
+        }
+      }
+    );
+
+    console.info(`[pg-boss] Workers registered for queues "${QUEUE_TICKET_CLASSIFICATION}" and "${QUEUE_TICKET_AUTO_RESOLVE}".`);
     return boss;
   } catch (err: any) {
     console.error('[pg-boss Init Error] Failed to initialize pg-boss queue:', err?.message || err);
@@ -85,6 +131,7 @@ export async function initQueue(): Promise<PgBoss | null> {
     return null;
   }
 }
+
 
 /**
  * Enqueues a ticket classification task into the pg-boss queue.
@@ -133,6 +180,56 @@ export function scheduleTicketClassification(
 ): void {
   enqueueTicketClassification(ticketId, options).catch((err) => {
     console.error(`[Schedule Classification Error for Ticket #${ticketId}]:`, err);
+  });
+}
+
+/**
+ * Enqueues a ticket auto-resolution task into the pg-boss queue.
+ * If pg-boss is unavailable or not running, falls back to non-blocking setImmediate execution.
+ */
+export async function enqueueTicketAutoResolve(
+  ticketId: number,
+  options?: AutoResolveTicketInput
+): Promise<string | null> {
+  if (isQueueReady() && bossInstance) {
+    try {
+      const jobId = await bossInstance.send(
+        QUEUE_TICKET_AUTO_RESOLVE,
+        { ticketId, options },
+        {
+          retryLimit: 3,
+          retryDelay: 5,
+          retryBackoff: true,
+          expireInSeconds: 180,
+        }
+      );
+
+      console.info(`[pg-boss Queue] Enqueued auto-resolve job ${jobId} for Ticket #${ticketId}`);
+      return jobId;
+    } catch (sendErr: any) {
+      console.warn(`[pg-boss Queue Warning] Failed to send auto-resolve job to queue for Ticket #${ticketId}, using event-loop fallback:`, sendErr?.message || sendErr);
+    }
+  }
+
+  // Graceful fallback to non-blocking event-loop execution
+  setImmediate(() => {
+    autoResolveSingleTicket(ticketId, options).catch((err) => {
+      console.error(`[Auto-Resolve Fallback Exception for Ticket #${ticketId}]:`, err);
+    });
+  });
+
+  return null;
+}
+
+/**
+ * Schedules ticket auto-resolution by dispatching to the pg-boss queue.
+ */
+export function scheduleTicketAutoResolve(
+  ticketId: number,
+  options?: AutoResolveTicketInput
+): void {
+  enqueueTicketAutoResolve(ticketId, options).catch((err) => {
+    console.error(`[Schedule Auto-Resolve Error for Ticket #${ticketId}]:`, err);
   });
 }
 

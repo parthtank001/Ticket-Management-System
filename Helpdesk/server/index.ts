@@ -8,20 +8,29 @@ import { prisma, checkDatabaseConnection } from './db';
 import { apiLimiter, authLimiter, ticketCreationLimiter, isProductionEnvironment } from './middleware/rate-limiter';
 import usersRouter from './routes/users';
 import emailsRouter from './routes/emails';
+import autoResolveRouter from './routes/auto-resolve';
+import classificationRouter from './routes/classification';
+import dashboardRouter from './routes/dashboard';
 import type { Category, Priority, TicketStatus, SenderType } from '@helpdesk/core';
 import {
   createTicketSchema,
   updateTicketSchema,
   createTicketMessageSchema,
   polishReplySchema,
+  autoResolveTicketSchema,
 } from './schemas';
 import {
   polishReplyWithAi,
   summarizeTicketAndHistory,
   classifyAndDraftInquiry,
   scheduleTicketClassification,
+  getAiAgentUser,
 } from './services/ai';
-import { initQueue, stopQueue, isQueueReady } from './services/queue';
+import {
+  autoResolveSingleTicket,
+} from './services/auto-resolve';
+import { initQueue, stopQueue, isQueueReady, scheduleTicketAutoResolve } from './services/queue';
+import { deployStoredFunctions } from './db/stored-procedures';
 
 dotenv.config();
 
@@ -78,6 +87,16 @@ app.use('/api/users', usersRouter);
 app.use('/api/emails', emailsRouter);
 app.use('/api/webhooks', emailsRouter);
 
+// Mount Auto-Resolution Routes
+app.use('/api/auto-resolve', autoResolveRouter);
+
+// Mount Classification Routes
+app.use('/api/classify', classificationRouter);
+app.use('/api/classification', classificationRouter);
+
+// Mount Dashboard Analytics Routes
+app.use('/api/dashboard', dashboardRouter);
+
 // List Active Agents for ticket assignment (Authenticated agents & admins)
 app.get('/api/agents', requireAuth, async (req: Request, res: Response) => {
   const agents = await prisma.user.findMany({
@@ -104,6 +123,9 @@ app.get('/api/tickets', requireAuth, async (req: Request, res: Response) => {
 
   if (status && typeof status === 'string' && status !== 'ALL') {
     where.status = status;
+  } else {
+    // Hide tickets currently being processed or resolved by AI (NEW, PROCESSING) from the human agent ticket list
+    where.status = { notIn: ['NEW', 'PROCESSING'] };
   }
 
   if (category && typeof category === 'string' && category !== 'ALL') {
@@ -281,6 +303,12 @@ app.post('/api/tickets', ticketCreationLimiter, async (req: Request, res: Respon
     }
 
     finalAssignedAgentId = assignedUser.id;
+  } else {
+    // Automatically assign newly arriving tickets to AI Agent for auto-resolution
+    const aiAgent = await getAiAgentUser();
+    if (aiAgent) {
+      finalAssignedAgentId = aiAgent.id;
+    }
   }
 
   // Create Ticket with body directly on Ticket table
@@ -292,7 +320,7 @@ app.post('/api/tickets', ticketCreationLimiter, async (req: Request, res: Respon
       body: trimmedMessage,
       category: selectedCategory,
       priority: selectedPriority,
-      status: 'OPEN',
+      status: 'NEW',
       summary: null,
       aiDraftResponse: null,
       assignedAgentId: finalAssignedAgentId,
@@ -591,6 +619,35 @@ app.post('/api/tickets/:id/classify', requireAuth, async (req: Request, res: Res
   });
 });
 
+// Auto-resolve ticket using Knowledge Base policies (Authenticated support staff only)
+app.post('/api/tickets/:id/auto-resolve', requireAuth, async (req: Request, res: Response) => {
+  const id = parseInt(req.params.id as string, 10);
+  if (isNaN(id) || id <= 0) {
+    return res.status(400).json({ error: 'Invalid ticket ID' });
+  }
+
+  const validationResult = autoResolveTicketSchema.safeParse(req.body || {});
+  if (!validationResult.success) {
+    return res.status(400).json({ error: validationResult.error.issues[0].message });
+  }
+
+  const isAsync = req.query.async === 'true' || req.body?.async === true;
+  if (isAsync) {
+    scheduleTicketAutoResolve(id, validationResult.data);
+    return res.json({
+      message: 'Ticket auto-resolution queued in background',
+      ticketId: id,
+    });
+  }
+
+  const result = await autoResolveSingleTicket(id, validationResult.data);
+  if (!result.success && result.reason.includes('does not exist')) {
+    return res.status(404).json({ error: result.reason });
+  }
+
+  res.json(result);
+});
+
 // Centralized Error Handling Middleware (Express 5 automatically forwards async promise rejections here)
 app.use((err: any, req: Request, res: Response, next: NextFunction) => {
   console.error('Unhandled API Error:', err);
@@ -601,6 +658,7 @@ app.use((err: any, req: Request, res: Response, next: NextFunction) => {
 
 const server = app.listen(PORT, async () => {
   console.log(`🚀 Express server running at http://localhost:${PORT}`);
+  await deployStoredFunctions();
   await initQueue();
 });
 

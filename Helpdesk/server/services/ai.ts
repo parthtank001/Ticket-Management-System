@@ -3,12 +3,18 @@ import { createOpenAI, openai } from '@ai-sdk/openai';
 import { Category, Priority } from '@helpdesk/core';
 import { prisma } from '../db';
 import { enqueueTicketClassification } from './queue';
+import { loadKnowledgeBaseContent } from './escalation-policy';
+import { evaluateKnowledgeBaseMatch } from './knowledge-base-matcher';
 
 export interface AIClassificationResult {
   category: Category;
   priority: Priority;
   summary: string;
   aiDraftResponse: string;
+  canAutoResolve?: boolean;
+  autoResolveReason?: string;
+  resolutionAnswer?: string;
+  hasAiError?: boolean;
 }
 
 /**
@@ -28,102 +34,35 @@ export function extractFirstName(studentName?: string): string {
 
 /**
  * Heuristic fallback classifier and draft generator for offline or non-API key runs.
+ * Evaluates the inquiry against the knowledge base and escalation rules.
  */
 export function heuristicClassifyAndDraft(
   subject: string,
   body: string,
   studentName?: string
 ): AIClassificationResult {
-  const content = `${subject} ${body}`.toLowerCase();
   const firstName = extractFirstName(studentName);
+  const kbMatch = evaluateKnowledgeBaseMatch(subject, body, studentName);
 
-  let category: Category = 'GENERAL_QUESTION';
-  let priority: Priority = 'MEDIUM';
-
-  // 1. Classification
-  const refundKeywords = [
-    'refund',
-    'billing',
-    'charge',
-    'payment',
-    'invoice',
-    'money back',
-    'receipt',
-    'overcharged',
-    'subscription fee',
-    'cancel payment',
-    'double charged',
-  ];
-  const technicalKeywords = [
-    'error',
-    'bug',
-    'login',
-    'cannot login',
-    'password',
-    '403',
-    '404',
-    '500',
-    'portal',
-    'crash',
-    'broken',
-    'recording',
-    'access denied',
-    'system down',
-    'cannot access',
-    'server error',
-    'glitch',
-    'session expired',
-  ];
-
-  if (refundKeywords.some((kw) => content.includes(kw))) {
-    category = 'REFUND_REQUEST';
-  } else if (technicalKeywords.some((kw) => content.includes(kw))) {
-    category = 'TECHNICAL_QUESTION';
-  } else {
-    category = 'GENERAL_QUESTION';
-  }
-
-  // 2. Priority detection
-  const urgentKeywords = ['urgent', 'emergency', 'asap', 'immediately', 'critical', 'exam today', 'deadline today'];
-  const highKeywords = ['cannot access', 'blocked', 'locked out', 'failing', 'refund', 'overcharged', 'high priority'];
-  const lowKeywords = ['fyi', 'suggestion', 'feedback', 'when possible', 'minor'];
-
-  if (urgentKeywords.some((kw) => content.includes(kw))) {
-    priority = 'URGENT';
-  } else if (highKeywords.some((kw) => content.includes(kw))) {
-    priority = 'HIGH';
-  } else if (lowKeywords.some((kw) => content.includes(kw))) {
-    priority = 'LOW';
-  } else {
-    priority = 'MEDIUM';
-  }
-
-  // 3. Bullet summary
-  const summaryBullets: string[] = [];
-  summaryBullets.push(`- Inquiry regarding: "${subject.trim()}"`);
-  if (category === 'TECHNICAL_QUESTION') {
-    summaryBullets.push('- Student is experiencing a technical issue with portal or digital resources');
-  } else if (category === 'REFUND_REQUEST') {
-    summaryBullets.push('- Student has requested financial/billing assistance or refund processing');
-  } else {
-    summaryBullets.push('- General informational/course inquiry received');
-  }
-  const summary = summaryBullets.join('\n');
-
-  // 4. Draft response
-  let aiDraftResponse = `Hello ${firstName},\n\nThank you for reaching out to Helpdesk Support. We have received your inquiry regarding "${subject.trim()}". An agent will review your request shortly.\n\nBest regards,\nHelpdesk AI Support`;
-
-  if (category === 'TECHNICAL_QUESTION') {
-    aiDraftResponse = `Hello ${firstName},\n\nRegarding your technical issue "${subject.trim()}": Please try clearing your browser cache, re-authenticating, or verifying your network connection. Our technical support team is inspecting the logs for your account.\n\nBest regards,\nHelpdesk Technical Team`;
-  } else if (category === 'REFUND_REQUEST') {
-    aiDraftResponse = `Hello ${firstName},\n\nThank you for submitting a refund inquiry for "${subject.trim()}". Refund requests are processed within 3-5 business days. Please verify your invoice number for speedier processing.\n\nBest regards,\nBilling Support Team`;
+  let aiDraftResponse = kbMatch.resolutionAnswer;
+  if (!aiDraftResponse) {
+    if (kbMatch.category === 'TECHNICAL_QUESTION') {
+      aiDraftResponse = `Hello ${firstName},\n\nThank you for reaching out to Code with Mosh Support.\n\nRegarding your technical issue "${subject.trim()}": Please try clearing your browser cache, re-authenticating, or verifying your network connection. Our support team is inspecting the logs for your account and will gladly assist if the issue persists.\n\nBest regards,\nCode with Mosh Support`;
+    } else if (kbMatch.category === 'REFUND_REQUEST') {
+      aiDraftResponse = `Hello ${firstName},\n\nThank you for reaching out to Code with Mosh Support.\n\nWe have received your refund inquiry for "${subject.trim()}". Refund requests under our 30-day guarantee are processed within 3–5 business days. Please verify your invoice or order receipt number so we can process this quickly for you.\n\nBest regards,\nCode with Mosh Support`;
+    } else {
+      aiDraftResponse = `Hello ${firstName},\n\nThank you for reaching out to Code with Mosh Support. We have received your inquiry regarding "${subject.trim()}". A support agent will review your request and get back to you shortly.\n\nBest regards,\nCode with Mosh Support`;
+    }
   }
 
   return {
-    category,
-    priority,
-    summary,
+    category: kbMatch.category,
+    priority: kbMatch.priority,
+    summary: kbMatch.summary,
     aiDraftResponse,
+    canAutoResolve: kbMatch.canAutoResolve,
+    autoResolveReason: kbMatch.autoResolveReason,
+    resolutionAnswer: kbMatch.resolutionAnswer,
   };
 }
 
@@ -152,12 +91,20 @@ export async function classifyAndDraftInquiry(
       apiKey: apiKey.trim(),
     });
 
-    const prompt = `You are an AI customer support triage assistant for a student helpdesk system.
-Analyze the following student support inquiry and provide a JSON response with:
+    const kbContent = loadKnowledgeBaseContent();
+
+    const prompt = `You are an AI customer support triage and auto-resolution assistant for Code with Mosh Support.
+Here is the official support Knowledge Base and Escalation Policy:
+${kbContent}
+
+Analyze the following student support inquiry and provide a JSON response:
 1. "category": EXACTLY one of ["GENERAL_QUESTION", "TECHNICAL_QUESTION", "REFUND_REQUEST"]
 2. "priority": EXACTLY one of ["LOW", "MEDIUM", "HIGH", "URGENT"]
 3. "summary": 2-3 bullet points summarizing the student's problem
-4. "aiDraftResponse": A professional, empathetic, and helpful draft response ready for a human agent to review and send to the student. ALWAYS address the customer directly by ONLY their first name ("Hello ${firstName},") at the start. Do not include their last name in the greeting. Sign off with appropriate support team signature.
+4. "aiDraftResponse": A professional, empathetic, and customer-friendly draft response addressed to the customer by ONLY their first name ("Hello ${firstName},"). Format clearly with clean paragraphs and lists, and sign off with "Best regards,\nCode with Mosh Support".
+5. "canAutoResolve": boolean (true ONLY IF the inquiry is directly and clearly answerable using the Knowledge Base policies and does NOT trigger any Escalation Rules such as legal threats, chargebacks, refund requests outside the 30-day guarantee window, or account security concerns; otherwise false)
+6. "autoResolveReason": string explaining why the inquiry can be auto-resolved or why it must be escalated to a human agent
+7. "resolutionAnswer": string (if canAutoResolve is true, the complete, professional, customer-friendly, and properly formatted answer directly solving the student's issue based on the Knowledge Base, addressed to "Hello ${firstName}," with full steps, formatted paragraphs/bullet points, and signed with "Best regards,\nCode with Mosh Support"; if false, omit or set to null)
 
 Customer First Name: ${firstName}
 Subject: ${subject}
@@ -169,7 +116,10 @@ Respond ONLY with valid JSON in this exact structure:
   "category": "GENERAL_QUESTION" | "TECHNICAL_QUESTION" | "REFUND_REQUEST",
   "priority": "LOW" | "MEDIUM" | "HIGH" | "URGENT",
   "summary": "string",
-  "aiDraftResponse": "string"
+  "aiDraftResponse": "string",
+  "canAutoResolve": boolean,
+  "autoResolveReason": "string",
+  "resolutionAnswer": "string" | null
 }`;
 
     let responseText = '';
@@ -219,19 +169,31 @@ Respond ONLY with valid JSON in this exact structure:
         typeof parsed.aiDraftResponse === 'string' && parsed.aiDraftResponse.length > 0
           ? parsed.aiDraftResponse
           : heuristicClassifyAndDraft(subject, body, studentName).aiDraftResponse;
+      const canAutoResolve = typeof parsed.canAutoResolve === 'boolean' ? parsed.canAutoResolve : false;
+      const autoResolveReason = typeof parsed.autoResolveReason === 'string' ? parsed.autoResolveReason : undefined;
+      const resolutionAnswer = typeof parsed.resolutionAnswer === 'string' && parsed.resolutionAnswer.length > 0
+        ? parsed.resolutionAnswer
+        : undefined;
 
       return {
         category,
         priority,
         summary: summary || heuristicClassifyAndDraft(subject, body, studentName).summary,
         aiDraftResponse,
+        canAutoResolve,
+        autoResolveReason,
+        resolutionAnswer,
       };
     }
 
     return heuristicClassifyAndDraft(subject, body, studentName);
   } catch (error) {
     console.warn('gpt-5-nano AI classification failed, using heuristic fallback:', error);
-    return heuristicClassifyAndDraft(subject, body, studentName);
+    const fallback = heuristicClassifyAndDraft(subject, body, studentName);
+    return {
+      ...fallback,
+      hasAiError: true,
+    };
   }
 }
 
@@ -268,11 +230,16 @@ export function heuristicPolishReply(
   cleaned = cleaned.replace(/\burl\b/gi, 'URL');
   cleaned = cleaned.replace(/\bid\b/gi, 'ID');
 
-  // Strip dangling trailing "thanks" / "thank you" / "regards" so we can place clean signoff
-  cleaned = cleaned.replace(/[\s,.-]+(thanks|thank you|thx|cheers|regards|best regards)[\s,.-]*$/i, '');
+  // Strip dangling trailing "thanks" / "thank you" / "regards" / signatures so we can place clean signoff
+  cleaned = cleaned.replace(/[\s,.-]+(thanks|thank you|thx|cheers|regards|best regards|code with mosh support)[\s,.-]*$/i, '');
 
-  // Strip any raw starting greeting (e.g. "hi", "hello", "dear customer", "hey alice smith") so we can uniformly format the salutation with only the customer's first name
-  cleaned = cleaned.replace(/^(hello|hi|dear|greetings|hey)(\s+[a-zA-Z0-9_\-\.]+){0,3}([,\s!:-]*)/i, '').trim();
+  // Strip any raw starting greeting (e.g. "hi alice,", "hello,", "dear customer,", "hey there,")
+  if (firstName && firstName !== 'Student') {
+    const nameEscaped = firstName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const nameRegex = new RegExp(`^(hello|hi|dear|greetings|hey)\\s+(?:${nameEscaped}|customer|student|there|all|team)?([,\\s!:-]+)`, 'i');
+    cleaned = cleaned.replace(nameRegex, '').trim();
+  }
+  cleaned = cleaned.replace(/^(hello|hi|dear|greetings|hey)\\s*(?:customer|student|there|all|team)?([,\\s!:-]+)/i, '').trim();
 
   // Capitalize sentence beginnings
   cleaned = cleaned.replace(/(^\s*|\.\s+|\?\s+|\!\s+)([a-z])/g, (_, p1, p2) => p1 + p2.toUpperCase());
@@ -285,9 +252,9 @@ export function heuristicPolishReply(
   // Always address the customer by only their first name
   const greeting = `Hello ${firstName},\n\n`;
 
-  // Professional signoff
-  const hasSignoff = /(best regards|sincerely|warm regards|helpdesk support team)/i.test(cleaned);
-  const signoff = hasSignoff ? '' : `\n\nBest regards,\nHelpdesk Support Team`;
+  // Professional and customer-friendly signoff
+  const hasSignoff = /(best regards|sincerely|warm regards|code with mosh support)/i.test(cleaned);
+  const signoff = hasSignoff ? '' : `\n\nBest regards,\nCode with Mosh Support`;
 
   return `${greeting}${cleaned}${signoff}`.trim();
 }
@@ -324,17 +291,19 @@ export async function polishReplyWithAi(options: PolishReplyOptions): Promise<st
       apiKey: apiKey.trim(),
     });
 
-    const prompt = `You are an expert customer service communication coach and editor.
+    const prompt = `You are an expert customer service communication coach and editor for Code with Mosh Support.
 Polish and improve the following support agent's draft reply to a student/customer.
 
 Guidelines:
-1. Salutation & Greeting: Always address the customer directly by ONLY their first name at the very beginning of the reply (e.g., "Hello ${firstName}," or "Hi ${firstName},"). Do NOT include their last name in the greeting.
-2. Tone: Professional, courteous, clear, and empathetic.
-3. Grammar: Fix any spelling, grammar, punctuation, and phrasing issues.
-4. Content: Retain all original instructions, facts, links, numbers, and solutions without fabricating new details.
-5. Structure: Format with clean paragraphs and line breaks where appropriate.
-6. Sign-off: Include a courteous sign-off with the support team name (e.g., "Best regards,\nHelpdesk Support Team").
-7. Return ONLY the final polished reply text directly. Do NOT include greetings about the prompt, explanations, multiple options, bullet points about what you changed, or markdown blockquotes. Output only the single polished message.
+1. Salutation & Greeting: Always address the customer directly by ONLY their first name at the very beginning of the reply (e.g., "Hello ${firstName},"). Do NOT include their last name in the greeting.
+2. Tone: Ensure a professional, customer-friendly, empathetic, clear, and courteous tone.
+3. Formatting & Structure: Format with clean paragraphs, appropriate line breaks, and clear bullet points where helpful.
+4. Grammar & Clarity: Fix any spelling, grammar, punctuation, and phrasing issues while maintaining natural conversational flow.
+5. Content Integrity: Retain all original instructions, facts, links, numbers, and solutions without fabricating new details.
+6. Sign-off: Always sign the email with Code with Mosh Support:
+Best regards,
+Code with Mosh Support
+7. Output: Return ONLY the final polished reply text directly. Do NOT include greetings about the prompt, explanations, multiple options, bullet points about what you changed, or markdown blockquotes. Output only the single polished message.
 
 Context:
 - Customer First Name: ${firstName}
@@ -572,6 +541,31 @@ Return ONLY the structured summary text without conversational prefixes or meta 
 export interface BackgroundClassifyOptions {
   preserveCategoryIfSet?: boolean;
   preservePriorityIfSet?: boolean;
+  force?: boolean;
+}
+
+export const AI_AGENT_EMAIL = process.env.AI_AGENT_EMAIL || 'ai@example.com';
+export const AI_AGENT_NAME = 'AI';
+
+/**
+ * Finds the system AI Agent user in the database.
+ */
+export async function getAiAgentUser() {
+  try {
+    return await prisma.user.findFirst({
+      where: {
+        OR: [
+          { email: AI_AGENT_EMAIL },
+          { name: AI_AGENT_NAME },
+        ],
+        deletedAt: null,
+        isActive: true,
+      },
+    });
+  } catch (err) {
+    console.warn('[AI Agent Lookup Warning]:', err);
+    return null;
+  }
 }
 
 /**
@@ -594,21 +588,54 @@ export async function classifyTicketInBackground(
 
     console.info(`[AI Classification] Starting non-blocking GPT classification for Ticket #${ticketId} ("${ticket.subject}")...`);
 
+    // Transition ticket to PROCESSING status while AI evaluates auto-resolution
+    await prisma.ticket.update({
+      where: { id: ticketId },
+      data: { status: 'PROCESSING' },
+    });
+
     const result = await classifyAndDraftInquiry(
       ticket.subject,
       ticket.body,
       ticket.studentName
     );
 
+    const aiAgent = await getAiAgentUser();
+
     const updateData: {
       category?: Category;
       priority?: Priority;
+      status?: 'OPEN' | 'RESOLVED';
+      body?: string;
       summary?: string;
       aiDraftResponse?: string;
+      assignedAgentId?: string | null;
     } = {
       summary: result.summary,
       aiDraftResponse: result.aiDraftResponse,
     };
+
+    if (result.canAutoResolve) {
+      updateData.status = 'RESOLVED';
+      const resolutionReply = result.resolutionAnswer || result.aiDraftResponse;
+      const resolutionMessage = `\n\n--- [Auto-Resolution Reply from Code with Mosh Support (support@example.com)] ---\n${resolutionReply}`;
+      updateData.body = ticket.body ? `${ticket.body}${resolutionMessage}` : resolutionReply;
+
+      // Keep assigned to AI Agent or assign to AI Agent if not explicitly assigned to a human
+      if (aiAgent && (!ticket.assignedAgentId || ticket.assignedAgentId === aiAgent.id)) {
+        updateData.assignedAgentId = aiAgent.id;
+      }
+      console.info(`[AI Auto-Resolution] Ticket #${ticketId} auto-resolved based on Knowledge Base: ${result.autoResolveReason || 'Policy match'}`);
+    } else {
+      updateData.status = 'OPEN';
+      // If the ticket was assigned to the AI agent and cannot be auto-resolved, unassign it so human agents can triage it
+      if (aiAgent && ticket.assignedAgentId === aiAgent.id) {
+        updateData.assignedAgentId = null;
+        console.info(`[AI Auto-Resolution] Ticket #${ticketId} cannot be auto-resolved; unassigned from AI Agent and routed to OPEN queue.`);
+      } else {
+        console.info(`[AI Classification] Ticket #${ticketId} transitioned to OPEN queue for human agent review.`);
+      }
+    }
 
     if (!options?.preserveCategoryIfSet || !ticket.category) {
       updateData.category = result.category;
@@ -629,12 +656,32 @@ export async function classifyTicketInBackground(
     });
 
     console.info(
-      `[AI Classification] Successfully classified Ticket #${ticketId} via GPT: Category=${updatedTicket.category}, Priority=${updatedTicket.priority}`
+      `[AI Classification] Successfully classified Ticket #${ticketId} via GPT: Category=${updatedTicket?.category || 'N/A'}, Priority=${updatedTicket?.priority || 'N/A'}`
     );
 
     return updatedTicket;
   } catch (error: any) {
     console.error(`[AI Classification] Error during background classification for Ticket #${ticketId}:`, error?.message || error);
+    try {
+      const aiAgent = await getAiAgentUser();
+      const currentTicket = await prisma.ticket.findUnique({
+        where: { id: ticketId },
+        select: { assignedAgentId: true },
+      });
+
+      const fallbackUpdate: { status: 'OPEN'; assignedAgentId?: null } = { status: 'OPEN' };
+      if (aiAgent && currentTicket?.assignedAgentId === aiAgent.id) {
+        fallbackUpdate.assignedAgentId = null;
+      }
+
+      await prisma.ticket.update({
+        where: { id: ticketId },
+        data: fallbackUpdate,
+      });
+      console.info(`[AI Classification] Ticket #${ticketId} status updated to OPEN after error.`);
+    } catch (statusErr) {
+      console.error(`[AI Classification] Failed to update ticket status to OPEN for Ticket #${ticketId}:`, statusErr);
+    }
     return null;
   }
 }

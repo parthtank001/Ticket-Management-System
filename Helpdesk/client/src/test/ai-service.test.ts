@@ -4,8 +4,10 @@ import {
   heuristicPolishReply,
   heuristicClassifyAndDraft,
   heuristicSummarizeTicketAndHistory,
+  classifyAndDraftInquiry,
   classifyTicketInBackground,
   scheduleTicketClassification,
+  getAiAgentUser,
 } from '../../../server/services/ai';
 import { prisma } from '../../../server/db';
 
@@ -14,6 +16,9 @@ vi.mock('../../../server/db', () => ({
     ticket: {
       findUnique: vi.fn(),
       update: vi.fn(),
+    },
+    user: {
+      findFirst: vi.fn(),
     },
   },
   checkDatabaseConnection: vi.fn(),
@@ -104,33 +109,43 @@ describe('AI Support Service Unit Tests', () => {
     it('strips redundant trailing thanks/regards before appending the formal sign-off', () => {
       const output = heuristicPolishReply('we processed your refund thanks', 'Daniel');
       expect(output).toContain('We processed your refund.');
-      expect(output).toContain('\n\nBest regards,\nHelpdesk Support Team');
+      expect(output).toContain('\n\nBest regards,\nCode with Mosh Support');
     });
   });
 
   describe('heuristicClassifyAndDraft Function', () => {
     it('classifies refund-related inquiries as REFUND_REQUEST and addresses customer by first name', () => {
       const result = heuristicClassifyAndDraft(
-        'Billing inquiry regarding double charge',
-        'I was overcharged on my subscription fee invoice and need a refund',
+        'Billing inquiry regarding refund policy',
+        'How does your money-back guarantee work and how do I request a refund?',
         'Lucas Vance'
       );
       expect(result.category).toBe('REFUND_REQUEST');
-      expect(result.priority).toBe('HIGH');
+      expect(result.canAutoResolve).toBe(true);
       expect(result.aiDraftResponse).toContain('Hello Lucas,\n\n');
       expect(result.aiDraftResponse).not.toContain('Vance');
     });
 
-    it('classifies technical inquiries as TECHNICAL_QUESTION and addresses customer by first name', () => {
+    it('auto-resolves password reset inquiries from knowledge base', () => {
       const result = heuristicClassifyAndDraft(
-        'Cannot access student portal',
-        'I am getting a 403 error and cannot access the portal',
+        'Forgot password',
+        'I forgot my password. How do I reset it?',
         'Chloe Decker'
       );
       expect(result.category).toBe('TECHNICAL_QUESTION');
-      expect(result.priority).toBe('HIGH');
+      expect(result.canAutoResolve).toBe(true);
       expect(result.aiDraftResponse).toContain('Hello Chloe,\n\n');
-      expect(result.aiDraftResponse).toContain('Regarding your technical issue');
+      expect(result.aiDraftResponse).toContain('Forgot Password');
+    });
+
+    it('escalates legal action inquiries without auto-resolving', () => {
+      const result = heuristicClassifyAndDraft(
+        'Legal action regarding issue',
+        'I will hire a lawyer to sue your team if this is not resolved',
+        'Elena Gilbert'
+      );
+      expect(result.canAutoResolve).toBe(false);
+      expect(result.autoResolveReason).toContain('legal action');
     });
 
     it('classifies general inquiries as GENERAL_QUESTION', () => {
@@ -140,17 +155,8 @@ describe('AI Support Service Unit Tests', () => {
         'Elena Gilbert'
       );
       expect(result.category).toBe('GENERAL_QUESTION');
-      expect(result.priority).toBe('MEDIUM');
+      expect(result.canAutoResolve).toBe(false);
       expect(result.aiDraftResponse).toContain('Hello Elena,\n\n');
-    });
-
-    it('detects urgent priority from critical keywords', () => {
-      const result = heuristicClassifyAndDraft(
-        'URGENT: Exam today and portal is broken',
-        'I have an emergency exam today and cannot open questions',
-        'Oliver Queen'
-      );
-      expect(result.priority).toBe('URGENT');
     });
   });
 
@@ -240,39 +246,50 @@ describe('AI Support Service Unit Tests', () => {
 
   describe('classifyTicketInBackground Function', () => {
     beforeEach(() => {
-      vi.clearAllMocks();
+      vi.resetAllMocks();
     });
 
-    it('classifies ticket and updates database record with AI category, priority, summary, and draft', async () => {
+    it('transitions ticket to PROCESSING and then to RESOLVED when auto-resolvable via KB', async () => {
       const mockTicket = {
         id: 105,
-        subject: 'Cannot login to portal - 403 error',
-        body: 'I cannot access the student portal and am blocked with error',
+        subject: 'Forgot my password',
+        body: 'I forgot my password. What should I do to reset it?',
         studentName: 'Alex Rivera',
         studentEmail: 'alex@example.com',
         category: null,
         priority: 'MEDIUM',
+        status: 'NEW',
       };
 
       vi.mocked(prisma.ticket.findUnique).mockResolvedValueOnce(mockTicket as any);
+      // 1st update: status -> PROCESSING
       vi.mocked(prisma.ticket.update).mockResolvedValueOnce({
         ...mockTicket,
+        status: 'PROCESSING',
+      } as any);
+      // 2nd update: status -> RESOLVED with KB answer
+      vi.mocked(prisma.ticket.update).mockResolvedValueOnce({
+        ...mockTicket,
+        status: 'RESOLVED',
         category: 'TECHNICAL_QUESTION',
-        priority: 'HIGH',
-        summary: '- Student is experiencing a technical issue with portal or digital resources',
-        aiDraftResponse: 'Hello Alex,\n\nRegarding your technical issue...',
+        priority: 'MEDIUM',
       } as any);
 
       const updated = await classifyTicketInBackground(105);
 
       expect(prisma.ticket.findUnique).toHaveBeenCalledWith({ where: { id: 105 } });
-      expect(prisma.ticket.update).toHaveBeenCalledWith({
+      // Verify first update transitioned to PROCESSING
+      expect(prisma.ticket.update).toHaveBeenNthCalledWith(1, {
+        where: { id: 105 },
+        data: { status: 'PROCESSING' },
+      });
+      // Verify second update resolved the ticket
+      expect(prisma.ticket.update).toHaveBeenNthCalledWith(2, {
         where: { id: 105 },
         data: expect.objectContaining({
+          status: 'RESOLVED',
           category: 'TECHNICAL_QUESTION',
-          priority: 'HIGH',
-          summary: expect.any(String),
-          aiDraftResponse: expect.any(String),
+          body: expect.stringContaining('Auto-Resolution Reply from Code with Mosh Support'),
         }),
         include: {
           assignedAgent: {
@@ -280,34 +297,53 @@ describe('AI Support Service Unit Tests', () => {
           },
         },
       });
-      expect(updated?.category).toBe('TECHNICAL_QUESTION');
+      expect(updated?.status).toBe('RESOLVED');
     });
 
-    it('preserves existing category when preserveCategoryIfSet is true', async () => {
+    it('transitions ticket to PROCESSING and then to OPEN when inquiry requires human agent review', async () => {
       const mockTicket = {
         id: 106,
-        subject: 'Double charge on course invoice',
-        body: 'Refund needed for second charge',
+        subject: 'Bespoke corporate consulting',
+        body: 'We want custom on-site consulting for 500 team members.',
         studentName: 'Elena Gilbert',
         studentEmail: 'elena@example.com',
-        category: 'GENERAL_QUESTION',
+        category: null,
         priority: 'MEDIUM',
+        status: 'NEW',
       };
 
       vi.mocked(prisma.ticket.findUnique).mockResolvedValueOnce(mockTicket as any);
+      // 1st update: PROCESSING
       vi.mocked(prisma.ticket.update).mockResolvedValueOnce({
         ...mockTicket,
+        status: 'PROCESSING',
+      } as any);
+      // 2nd update: OPEN
+      vi.mocked(prisma.ticket.update).mockResolvedValueOnce({
+        ...mockTicket,
+        status: 'OPEN',
         category: 'GENERAL_QUESTION',
-        priority: 'HIGH',
+        priority: 'MEDIUM',
       } as any);
 
-      await classifyTicketInBackground(106, { preserveCategoryIfSet: true });
+      const updated = await classifyTicketInBackground(106);
 
-      expect(prisma.ticket.update).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.not.objectContaining({ category: 'REFUND_REQUEST' }),
-        })
-      );
+      expect(prisma.ticket.update).toHaveBeenNthCalledWith(1, {
+        where: { id: 106 },
+        data: { status: 'PROCESSING' },
+      });
+      expect(prisma.ticket.update).toHaveBeenNthCalledWith(2, {
+        where: { id: 106 },
+        data: expect.objectContaining({
+          status: 'OPEN',
+        }),
+        include: {
+          assignedAgent: {
+            select: { id: true, name: true, email: true, role: true },
+          },
+        },
+      });
+      expect(updated?.status).toBe('OPEN');
     });
 
     it('returns null gracefully when ticket is not found in database', async () => {
@@ -330,6 +366,161 @@ describe('AI Support Service Unit Tests', () => {
       const result = await classifyTicketInBackground(107);
       expect(result).toBeNull();
     });
+
+    it('updates ticket status to OPEN when generateText or background processing throws an error', async () => {
+      const mockTicket = {
+        id: 109,
+        subject: 'API Error test',
+        body: 'Testing AI failure behavior',
+        studentName: 'Oliver Queen',
+        studentEmail: 'oliver@example.com',
+        status: 'NEW',
+      };
+
+      vi.mocked(prisma.ticket.findUnique).mockResolvedValueOnce(mockTicket as any);
+      // Update inside catch block: status -> OPEN
+      vi.mocked(prisma.ticket.update).mockResolvedValueOnce({
+        ...mockTicket,
+        status: 'OPEN',
+      } as any);
+
+      // Trigger error in classification execution
+      Object.defineProperty(mockTicket, 'subject', {
+        get: () => {
+          throw new Error('generateText OpenAI failure');
+        },
+      });
+
+      const result = await classifyTicketInBackground(109);
+      expect(result).toBeNull();
+
+      // Verify that status was updated to OPEN in catch block
+      expect(prisma.ticket.update).toHaveBeenCalledWith({
+        where: { id: 109 },
+        data: { status: 'OPEN' },
+      });
+    });
+
+    it('unassigns ticket from AI agent when inquiry cannot be auto-resolved', async () => {
+      const mockAiAgent = {
+        id: 'user-ai-1',
+        name: 'AI',
+        email: 'ai@example.com',
+        role: 'AGENT',
+      };
+      const mockTicket = {
+        id: 110,
+        subject: 'Custom consulting quote',
+        body: 'I need a custom consulting project.',
+        studentName: 'Bruce Wayne',
+        studentEmail: 'bruce@example.com',
+        status: 'NEW',
+        assignedAgentId: 'user-ai-1',
+      };
+
+      vi.mocked(prisma.ticket.findUnique).mockResolvedValueOnce(mockTicket as any);
+      vi.mocked(prisma.user.findFirst).mockResolvedValueOnce(mockAiAgent as any);
+      // 1st update: PROCESSING
+      vi.mocked(prisma.ticket.update).mockResolvedValueOnce({
+        ...mockTicket,
+        status: 'PROCESSING',
+      } as any);
+      // 2nd update: OPEN with assignedAgentId: null
+      vi.mocked(prisma.ticket.update).mockResolvedValueOnce({
+        ...mockTicket,
+        status: 'OPEN',
+        assignedAgentId: null,
+      } as any);
+
+      const result = await classifyTicketInBackground(110);
+
+      expect(prisma.ticket.update).toHaveBeenNthCalledWith(2, {
+        where: { id: 110 },
+        data: expect.objectContaining({
+          status: 'OPEN',
+          assignedAgentId: null,
+        }),
+        include: {
+          assignedAgent: {
+            select: { id: true, name: true, email: true, role: true },
+          },
+        },
+      });
+      expect(result?.status).toBe('OPEN');
+    });
+
+    it('maintains assignment to AI agent when ticket is auto-resolved', async () => {
+      const mockAiAgent = {
+        id: 'user-ai-1',
+        name: 'AI',
+        email: 'ai@example.com',
+        role: 'AGENT',
+      };
+      const mockTicket = {
+        id: 111,
+        subject: 'I forgot my password',
+        body: 'Please help reset password',
+        studentName: 'Clark Kent',
+        studentEmail: 'clark@example.com',
+        status: 'NEW',
+        assignedAgentId: 'user-ai-1',
+      };
+
+      vi.mocked(prisma.ticket.findUnique).mockResolvedValueOnce(mockTicket as any);
+      vi.mocked(prisma.user.findFirst).mockResolvedValueOnce(mockAiAgent as any);
+      // 1st update: PROCESSING
+      vi.mocked(prisma.ticket.update).mockResolvedValueOnce({
+        ...mockTicket,
+        status: 'PROCESSING',
+      } as any);
+      // 2nd update: RESOLVED
+      vi.mocked(prisma.ticket.update).mockResolvedValueOnce({
+        ...mockTicket,
+        status: 'RESOLVED',
+        assignedAgentId: 'user-ai-1',
+      } as any);
+
+      const result = await classifyTicketInBackground(111);
+
+      expect(prisma.ticket.update).toHaveBeenNthCalledWith(2, {
+        where: { id: 111 },
+        data: expect.objectContaining({
+          status: 'RESOLVED',
+          assignedAgentId: 'user-ai-1',
+        }),
+        include: {
+          assignedAgent: {
+            select: { id: true, name: true, email: true, role: true },
+          },
+        },
+      });
+      expect(result?.status).toBe('RESOLVED');
+    });
+  });
+
+  describe('getAiAgentUser Function', () => {
+    it('returns the AI agent user when present in the database', async () => {
+      const mockAi = {
+        id: 'ai-agent-id',
+        name: 'AI',
+        email: 'ai@example.com',
+        role: 'AGENT',
+        isActive: true,
+      };
+
+      vi.mocked(prisma.user.findFirst).mockResolvedValueOnce(mockAi as any);
+
+      const user = await getAiAgentUser();
+      expect(user).toEqual(mockAi);
+      expect(user?.name).toBe('AI');
+    });
+
+    it('returns null when AI agent is not found or error occurs', async () => {
+      vi.mocked(prisma.user.findFirst).mockResolvedValueOnce(null);
+
+      const user = await getAiAgentUser();
+      expect(user).toBeNull();
+    });
   });
 
   describe('scheduleTicketClassification Function', () => {
@@ -346,5 +537,4 @@ describe('AI Support Service Unit Tests', () => {
     });
   });
 });
-
 

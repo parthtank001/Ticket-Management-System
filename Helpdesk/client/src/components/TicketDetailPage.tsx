@@ -12,6 +12,8 @@ import { ReplyThred } from './ReplyThred';
 import { ErrorMessage } from './ErrorMessage';
 import { UpdateTicket } from './UpdateTicket';
 import { TicketSummaryCard } from './TicketSummaryCard';
+import { AutoResolveCard } from './AutoResolveCard';
+import { ClassificationCard } from './ClassificationCard';
 import { TicketDetailSkeleton } from './ui/skeleton';
 import {
   ArrowLeft,
@@ -143,6 +145,12 @@ export const TicketDetailPage: React.FC<TicketDetailPageProps> = ({
 
           {/* AI Issue & Conversation Summary Card */}
           <TicketSummaryCard ticket={ticket} onError={setActionError} />
+
+          {/* AI Ticket Classification Card */}
+          <ClassificationCard ticket={ticket} />
+
+          {/* Knowledge Base Auto-Resolution Card */}
+          <AutoResolveCard ticket={ticket} />
 
           {/* Conversation & Reply Thread */}
           <ReplyThred

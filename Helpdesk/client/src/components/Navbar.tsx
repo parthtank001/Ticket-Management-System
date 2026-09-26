@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { LogOut, Ticket, Loader2, Users } from 'lucide-react';
+import { LogOut, Ticket, Loader2, Users, LayoutDashboard } from 'lucide-react';
 import { AuthUser } from '../lib/auth-client';
 import type { Role } from '../lib/types';
 
@@ -24,6 +24,7 @@ export const Navbar: React.FC<NavbarProps> = ({ user, currentPath, onNavigate, o
     }
   };
 
+  const isDashboardActive = currentPath === '/' || currentPath === '/dashboard';
   const isTicketsActive = currentPath === '/tickets' || currentPath.startsWith('/tickets/');
   const isUsersActive = currentPath === '/users';
 
@@ -48,6 +49,19 @@ export const Navbar: React.FC<NavbarProps> = ({ user, currentPath, onNavigate, o
 
           {/* Navigation Links */}
           <div className="flex items-center space-x-1.5">
+            <button
+              onClick={() => onNavigate('/')}
+              className={`inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                isDashboardActive
+                  ? 'bg-indigo-50 text-indigo-700 border border-indigo-200/60 shadow-2xs'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+              }`}
+              title="Go to Dashboard"
+            >
+              <LayoutDashboard className="h-3.5 w-3.5 text-indigo-600" />
+              <span>Dashboard</span>
+            </button>
+
             <button
               onClick={() => onNavigate('/tickets')}
               className={`inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${

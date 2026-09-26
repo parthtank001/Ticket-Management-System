@@ -1,7 +1,7 @@
 import { prisma } from '../db';
 import { Category, Priority, TicketStatus, SenderType } from '@helpdesk/core';
 import { parseInboundEmail, ParsedEmail } from './email-parser';
-import { scheduleTicketClassification } from './ai';
+import { scheduleTicketClassification, getAiAgentUser } from './ai';
 
 export interface EmailIngestionResult {
   status: 'created' | 'appended' | 'ignored' | 'duplicate';
@@ -156,6 +156,7 @@ export async function ingestInboundEmail(rawPayload: any): Promise<EmailIngestio
 
   // Case B: No matching ticket -> Create a new Ticket and trigger non-blocking GPT classification
   const subjectToUse = parsed.cleanSubject || parsed.subject || 'Support Inquiry';
+  const aiAgent = await getAiAgentUser();
 
   const newTicket = await prisma.ticket.create({
     data: {
@@ -165,9 +166,10 @@ export async function ingestInboundEmail(rawPayload: any): Promise<EmailIngestio
       body: parsed.body,
       category: null,
       priority: 'MEDIUM',
-      status: 'OPEN',
+      status: 'NEW',
       summary: null,
       aiDraftResponse: null,
+      assignedAgentId: aiAgent ? aiAgent.id : null,
     },
     include: {
       assignedAgent: true,

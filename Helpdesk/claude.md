@@ -170,7 +170,9 @@ e:\claude_ai\Ticket Management System\
     │   │   ├── enums.ts        # Pure explicit string union types (Role, Category, Priority, TicketStatus, SenderType)
     │   │   ├── schemas/        # Shared domain Zod validation schemas
     │   │   │   ├── user.ts     # User validation schemas & types (createUserSchema, updateUserSchema)
-    │   │   │   └── ticket.ts   # Ticket validation schemas & types (createTicketSchema, inboundEmailSchema, etc.)
+    │   │   │   ├── ticket.ts   # Ticket validation schemas & types (createTicketSchema, inboundEmailSchema, etc.)
+    │   │   │   ├── auto-resolve.ts # Auto-resolution schemas & types (evaluateInquirySchema, autoResolveTicketSchema, batchAutoResolveSchema)
+    │   │   │   └── classification.ts # Classification schemas & types (evaluateClassificationSchema, classifyTicketSchema, batchClassifySchema)
     │   │   ├── email-parser.ts # Email header parsing, threading tag extraction, loop protection
     │   │   └── index.ts        # Central export entrypoint
     │   ├── package.json        # Core package definition (@helpdesk/core)
@@ -185,8 +187,14 @@ e:\claude_ai\Ticket Management System\
     │   │   │   ├── Pagination.tsx    # Reusable smart pagination component with range summary & page size selector
     │   │   │   ├── TicketsPage.tsx   # Tickets dashboard with search, filters, sorting, page state & quick actions
     │   │   │   ├── TicketBadges.tsx  # Reusable status, priority, and category badge components
-    │   │   │   ├── TicketDetailPage.tsx  # Standalone 2-column ticket details view with thread & status actions
-    │   │   │   ├── TicketDetailModal.tsx # Full ticket view dialog with conversation thread & reply composer
+    │   │   │   ├── AutoResolveBadge.tsx # Reusable auto-resolution, KB match, and escalation alert badge/banner component
+    │   │   │   ├── AutoResolveCard.tsx  # Knowledge Base auto-resolution management card with live policy evaluation & 1-click resolve
+    │   │   │   ├── BatchAutoResolveModal.tsx # Bulk ticket auto-resolution modal dialog with queue filters, dry run & progress summary
+    │   │   │   ├── ClassificationBadge.tsx # Reusable AI classification badge and topic tag component
+    │   │   │   ├── ClassificationCard.tsx # Dedicated ticket classification card with live preview, AI draft reply & 1-click classify
+    │   │   │   ├── BatchClassifyModal.tsx # Bulk ticket classification modal dialog with queue filters, dry run & progress summary
+    │   │   │   ├── TicketDetailPage.tsx  # Standalone 2-column ticket details view with thread, AI summary & auto-resolution actions
+    │   │   │   ├── TicketDetailModal.tsx # Full ticket view dialog with conversation thread, reply composer & auto-resolution actions
     │   │   │   ├── TicketSummaryCard.tsx # Reusable AI Ticket & Conversation History summary card with on-demand generation & copy
     │   │   │   ├── UpdateTicket.tsx      # Reusable ticket status quick actions & properties dropdowns (Category, Assignee, Priority)
     │   │   │   ├── TicketReplyForm.tsx   # Reusable reply composer form with Agent reply posting, validation & error alerts
@@ -198,16 +206,20 @@ e:\claude_ai\Ticket Management System\
     │   │   │   └── UserForm.tsx      # Reusable create/edit user modal dialog with Zod validation
     │   │   ├── lib/
     │   │   │   ├── hooks/
-    │   │   │   │   ├── useAuth.ts    # React Query hooks for session & auth lifecycle
-    │   │   │   │   ├── useTickets.ts # React Query hooks for tickets, agents, messaging & AI summarization with reactive pagination
-    │   │   │   │   └── useUsers.ts   # React Query hooks for user CRUD management
-    │   │   │   ├── api-client.ts     # Centralized Axios client instance with credentials
-    │   │   │   ├── auth-client.ts    # Client authentication helper (Better Auth client wrapper)
-    │   │   │   ├── query-client.ts   # TanStack React Query client instance & default cache policies
-    │   │   │   ├── tickets-api.ts    # Typed API service for tickets, agents & replies with search and filter params
-    │   │   │   ├── users-api.ts      # Typed API service for user endpoints using axios
-    │   │   │   ├── types.ts          # Centralized client type re-exports from @helpdesk/core
-    │   │   │   └── utils.ts          # Class merging utilities (clsx + tailwind-merge)
+    │   │   │   │   ├── useAuth.ts        # React Query hooks for session & auth lifecycle
+    │   │   │   │   ├── useTickets.ts     # React Query hooks for tickets, agents, messaging & AI summarization with reactive pagination
+    │   │   │   │   ├── useUsers.ts       # React Query hooks for user CRUD management
+    │   │   │   │   ├── useAutoResolve.ts # React Query hooks for ticket & batch auto-resolution, live evaluation & stats
+    │   │   │   │   └── useClassification.ts # React Query hooks for single & batch ticket classification, evaluation & metrics
+    │   │   │   ├── api-client.ts         # Centralized Axios client instance with credentials
+    │   │   │   ├── auto-resolve-api.ts   # Typed API service for auto-resolution endpoints (evaluate, ticket, batch, stats, rules)
+    │   │   │   ├── classification-api.ts # Typed API service for classification endpoints (evaluate, ticket, batch, stats, categories)
+    │   │   │   ├── auth-client.ts        # Client authentication helper (Better Auth client wrapper)
+    │   │   │   ├── query-client.ts       # TanStack React Query client instance & default cache policies
+    │   │   │   ├── tickets-api.ts        # Typed API service for tickets, agents & replies with search and filter params
+    │   │   │   ├── users-api.ts          # Typed API service for user endpoints using axios
+    │   │   │   ├── types.ts              # Centralized client type re-exports from @helpdesk/core
+    │   │   │   └── utils.ts              # Class merging utilities (clsx + tailwind-merge)
     │   │   ├── App.tsx         # Main application root & session router
     │   │   ├── main.tsx        # React DOM entry point with QueryClientProvider
     │   │   └── index.css       # Tailwind directives & global styles
@@ -221,9 +233,16 @@ e:\claude_ai\Ticket Management System\
     │   │   └── rate-limiter.ts # Production-only rate limiting middleware (express-rate-limit)
     │   ├── routes/
     │   │   ├── users.ts        # Modular Express router for /api/users CRUD endpoints (Admin only)
-    │   │   └── emails.ts       # Inbound email webhook (/api/webhooks/email), support-address & audit logs
+    │   │   ├── emails.ts       # Inbound email webhook (/api/webhooks/email), support-address & audit logs
+    │   │   ├── auto-resolve.ts # Modular Express router for /api/auto-resolve (evaluate, ticket, batch, stats, rules)
+    │   │   └── classification.ts # Modular Express router for /api/classify (evaluate, ticket, batch, stats, categories)
     │   ├── services/
     │   │   ├── ai.ts           # gpt-5-nano AI classification, summarization & response drafting service
+    │   │   ├── auto-resolve.ts # Knowledge Base ticket auto-resolution service, rule evaluation, batch processing & metrics
+    │   │   ├── classification.ts # AI & heuristic ticket classification service, batch classification & distribution metrics
+    │   │   ├── escalation-policy.ts # Knowledge Base Section 10 escalation guardrails (legal, >30 day refund, chargeback, security)
+    │   │   ├── knowledge-base-matcher.ts # Deterministic Knowledge Base policy matching & answer synthesis
+    │   │   ├── queue.ts        # pg-boss PostgreSQL background job queues (ticket-classification, ticket-auto-resolve)
     │   │   └── email-ingestion.ts # Inbound email processing, threading matching & ticket creation
     │   ├── auth.ts             # Better Auth server configuration with Prisma adapter
     │   ├── db.ts               # Prisma client instance & PostgreSQL health check
@@ -365,16 +384,86 @@ From `e:\claude_ai\Ticket Management System\Helpdesk`:
   - `POST /api/tickets/:id/classify`: Authenticated endpoint allowing support agents to trigger or re-run classification on demand (supports `?async=true` to enqueue via pg-boss).
   - Client API method `ticketsApi.classifyTicket(id)` and React Query mutation hook `useClassifyTicket()` with automatic cache invalidation.
 
+### 6.13 Knowledge Base Ticket Auto-Resolution Module (`server/services/auto-resolve.ts`, `server/routes/auto-resolve.ts` & `client/src/lib/hooks/useAutoResolve.ts`)
+- **End-to-End Automated Resolution Pipeline**: Evaluates inbound student inquiries against official Code with Mosh Knowledge Base policies (Sections 1–9) and enforces strict escalation guardrails (Section 10) to deliver instant, high-quality resolutions:
+  1. **Knowledge Base Policy Matching (Sections 1–9)**: Self-service password reset, course transfers (non-transferable), missing purchased courses, lifetime access terms, standard refund policy (< 30 days, < 80% completion), completion certificates, video streaming/downloads, video playback troubleshooting, coupon codes, and account email updates. Matches assign confidence scores (0.95), address students by first name (`Hello {FirstName},`), provide complete step-by-step guidance, and sign off with `Code with Mosh Support`.
+  2. **Strict Escalation Guardrails (Section 10)**: Guarantees that inquiries involving legal action threats, refund requests outside the 30-day guarantee window, chargebacks/payment disputes, or account security concerns are **strictly blocked from auto-resolution** and safely routed to human staff queues with `HIGH` or `URGENT` priority.
+- **Backend Service & Background Job Queue Integration (`server/services/auto-resolve.ts` & `server/services/queue.ts`)**:
+  - `evaluateInquiryForAutoResolve(params)`: Evaluates inquiry content and returns match status, confidence, matched section, and generated resolution reply without database writes.
+  - `autoResolveSingleTicket(ticketId, options)`: Evaluates ticket by ID, updates status to `RESOLVED` (or transitions `NEW`/`PROCESSING` to `OPEN`), appends official resolution reply, creates audit webhook log, and supports dryRun and force options.
+  - `batchAutoResolveTickets(options)`: Scans queue with status/category filters, evaluates candidate tickets in bulk, and returns aggregated batch statistics (`totalProcessed`, `autoResolvedCount`, `escalatedCount`, `skippedCount`).
+  - `getAutoResolveMetrics()`: Aggregates real-time auto-resolution rates, category breakdown, and top matched sections.
+  - `pg-boss` Queue: Registers dedicated `ticket-auto-resolve` queue with automatic worker handler and non-blocking `enqueueTicketAutoResolve()` / `scheduleTicketAutoResolve()`.
+- **REST API Endpoints (`server/routes/auto-resolve.ts` mounted at `/api/auto-resolve`)**:
+  - `POST /api/auto-resolve/evaluate`: Live inquiry evaluation without database modification.
+  - `POST /api/auto-resolve/ticket/:id` (and shortcut `POST /api/tickets/:id/auto-resolve`): Executes single ticket auto-resolution.
+  - `POST /api/auto-resolve/batch`: Executes batch auto-resolution across pending tickets.
+  - `GET /api/auto-resolve/stats`: Returns aggregate metrics on auto-resolution performance.
+  - `GET /api/auto-resolve/rules`: Returns list of 10 supported Knowledge Base rules and 4 escalation guardrails.
+- **Frontend Architecture & Components (`AutoResolveCard.tsx`, `BatchAutoResolveModal.tsx`, `AutoResolveBadge.tsx`, `useAutoResolve.ts`)**:
+  - `AutoResolveCard`: Reusable card in `TicketDetailPage` and `TicketDetailModal` featuring live Knowledge Base policy check, resolution answer preview, and 1-click Auto-Resolve & Reply.
+  - `BatchAutoResolveModal`: Bulk auto-resolution modal on `TicketsPage` enabling agents to filter by queue status/category, test with dry-run mode, and view processed/resolved/escalated counts and per-ticket results.
+  - `AutoResolveBadge`: Reusable badge and banner displaying auto-resolved policy confirmations, KB match eligibility, or escalation alerts.
+### 6.14 AI Ticket Classification Module (`server/services/classification.ts`, `server/routes/classification.ts` & `client/src/lib/hooks/useClassification.ts`)
+- **End-to-End Classification Pipeline**: Automatically categorizes inbound student inquiries into the 3 official system categories (`GENERAL_QUESTION`, `TECHNICAL_QUESTION`, `REFUND_REQUEST`), evaluates priority (`LOW`, `MEDIUM`, `HIGH`, `URGENT`), creates concise bullet summaries, extracts domain topic tags, computes confidence scores, and produces personalized draft replies.
+- **Strict Escalation Guardrails**: Evaluates inquiry text for legal action threats, refund claims outside the 30-day window, payment disputes/chargebacks, and account security breaches, automatically elevating priority to `HIGH` or `URGENT` and setting explicit escalation flags.
+- **Backend Service Layer (`server/services/classification.ts`)**:
+  - `evaluateInquiryForClassification(params)`: Evaluates inquiry content and returns predicted category, priority, summary, draft response, tags, confidence, and reasoning without database writes.
+  - `classifySingleTicket(ticketId, options)`: Evaluates ticket by ID, updates category, priority, summary, and draft reply in PostgreSQL, records audit log in `WebhookLog`, and supports `force` and `dryRun` options.
+  - `batchClassifyTickets(options)`: Processes pending/unclassified tickets in bulk with filters (`statusFilter: UNCLASSIFIED | NEW | OPEN | ALL`), `limit`, `force`, and `dryRun`, returning aggregated batch statistics and per-ticket items.
+  - `getClassificationMetrics()`: Computes real-time distribution across categories, priorities, unclassified ticket counts, and classification rates.
+  - `getAvailableClassificationCategories()`: Returns catalog of supported categories, descriptions, keyword triggers, and priority defaults.
+- **REST API Endpoints (`server/routes/classification.ts` mounted at `/api/classify` and `/api/classification`)**:
+  - `POST /api/classify/evaluate`: Live text evaluation without database modification.
+  - `POST /api/classify/ticket/:id`: Executes single ticket classification (supports `?async=true` for pg-boss queuing).
+  - `POST /api/classify/batch`: Executes batch classification across pending tickets.
+  - `GET /api/classify/stats`: Returns real-time metrics and category/priority breakdown.
+  - `GET /api/classify/categories`: Returns supported categories metadata.
+- **Frontend Architecture & Components (`ClassificationCard.tsx`, `BatchClassifyModal.tsx`, `ClassificationBadge.tsx`, `useClassification.ts`)**:
+  - `ClassificationCard`: Dedicated card in `TicketDetailPage` and `TicketDetailModal` displaying category, priority, summary, AI draft response preview (with clipboard copy), confidence indicator, and 1-click "Classify Ticket" / "Re-Classify with AI".
+  - `BatchClassifyModal`: Bulk classification dialog in `TicketsPage` allowing agents to filter by queue status, select batch size, toggle dry-run simulation and force re-classification, and view batch results breakdown.
+  - `ClassificationBadge`: Reusable badge and banner displaying classification tags, confidence percentages, and escalation alerts.
+  - Custom React Query hooks in `client/src/lib/hooks/useClassification.ts` (`useClassifyTicket`, `useBatchClassify`, `useEvaluateClassification`, `useClassificationStats`, `useClassificationCategories`).
+
+### 6.15 Helpdesk Operations & Analytics Dashboard Module (`server/services/dashboard.ts`, `server/routes/dashboard.ts` & `HomePage.tsx`)
+- **End-to-End Operational Intelligence & Metrics Pipeline**: Aggregates real-time ticket volume, backlog metrics, automation efficacy, and turnaround speed analytics across the entire support system:
+  1. **Total Tickets**: Total volume of support inquiries across all lifecycle states (`NEW`, `PROCESSING`, `OPEN`, `RESOLVED`, `CLOSED`).
+  2. **Open Tickets Backlog**: Active inquiries requiring human staff attention (`OPEN`, `NEW`, `PROCESSING`).
+  3. **Number of Tickets Resolved by AI**: Exact count of tickets resolved autonomously via Knowledge Base policies without human agent intervention.
+  4. **% of Tickets Resolved by AI**: Real-time ratio of AI-resolved inquiries relative to total system volume (`aiResolvedPercentage`) and completed tickets (`aiResolvedPercentageOfResolved`).
+  5. **Average Resolution Time**: Formatted duration (`avgResolutionTimeFormatted`) benchmarked side-by-side with instantaneous AI speed (`aiAvgResolutionTimeFormatted`) vs. human agent triage (`humanAvgResolutionTimeFormatted`).
+- **Backend Service Layer (`server/services/dashboard.ts` & `server/routes/dashboard.ts`)**:
+  - `getDashboardStats()`: Aggregates total tickets, open backlog, resolved count, AI-resolved count via WebhookLog audit trails and auto-resolve marker detection, category/priority breakdowns, duration deltas (`updatedAt - createdAt`), and recent 5 tickets.
+  - `formatDurationMs(ms)`: Converts millisecond durations to clean human-readable units (`"15s"`, `"4 mins"`, `"1.5 hrs"`, `"2.0 days"`).
+  - REST endpoint `GET /api/dashboard/stats` guarded with `requireAuth`.
+- **Frontend Architecture (`HomePage.tsx`, `useDashboard.ts`, `dashboard-api.ts`)**:
+  - `HomePage`: Streamlined executive operations dashboard focusing on the 5 core KPI metric cards (Total Tickets, Open Tickets, AI Resolved count, % AI Resolved, Average Resolution Time), Live Ops header bar with user role indicator, 1-click manual ticket creation modal, and real-time refresh capability.
+  - Custom React Query hook `useDashboardStats()` with query key `['dashboard', 'stats']` and 1-minute fresh caching.
+  - Dedicated "Dashboard" navigation tab in `Navbar.tsx` with active route detection.
+
+### 6.16 AI Agent Provisioning & Inbound Auto-Assignment / Unassignment Lifecycle (`prisma/seed.ts`, `scripts/seed-ai-agent.ts`, `server/services/ai.ts` & `server/services/auto-resolve.ts`)
+- **Dedicated AI Agent Account (`prisma/seed.ts` & `scripts/seed-ai-agent.ts`)**:
+  - Seeds a dedicated AI Agent user (`name: 'AI'`, `email: process.env.AI_AGENT_EMAIL || 'ai@example.com'`, `role: 'AGENT'`, `isActive: true`) alongside Admin and human Agent accounts.
+  - Dedicated CLI seed script `npm run seed:ai` (`ts-node scripts/seed-ai-agent.ts`) provisions or updates the AI Agent user and credentials account idempotently.
+- **Inbound Ticket Automatic Assignment**:
+  - Whenever a new ticket arrives into the system via REST API (`POST /api/tickets`) or inbound email ingestion (`ingestInboundEmail`), if no explicit human agent is assigned, the system automatically assigns the ticket to the AI Agent (`assignedAgentId: aiAgent.id`).
+- **Auto-Resolution & Unassignment Rules**:
+  - **Successful Auto-Resolution**: When the Knowledge Base evaluation succeeds (`canAutoResolve: true`), the ticket transitions to `RESOLVED`, appends the official resolution reply from Code with Mosh Support, and confirms assignment to the AI Agent.
+  - **Unassignment on Non-Auto-Resolution**: If the ticket cannot be auto-resolved (e.g., Section 10 escalation guardrails triggered for legal/chargeback/refund outside 30 days/security, low confidence score, or unhandled AI error):
+    - The ticket is automatically unassigned from the AI Agent (`assignedAgentId = null`) and placed in the `OPEN` queue.
+    - This immediately routes the ticket into the human support agents' active backlog for triage and manual reply.
+    - If a ticket was explicitly assigned to a human agent by an administrator, the human assignment is safely preserved.
+
 ---
 
 ## 7. Testing Architecture (Component-First: Vitest + React Testing Library & Selective Playwright E2E)
 
-The project enforces a **Component-First Testing Philosophy**: The vast majority of test coverage (**378/378 tests, 100% pass rate**) is maintained via fast, deterministic Vitest + React Testing Library tests in jsdom, reserving Playwright E2E tests strictly for critical full-stack integration validation.
+The project enforces a **Component-First Testing Philosophy**: The vast majority of test coverage (**490/490 tests, 100% pass rate**) is maintained via fast, deterministic Vitest + React Testing Library tests in jsdom, reserving Playwright E2E tests strictly for critical full-stack integration validation.
 
 ### 7.1 Client Component & Unit Test Suite (Vitest + RTL)
 - **Test Framework**: Vitest (`vitest`), React Testing Library (`@testing-library/react`, `@testing-library/user-event`), `@testing-library/jest-dom`, and jsdom.
 - **Test Directory**: `client/src/**/__tests__/*.test.tsx` and `client/src/test/*.test.ts`.
-- **Current Coverage**: **378/378 tests passing (100%)** across 27 test suites:
+- **Current Coverage**: **490/490 tests passing (100%)** across 37 test suites:
   1. `client/src/pages/__tests__/DashboardPage.test.tsx` (14 tests): Metric cards, volume statistics, category breakdowns, recent activity table, and navigation.
   2. `client/src/pages/__tests__/TicketsPage.test.tsx` (23 tests): Tickets dashboard, TanStack table sorting, search query filtering, category/priority/status filters, filter reset counters, pagination state, and modal triggers.
   3. `client/src/pages/__tests__/TicketDetailPage.test.tsx` (20 tests): 2-column layout, ticket metadata, status actions, category/priority/assignee updates, AI summary integration, conversation thread rendering, and reply composer.
@@ -411,14 +500,22 @@ The project enforces a **Component-First Testing Philosophy**: The vast majority
   34. `client/src/components/__tests__/CategoryBadge.test.tsx` (11 tests): General Question, Technical Question, and Refund Request badge styling.
   35. `client/src/components/__tests__/TicketBadges.test.tsx` (15 tests): Composite ticket badge exports and sender type badges.
   36. `client/src/components/__tests__/UIComponents.test.tsx` (9 tests): UI primitive building blocks.
-  37. `client/src/test/hooks.test.tsx` (15 tests): Custom React Query hooks lifecycle and query invalidation.
-  38. `client/src/test/auth-client.test.ts` (8 tests): Better Auth client wrapper methods and error fallbacks.
-  39. `client/src/test/utils.test.ts` (22 tests): `cn` class merging, title formatters, date formatters, and avatar initials extractor.
-  40. `client/src/test/users-api.test.ts` (11 tests): User management API client requests and error extractions.
-  41. `client/src/test/email-parser.test.ts` (19 tests): RFC 2822 header parsing, subject ticket tag extraction, and anti-loop detection.
-  42. `client/src/test/ai-service.test.ts` (21 tests): First name extraction, heuristic reply polish, heuristic classify & draft, and heuristic ticket & conversation history summarization.
-  43. `client/src/test/ticket-schema.test.ts` (19 tests): Zod schemas for tickets and inbound email payloads.
-  44. `client/src/test/tickets-api.test.ts` (23 tests): Typed `ticketsApi` service methods (`listTickets`, `getTicket`, `listAgents`, `createTicket`, `updateTicket`, `addTicketMessage`, `polishReply`, `summarizeTicket`).
+  37. `client/src/components/__tests__/AutoResolveComponents.test.tsx` (13 tests): AutoResolveBadge, AutoResolveCard, and BatchAutoResolveModal components.
+  38. `client/src/components/__tests__/ClassificationComponents.test.tsx` (14 tests): ClassificationBadge, ClassificationCard, and BatchClassifyModal components.
+  39. `client/src/test/hooks.test.tsx` (16 tests): Custom React Query hooks lifecycle and query invalidation.
+  40. `client/src/test/auth-client.test.ts` (8 tests): Better Auth client wrapper methods and error fallbacks.
+  41. `client/src/test/utils.test.ts` (22 tests): `cn` class merging, title formatters, date formatters, and avatar initials extractor.
+  42. `client/src/test/users-api.test.ts` (11 tests): User management API client requests and error extractions.
+  43. `client/src/test/email-parser.test.ts` (19 tests): RFC 2822 header parsing, subject ticket tag extraction, and anti-loop detection.
+  44. `client/src/test/ai-service.test.ts` (26 tests): First name extraction, heuristic reply polish, heuristic classify & draft, and background classification.
+  45. `client/src/test/knowledge-base.test.ts` (21 tests): Knowledge Base policy matching and escalation policy evaluation.
+  46. `client/src/test/queue.test.ts` (5 tests): Background pg-boss job queues and scheduling.
+  47. `client/src/test/auto-resolve-service.test.ts` (15 tests): Auto-resolve service, single ticket evaluation, batch processing, and metrics.
+  48. `client/src/test/auto-resolve-api.test.ts` (6 tests): Auto-resolve client API service methods.
+  49. `client/src/test/classification-service.test.ts` (17 tests): Classification service, single ticket evaluation, batch processing, and metrics.
+  50. `client/src/test/classification-api.test.ts` (6 tests): Classification client API service methods.
+  51. `client/src/test/ticket-schema.test.ts` (20 tests): Zod schemas for tickets and inbound email payloads.
+  52. `client/src/test/tickets-api.test.ts` (25 tests): Typed `ticketsApi` service methods (`listTickets`, `getTicket`, `listAgents`, `createTicket`, `updateTicket`, `addTicketMessage`, `polishReply`, `summarizeTicket`).
 - **Testing Utilities & Standards**:
   - `renderWithQuery`: Custom test helper wrapping components with `QueryClientProvider` configured with zero retries.
   - Typed Mocking: Mock API modules using `vi.mock('../../lib/tickets-api')` and `vi.mock('../../lib/users-api')`.

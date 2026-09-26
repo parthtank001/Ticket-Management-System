@@ -176,6 +176,14 @@ describe('Ticket Validation Schemas & Assigned User Validation', () => {
         expect(result.data.assignedToId).toBe('user-123');
       }
     });
+
+    it('accepts NEW and PROCESSING statuses in updateTicketSchema', () => {
+      const resultNew = updateTicketSchema.safeParse({ status: 'NEW' });
+      expect(resultNew.success).toBe(true);
+
+      const resultProcessing = updateTicketSchema.safeParse({ status: 'PROCESSING' });
+      expect(resultProcessing.success).toBe(true);
+    });
   });
 
   describe('getTicketsQuerySchema', () => {

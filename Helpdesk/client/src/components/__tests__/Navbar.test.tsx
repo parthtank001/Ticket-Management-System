@@ -25,7 +25,7 @@ describe('Navbar Component', () => {
     updatedAt: '2026-01-01T00:00:00.000Z',
   };
 
-  it('renders "Tickets" button for both Admin and Agent users', () => {
+  it('renders "Dashboard" and "Tickets" button for both Admin and Agent users', () => {
     const { rerender } = render(
       <Navbar
         user={mockAdminUser}
@@ -35,6 +35,7 @@ describe('Navbar Component', () => {
       />
     );
 
+    expect(screen.getByRole('button', { name: /dashboard/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /tickets/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /users/i })).toBeInTheDocument();
 
@@ -47,12 +48,25 @@ describe('Navbar Component', () => {
       />
     );
 
+    expect(screen.getByRole('button', { name: /dashboard/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /tickets/i })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /users/i })).not.toBeInTheDocument();
   });
 
-  it('highlights "Tickets" button when currentPath is "/tickets"', () => {
+  it('highlights "Dashboard" button when currentPath is "/" and "Tickets" when "/tickets"', () => {
     const { rerender } = render(
+      <Navbar
+        user={mockAdminUser}
+        currentPath="/"
+        onNavigate={vi.fn()}
+        onSignOut={vi.fn()}
+      />
+    );
+
+    const dashboardBtn = screen.getByRole('button', { name: /dashboard/i });
+    expect(dashboardBtn.className).toContain('bg-indigo-50');
+
+    rerender(
       <Navbar
         user={mockAdminUser}
         currentPath="/tickets"
@@ -61,48 +75,27 @@ describe('Navbar Component', () => {
       />
     );
 
-    const ticketsBtnPath = screen.getByRole('button', { name: /tickets/i });
-    expect(ticketsBtnPath.className).toContain('bg-indigo-50');
-
-    rerender(
-      <Navbar
-        user={mockAdminUser}
-        currentPath="/"
-        onNavigate={vi.fn()}
-        onSignOut={vi.fn()}
-      />
-    );
-
-    const ticketsBtnRoot = screen.getByRole('button', { name: /tickets/i });
-    expect(ticketsBtnRoot.className).not.toContain('bg-indigo-50');
-
-    rerender(
-      <Navbar
-        user={mockAdminUser}
-        currentPath="/users"
-        onNavigate={vi.fn()}
-        onSignOut={vi.fn()}
-      />
-    );
-
-    const ticketsBtnInactive = screen.getByRole('button', { name: /tickets/i });
-    expect(ticketsBtnInactive.className).not.toContain('bg-indigo-50');
-    const usersBtnActive = screen.getByRole('button', { name: /users/i });
-    expect(usersBtnActive.className).toContain('bg-indigo-50');
+    const ticketsBtn = screen.getByRole('button', { name: /tickets/i });
+    expect(ticketsBtn.className).toContain('bg-indigo-50');
+    expect(screen.getByRole('button', { name: /dashboard/i }).className).not.toContain('bg-indigo-50');
   });
 
-  it('calls onNavigate with "/tickets" when Tickets button is clicked and "/" when Brand logo is clicked', async () => {
+  it('calls onNavigate with "/" when Dashboard button is clicked and "/tickets" when Tickets is clicked', async () => {
     const user = userEvent.setup();
     const handleNavigate = vi.fn();
 
     render(
       <Navbar
         user={mockAdminUser}
-        currentPath="/"
+        currentPath="/tickets"
         onNavigate={handleNavigate}
         onSignOut={vi.fn()}
       />
     );
+
+    const dashboardBtn = screen.getByRole('button', { name: /dashboard/i });
+    await user.click(dashboardBtn);
+    expect(handleNavigate).toHaveBeenCalledWith('/');
 
     const ticketsBtn = screen.getByRole('button', { name: /tickets/i });
     await user.click(ticketsBtn);

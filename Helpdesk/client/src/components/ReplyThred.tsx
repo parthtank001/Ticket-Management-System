@@ -72,8 +72,9 @@ export function parseBodyToMessages(
 
     const isInternalNote = headerType.toUpperCase().includes('INTERNAL NOTE') || headerType.toUpperCase().includes('NOTE');
     const isStudent = headerType.toUpperCase().includes('STUDENT') || headerType.toUpperCase().includes('CUSTOMER');
-    const senderType = isStudent ? 'STUDENT' : 'AGENT';
-    const senderEmail = email || (isStudent ? (studentEmail || 'student@example.com') : 'agent@example.com');
+    const isSystemOrAi = headerType.toUpperCase().includes('AI') || headerType.toUpperCase().includes('AUTO-RESOLUTION') || headerType.toUpperCase().includes('SYSTEM');
+    const senderType = isSystemOrAi ? 'SYSTEM' : (isStudent ? 'STUDENT' : 'AGENT');
+    const senderEmail = email || (isSystemOrAi ? 'support@example.com' : (isStudent ? (studentEmail || 'student@example.com') : 'agent@example.com'));
     const turnDate = new Date(baseDate + (i + 1) * 35 * 60 * 1000).toISOString();
 
     messages.push({

@@ -83,7 +83,7 @@ export const createTicketSchema = z.object({
  */
 export const updateTicketSchema = z.object({
   body: z.string().optional(),
-  status: z.enum(['OPEN', 'RESOLVED', 'CLOSED']).optional(),
+  status: z.enum(['NEW', 'PROCESSING', 'OPEN', 'RESOLVED', 'CLOSED']).optional(),
   category: z.enum(['GENERAL_QUESTION', 'TECHNICAL_QUESTION', 'REFUND_REQUEST']).nullable().optional(),
   priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'URGENT']).optional(),
   assignedAgentId: z.string().nullable().optional(),

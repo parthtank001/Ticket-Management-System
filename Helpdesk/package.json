@@ -9,6 +9,7 @@
     "build": "npm --prefix client run build",
     "start": "ts-node server/index.ts",
     "seed": "ts-node prisma/seed.ts",
+    "seed:ai": "ts-node scripts/seed-ai-agent.ts",
     "seed:tickets": "ts-node scripts/seed-100-tickets.ts",
     "seed:110": "ts-node scripts/seed-ticket-110-replies.ts",
     "create-user": "ts-node scripts/create-user.ts",

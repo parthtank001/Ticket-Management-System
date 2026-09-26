@@ -31,3 +31,33 @@ export type {
   PaginatedTicketsResponse,
   ListTicketsParams,
 } from './tickets-api';
+
+export type {
+  EvaluateInquiryInput,
+  EvaluateInquiryOutput,
+  AutoResolveTicketInput,
+  AutoResolveTicketOutput,
+  BatchAutoResolveInput,
+  BatchAutoResolveOutput,
+  AutoResolveEvaluationResult,
+  AutoResolveTicketResult,
+  BatchAutoResolveResult,
+  AutoResolveStats,
+  AutoResolveRuleInfo,
+  EvaluateClassificationInput,
+  EvaluateClassificationOutput,
+  ClassifyTicketInput,
+  ClassifyTicketOutput,
+  BatchClassifyInput,
+  BatchClassifyOutput,
+  TicketClassificationResult,
+  ClassifyTicketResult,
+  BatchClassifyResult,
+  ClassificationStats,
+  ClassificationCategoryInfo,
+  DashboardStats,
+  DailyTicketCount,
+  GetDashboardStatsQueryInput,
+  GetDashboardStatsQueryOutput,
+} from '@helpdesk/core';
+

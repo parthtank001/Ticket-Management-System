@@ -15,6 +15,9 @@ async function main() {
   const agentEmail = process.env.AGENT_EMAIL || 'agent@example.com';
   const agentPassword = process.env.AGENT_PASSWORD || 'password123';
 
+  const aiAgentEmail = process.env.AI_AGENT_EMAIL || 'ai@example.com';
+  const aiAgentPassword = process.env.AI_AGENT_PASSWORD || 'password123';
+
   interface SeedUser {
     email: string;
     password: string;
@@ -33,6 +36,12 @@ async function main() {
       email: agentEmail,
       password: agentPassword,
       name: 'Helpdesk Agent',
+      role: 'AGENT',
+    },
+    {
+      email: aiAgentEmail,
+      password: aiAgentPassword,
+      name: 'AI',
       role: 'AGENT',
     },
   ];

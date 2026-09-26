@@ -13,6 +13,8 @@ import { ReplyThred } from './ReplyThred';
 import { ErrorMessage } from './ErrorMessage';
 import { UpdateTicket } from './UpdateTicket';
 import { TicketSummaryCard } from './TicketSummaryCard';
+import { AutoResolveCard } from './AutoResolveCard';
+import { ClassificationCard } from './ClassificationCard';
 import {
   X,
   User,
@@ -101,6 +103,12 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({
 
               {/* AI Issue & Conversation Summary Card */}
               <TicketSummaryCard ticket={ticket} onError={setActionError} />
+
+              {/* AI Ticket Classification Card */}
+              <ClassificationCard ticket={ticket} />
+
+              {/* Knowledge Base Auto-Resolution Card */}
+              <AutoResolveCard ticket={ticket} />
 
               {/* Conversation Thread */}
               <ReplyThred
