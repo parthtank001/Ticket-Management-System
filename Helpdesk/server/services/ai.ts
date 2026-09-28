@@ -576,8 +576,9 @@ export async function classifyTicketInBackground(
   ticketId: number,
   options?: BackgroundClassifyOptions
 ): Promise<any> {
+  let ticket: any = null;
   try {
-    const ticket = await prisma.ticket.findUnique({
+    ticket = await prisma.ticket.findUnique({
       where: { id: ticketId },
     });
 
@@ -661,16 +662,15 @@ export async function classifyTicketInBackground(
 
     return updatedTicket;
   } catch (error: any) {
+    if (error?.code === 'P2025' || error?.message?.includes('Record to update not found')) {
+      console.info(`[AI Classification] Ticket #${ticketId} was deleted or not found; stopping background task.`);
+      return null;
+    }
     console.error(`[AI Classification] Error during background classification for Ticket #${ticketId}:`, error?.message || error);
     try {
       const aiAgent = await getAiAgentUser();
-      const currentTicket = await prisma.ticket.findUnique({
-        where: { id: ticketId },
-        select: { assignedAgentId: true },
-      });
-
       const fallbackUpdate: { status: 'OPEN'; assignedAgentId?: null } = { status: 'OPEN' };
-      if (aiAgent && currentTicket?.assignedAgentId === aiAgent.id) {
+      if (aiAgent && ticket?.assignedAgentId === aiAgent.id) {
         fallbackUpdate.assignedAgentId = null;
       }
 
@@ -679,8 +679,10 @@ export async function classifyTicketInBackground(
         data: fallbackUpdate,
       });
       console.info(`[AI Classification] Ticket #${ticketId} status updated to OPEN after error.`);
-    } catch (statusErr) {
-      console.error(`[AI Classification] Failed to update ticket status to OPEN for Ticket #${ticketId}:`, statusErr);
+    } catch (statusErr: any) {
+      if (statusErr?.code !== 'P2025' && !statusErr?.message?.includes('Record to update not found')) {
+        console.error(`[AI Classification] Failed to update ticket status to OPEN for Ticket #${ticketId}:`, statusErr);
+      }
     }
     return null;
   }

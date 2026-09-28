@@ -85,6 +85,31 @@ describe('Email Parser Unit Tests', () => {
     });
   });
 
+  describe('normalizeHeaders (Mailgun JSON arrays and standard headers)', () => {
+    it('should parse Mailgun JSON stringified array of header tuples', () => {
+      const rawMailgunHeaders = JSON.stringify([
+        ['Received', 'by mailgun.org with HTTP...'],
+        ['Message-Id', '<mailgun-msg-123@university.edu>'],
+        ['In-Reply-To', '<parent-ticket-999@helpdesk.com>'],
+        ['Auto-Submitted', 'auto-generated'],
+      ]);
+
+      const headers = normalizeHeaders(rawMailgunHeaders);
+      expect(headers['message-id']).toBe('<mailgun-msg-123@university.edu>');
+      expect(headers['in-reply-to']).toBe('<parent-ticket-999@helpdesk.com>');
+      expect(headers['auto-submitted']).toBe('auto-generated');
+    });
+
+    it('should parse standard object headers', () => {
+      const headers = normalizeHeaders({
+        'Message-ID': '<std-123@example.com>',
+        'Subject': 'Need assistance',
+      });
+      expect(headers['message-id']).toBe('<std-123@example.com>');
+      expect(headers['subject']).toBe('Need assistance');
+    });
+  });
+
   describe('detectAutoSubmitted (Anti-Loop Protection)', () => {
     it('should detect Auto-Submitted: auto-generated', () => {
       const headers = { 'auto-submitted': 'auto-generated' };
@@ -154,20 +179,36 @@ describe('Email Parser Unit Tests', () => {
       expect(parsed.body).toContain('Can you check my course enrollment status?');
     });
 
-    it('should normalize Mailgun format payload', () => {
+    it('should normalize Mailgun format payload with stripped-text, signature, and headers', () => {
       const payload = {
         sender: 'clara@university.edu',
+        from: 'Clara Barton <clara@university.edu>',
         recipient: 'support@helpdesk.com',
-        subject: 'Refund request for dropped lab',
+        subject: 'Refund request for dropped lab [Ticket #1055]',
         'stripped-text': 'I dropped the physics lab within the add/drop period. Please process my refund.',
+        'body-plain': 'I dropped the physics lab within the add/drop period. Please process my refund.\n\nOn Mon, Sep 20 Support wrote: ...',
         'Message-Id': '<mailgun-777@university.edu>',
+        'In-Reply-To': '<ticket-1055-msg@helpdesk.com>',
+        token: 'mg-token-xyz',
+        timestamp: 1690000000,
+        signature: 'mg-signature-abc123',
+        attachments: [
+          { name: 'receipt.pdf', contentType: 'application/pdf', size: 102400 }
+        ]
       };
 
       const parsed = parseInboundEmail(payload);
-      expect(parsed.senderName).toBe('clara');
+      expect(parsed.senderName).toBe('Clara Barton');
       expect(parsed.senderEmail).toBe('clara@university.edu');
-      expect(parsed.body).toContain('Please process my refund.');
+      expect(parsed.ticketNumberFromSubject).toBe(1055);
+      expect(parsed.cleanSubject).toBe('Refund request for dropped lab');
+      expect(parsed.body).toBe('I dropped the physics lab within the add/drop period. Please process my refund.');
       expect(parsed.messageId).toBe('mailgun-777@university.edu');
+      expect(parsed.inReplyTo).toBe('ticket-1055-msg@helpdesk.com');
+      expect(parsed.signature?.token).toBe('mg-token-xyz');
+      expect(parsed.signature?.signature).toBe('mg-signature-abc123');
+      expect(parsed.attachments).toHaveLength(1);
+      expect(parsed.attachments![0].filename).toBe('receipt.pdf');
     });
   });
 });

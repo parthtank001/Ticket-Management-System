@@ -1,8 +1,16 @@
 /**
  * Email Parser & Header Processing Utility
  * Pure TypeScript module for extracting sender details, message IDs, thread references, ticket tags,
- * and detecting auto-responders.
+ * and detecting auto-responders across Mailgun, SendGrid, Postmark, and standard email gateways.
  */
+
+export interface EmailAttachmentInfo {
+  filename?: string;
+  name?: string;
+  contentType?: string;
+  size?: number;
+  url?: string;
+}
 
 export interface ParsedEmail {
   senderEmail: string;
@@ -11,6 +19,7 @@ export interface ParsedEmail {
   subject: string;
   cleanSubject: string;
   body: string;
+  bodyHtml?: string;
   messageId?: string;
   inReplyTo?: string;
   references: string[];
@@ -19,6 +28,12 @@ export interface ParsedEmail {
   ticketNumberFromSubject?: number;
   headers: Record<string, string>;
   rawPayload: any;
+  signature?: {
+    token?: string;
+    timestamp?: string | number;
+    signature?: string;
+  };
+  attachments?: EmailAttachmentInfo[];
 }
 
 /**
@@ -129,12 +144,43 @@ export function parseReferences(references?: string | string[] | null): string[]
 
 /**
  * Normalizes email headers into a lowercase key-value dictionary.
+ * Supports Mailgun JSON stringified arrays `[["Header", "Value"], ...]`,
+ * objects, and RFC raw string lines.
  */
 export function normalizeHeaders(rawHeaders: any): Record<string, string> {
   const headers: Record<string, string> = {};
   if (!rawHeaders) return headers;
 
   if (typeof rawHeaders === 'string') {
+    let parsedJson: any = null;
+    try {
+      parsedJson = JSON.parse(rawHeaders);
+    } catch {
+      // Not JSON, continue to line-by-line parsing
+    }
+
+    if (Array.isArray(parsedJson)) {
+      for (const item of parsedJson) {
+        if (Array.isArray(item) && item.length >= 2) {
+          headers[String(item[0]).toLowerCase().trim()] = String(item[1]).trim();
+        } else if (item && typeof item === 'object') {
+          const key = (item.name || item.key || item.header || '').toLowerCase().trim();
+          const val = item.value || item.val || '';
+          if (key) {
+            headers[key] = String(val).trim();
+          }
+        }
+      }
+      return headers;
+    }
+
+    if (parsedJson && typeof parsedJson === 'object') {
+      for (const [key, value] of Object.entries(parsedJson)) {
+        headers[key.toLowerCase().trim()] = String(value).trim();
+      }
+      return headers;
+    }
+
     const lines = rawHeaders.split(/\r?\n/);
     let currentKey = '';
     for (const line of lines) {
@@ -146,6 +192,21 @@ export function normalizeHeaders(rawHeaders: any): Record<string, string> {
           currentKey = line.substring(0, colonIndex).trim().toLowerCase();
           const val = line.substring(colonIndex + 1).trim();
           headers[currentKey] = val;
+        }
+      }
+    }
+    return headers;
+  }
+
+  if (Array.isArray(rawHeaders)) {
+    for (const item of rawHeaders) {
+      if (Array.isArray(item) && item.length >= 2) {
+        headers[String(item[0]).toLowerCase().trim()] = String(item[1]).trim();
+      } else if (item && typeof item === 'object') {
+        const key = (item.name || item.key || item.header || '').toLowerCase().trim();
+        const val = item.value || item.val || '';
+        if (key) {
+          headers[key] = String(val).trim();
         }
       }
     }
@@ -231,14 +292,18 @@ export function detectAutoSubmitted(
 
 /**
  * Main parser function to normalize any inbound email webhook payload
- * (Standard JSON, SendGrid Inbound Parse, Mailgun Inbound Parse, form-urlencoded).
+ * (Mailgun Inbound Routes, SendGrid Inbound Parse, Postmark JSON, standard JSON, form-urlencoded).
  */
 export function parseInboundEmail(payload: any): ParsedEmail {
   if (!payload || typeof payload !== 'object') {
     throw new Error('Invalid email payload: expected a JSON object or form payload.');
   }
 
-  // Extract raw fields across different provider conventions
+  // Normalize headers first to allow fallback extraction
+  let rawHeaders = payload.headers || payload['message-headers'] || payload.Headers;
+  const headers = normalizeHeaders(rawHeaders);
+
+  // Extract raw fields across different provider conventions (Mailgun, SendGrid, Postmark, standard)
   const rawFrom =
     payload.from ||
     payload.sender ||
@@ -246,6 +311,7 @@ export function parseInboundEmail(payload: any): ParsedEmail {
     payload.Sender ||
     payload.envelope?.from ||
     payload['from[address]'] ||
+    headers['from'] ||
     '';
 
   const rawTo =
@@ -254,24 +320,28 @@ export function parseInboundEmail(payload: any): ParsedEmail {
     payload.To ||
     payload.Recipient ||
     payload.envelope?.to?.[0] ||
+    headers['to'] ||
     '';
 
-  const rawSubject = payload.subject || payload.Subject || '(No Subject)';
+  const rawSubject = payload.subject || payload.Subject || headers['subject'] || '(No Subject)';
 
-  // Extract body content (prefer text/plain, fallback to stripped html)
+  // Extract body content:
+  // For Mailgun, prefer 'stripped-text' so threaded replies do not duplicate old quoted history!
   let rawBody =
+    payload['stripped-text'] ||
     payload.text ||
     payload.body ||
     payload['body-plain'] ||
-    payload['stripped-text'] ||
+    payload.TextBody ||
     payload.Body ||
     payload.Text ||
     '';
 
   const rawHtml =
+    payload['stripped-html'] ||
     payload.html ||
     payload['body-html'] ||
-    payload['stripped-html'] ||
+    payload.HtmlBody ||
     payload.Html ||
     '';
 
@@ -279,19 +349,14 @@ export function parseInboundEmail(payload: any): ParsedEmail {
     rawBody = stripHtml(rawHtml);
   }
 
-  const { name: senderName, email: senderEmail } = parseEmailAddress(rawFrom);
+  const { name: senderName, email: fromEmail } = parseEmailAddress(rawFrom);
   const { email: recipientEmail } = parseEmailAddress(rawTo);
 
-  // Normalize headers
-  let rawHeaders = payload.headers || payload['message-headers'] || payload.Headers;
-  if (typeof rawHeaders === 'string') {
-    try {
-      rawHeaders = JSON.parse(rawHeaders);
-    } catch {
-      // Keep as string for MIME parser
-    }
+  // Determine clean sender email
+  let senderEmail = fromEmail;
+  if (!senderEmail && payload.sender && typeof payload.sender === 'string') {
+    senderEmail = parseEmailAddress(payload.sender).email;
   }
-  const headers = normalizeHeaders(rawHeaders);
 
   // Extract Message-ID, In-Reply-To, References
   const messageId = cleanMessageId(
@@ -299,8 +364,8 @@ export function parseInboundEmail(payload: any): ParsedEmail {
     payload['Message-Id'] ||
     payload['message-id'] ||
     payload.message_id ||
-    headers['message-id'] ||
-    headers['message_id']
+    payload.MessageID ||
+    headers['message-id']
   );
 
   const inReplyTo = cleanMessageId(
@@ -308,8 +373,7 @@ export function parseInboundEmail(payload: any): ParsedEmail {
     payload['In-Reply-To'] ||
     payload['in-reply-to'] ||
     payload.in_reply_to ||
-    headers['in-reply-to'] ||
-    headers['in_reply_to']
+    headers['in-reply-to']
   );
 
   const rawReferences =
@@ -331,6 +395,33 @@ export function parseInboundEmail(payload: any): ParsedEmail {
   const explicitSenderName = payload.studentName || payload.name || payload.senderName;
   const resolvedSenderName = (explicitSenderName || senderName || (senderEmail ? senderEmail.split('@')[0] : '')).trim();
 
+  // Extract Mailgun signature if present
+  let signatureInfo: ParsedEmail['signature'] = undefined;
+  if (payload.signature && typeof payload.signature === 'object') {
+    signatureInfo = {
+      token: payload.signature.token,
+      timestamp: payload.signature.timestamp,
+      signature: payload.signature.signature,
+    };
+  } else if (payload.signature || payload.token || payload.timestamp) {
+    signatureInfo = {
+      token: payload.token,
+      timestamp: payload.timestamp,
+      signature: typeof payload.signature === 'string' ? payload.signature : undefined,
+    };
+  }
+
+  // Extract attachment metadata if provided
+  let attachments: EmailAttachmentInfo[] = [];
+  if (Array.isArray(payload.attachments)) {
+    attachments = payload.attachments.map((att: any) => ({
+      filename: att.name || att.filename || att.Name,
+      contentType: att.contentType || att.type || att.ContentType,
+      size: att.size || att.ContentLength,
+      url: att.url,
+    }));
+  }
+
   return {
     senderEmail,
     senderName: resolvedSenderName,
@@ -338,6 +429,7 @@ export function parseInboundEmail(payload: any): ParsedEmail {
     subject: rawSubject.trim(),
     cleanSubject,
     body: rawBody.trim(),
+    bodyHtml: rawHtml ? rawHtml.trim() : undefined,
     messageId,
     inReplyTo,
     references,
@@ -346,5 +438,7 @@ export function parseInboundEmail(payload: any): ParsedEmail {
     ticketNumberFromSubject,
     headers,
     rawPayload: payload,
+    signature: signatureInfo,
+    attachments: attachments.length > 0 ? attachments : undefined,
   };
 }

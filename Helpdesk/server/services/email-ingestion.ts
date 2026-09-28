@@ -15,7 +15,32 @@ export interface EmailIngestionResult {
 }
 
 /**
- * Ingests and processes an incoming email payload (webhook or direct ingestion),
+ * Safely serializes payload for storing in WebhookLog without throwing on circular or buffer data
+ */
+function safeSerializePayload(payload: any): string {
+  try {
+    return JSON.stringify(payload);
+  } catch {
+    try {
+      const sanitized: Record<string, any> = {};
+      for (const [k, v] of Object.entries(payload || {})) {
+        if (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean') {
+          sanitized[k] = v;
+        } else if (Array.isArray(v)) {
+          sanitized[k] = `[Array length: ${v.length}]`;
+        } else if (v && typeof v === 'object') {
+          sanitized[k] = '[Object]';
+        }
+      }
+      return JSON.stringify(sanitized);
+    } catch {
+      return String(payload);
+    }
+  }
+}
+
+/**
+ * Ingests and processes an incoming email payload from Mailgun (or any supported provider),
  * applying anti-loop protection, conversation threading, AI classification,
  * and converting it into a new Ticket or appending a message to an existing Ticket thread.
  */
@@ -50,7 +75,7 @@ export async function ingestInboundEmail(rawPayload: any): Promise<EmailIngestio
       await prisma.webhookLog.create({
         data: {
           source: 'inbound_email',
-          payload: JSON.stringify(rawPayload),
+          payload: safeSerializePayload(rawPayload),
           status: 'ignored',
           reason: parsed.autoSubmittedReason || 'Auto-submitted loop protection',
         },
@@ -87,9 +112,9 @@ export async function ingestInboundEmail(rawPayload: any): Promise<EmailIngestio
   }
 
   // Thread Matching:
-  // 1. Check ticket number tag in subject (e.g., "[Ticket #1005]")
   let existingTicket: any = null;
 
+  // Strategy 1: Check ticket number tag in subject (e.g., "[Ticket #1005]")
   if (parsed.ticketNumberFromSubject) {
     const ticketById = await prisma.ticket.findUnique({
       where: { id: parsed.ticketNumberFromSubject },
@@ -100,6 +125,53 @@ export async function ingestInboundEmail(rawPayload: any): Promise<EmailIngestio
 
     if (ticketById) {
       existingTicket = ticketById;
+    }
+  }
+
+  // Strategy 2: Match In-Reply-To header against previously logged ticket Message-IDs
+  if (!existingTicket && parsed.inReplyTo) {
+    const matchedLog = await prisma.webhookLog.findFirst({
+      where: {
+        payload: {
+          contains: parsed.inReplyTo,
+        },
+        ticketId: {
+          not: null,
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (matchedLog && matchedLog.ticketId) {
+      existingTicket = await prisma.ticket.findUnique({
+        where: { id: matchedLog.ticketId },
+        include: { assignedAgent: true },
+      });
+    }
+  }
+
+  // Strategy 3: Match References headers
+  if (!existingTicket && parsed.references && parsed.references.length > 0) {
+    for (const ref of parsed.references) {
+      const matchedLog = await prisma.webhookLog.findFirst({
+        where: {
+          payload: {
+            contains: ref,
+          },
+          ticketId: {
+            not: null,
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      if (matchedLog && matchedLog.ticketId) {
+        existingTicket = await prisma.ticket.findUnique({
+          where: { id: matchedLog.ticketId },
+          include: { assignedAgent: true },
+        });
+        if (existingTicket) break;
+      }
     }
   }
 
@@ -135,7 +207,7 @@ export async function ingestInboundEmail(rawPayload: any): Promise<EmailIngestio
       await prisma.webhookLog.create({
         data: {
           source: 'inbound_email',
-          payload: JSON.stringify(rawPayload),
+          payload: safeSerializePayload(rawPayload),
           status: 'appended',
           ticketId: existingTicket.id,
           reason: `Appended message to Ticket #${existingTicket.id}`,
@@ -183,7 +255,7 @@ export async function ingestInboundEmail(rawPayload: any): Promise<EmailIngestio
     await prisma.webhookLog.create({
       data: {
         source: 'inbound_email',
-        payload: JSON.stringify(rawPayload),
+        payload: safeSerializePayload(rawPayload),
         status: 'created',
         ticketId: newTicket.id,
         reason: `Created Ticket #${newTicket.id}`,

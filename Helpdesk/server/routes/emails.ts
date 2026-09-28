@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import multer from 'multer';
 import { ingestInboundEmail } from '../services/email-ingestion';
 import { verifyWebhookSecret } from '../middleware/webhook-auth';
 import { requireAuth, requireRole } from '../middleware/auth';
@@ -7,9 +8,17 @@ import { prisma } from '../db';
 
 const emailsRouter = Router();
 
+// Configure multer for Mailgun / SendGrid multipart/form-data payloads & attachments
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 25 * 1024 * 1024, // 25MB max
+  },
+});
+
 /**
  * GET /api/emails/support-address (or /api/webhooks/support-address)
- * Returns configured system support address information
+ * Returns configured system support address information and Mailgun webhook instructions
  */
 emailsRouter.get('/support-address', (req: Request, res: Response) => {
   const supportEmail = process.env.SUPPORT_EMAIL || 'support@example.com';
@@ -18,12 +27,16 @@ emailsRouter.get('/support-address', (req: Request, res: Response) => {
     supportEmail,
     apiBaseUrl,
     inboundWebhookUrl: '/api/webhooks/email',
+    mailgunWebhookUrl: '/api/webhooks/mailgun',
     inboundDirectUrl: '/api/emails/inbound',
     fullInboundWebhookUrl: `${apiBaseUrl}/api/webhooks/email`,
+    fullMailgunWebhookUrl: `${apiBaseUrl}/api/webhooks/mailgun`,
     fullInboundDirectUrl: `${apiBaseUrl}/api/emails/inbound`,
+    provider: 'Mailgun',
     threadingFormat: '[Ticket #XXXX]',
     antiLoopProtection: 'enabled',
     secretAuthRequired: Boolean(process.env.WEBHOOK_SECRET && process.env.WEBHOOK_SECRET.trim().length > 0),
+    mailgunSignatureConfigured: Boolean(process.env.MAILGUN_SIGNING_KEY || process.env.MAILGUN_API_KEY),
   });
 });
 
@@ -40,7 +53,19 @@ emailsRouter.get('/logs', requireAuth, requireRole('ADMIN'), async (req: Request
 });
 
 async function handleInboundEmail(req: Request, res: Response) {
-  const result = await ingestInboundEmail(req.body);
+  // Combine req.body with req.files metadata if multipart
+  const payload = {
+    ...req.body,
+    uploadedFiles: Array.isArray(req.files)
+      ? req.files.map((file) => ({
+          filename: file.originalname,
+          contentType: file.mimetype,
+          size: file.size,
+        }))
+      : undefined,
+  };
+
+  const result = await ingestInboundEmail(payload);
 
   if (result.status === 'created') {
     return res.status(201).json({
@@ -82,11 +107,12 @@ async function handleInboundEmail(req: Request, res: Response) {
 
 /**
  * Inbound email & webhook endpoints
- * Handles POST /api/emails/inbound, POST /api/webhooks/email, etc.
+ * Handles POST /api/emails/inbound, POST /api/webhooks/mailgun, POST /api/webhooks/email, etc.
  */
-emailsRouter.post('/inbound', verifyWebhookSecret, handleInboundEmail);
-emailsRouter.post('/email', verifyWebhookSecret, handleInboundEmail);
-emailsRouter.post('/webhook', verifyWebhookSecret, handleInboundEmail);
-emailsRouter.post('/', verifyWebhookSecret, handleInboundEmail);
+emailsRouter.post('/mailgun', upload.any(), verifyWebhookSecret, handleInboundEmail);
+emailsRouter.post('/inbound', upload.any(), verifyWebhookSecret, handleInboundEmail);
+emailsRouter.post('/email', upload.any(), verifyWebhookSecret, handleInboundEmail);
+emailsRouter.post('/webhook', upload.any(), verifyWebhookSecret, handleInboundEmail);
+emailsRouter.post('/', upload.any(), verifyWebhookSecret, handleInboundEmail);
 
 export default emailsRouter;

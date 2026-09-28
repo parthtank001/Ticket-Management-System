@@ -229,11 +229,11 @@ e:\claude_ai\Ticket Management System\
     ├── server/                 # Express 5 backend API
     │   ├── middleware/
     │   │   ├── auth.ts         # Session verification (requireAuth) & RBAC (requireRole)
-    │   │   ├── webhook-auth.ts # Webhook secret header validation (verifyWebhookSecret)
+    │   │   ├── webhook-auth.ts # Webhook auth (Mailgun HMAC-SHA256 signature verification & static X-Webhook-Secret)
     │   │   └── rate-limiter.ts # Production-only rate limiting middleware (express-rate-limit)
     │   ├── routes/
     │   │   ├── users.ts        # Modular Express router for /api/users CRUD endpoints (Admin only)
-    │   │   ├── emails.ts       # Inbound email webhook (/api/webhooks/email), support-address & audit logs
+    │   │   ├── emails.ts       # Inbound email webhook (/api/webhooks/mailgun, /api/webhooks/email), support-address & audit logs (multer multipart)
     │   │   ├── auto-resolve.ts # Modular Express router for /api/auto-resolve (evaluate, ticket, batch, stats, rules)
     │   │   └── classification.ts # Modular Express router for /api/classify (evaluate, ticket, batch, stats, categories)
     │   ├── services/
@@ -243,7 +243,8 @@ e:\claude_ai\Ticket Management System\
     │   │   ├── escalation-policy.ts # Knowledge Base Section 10 escalation guardrails (legal, >30 day refund, chargeback, security)
     │   │   ├── knowledge-base-matcher.ts # Deterministic Knowledge Base policy matching & answer synthesis
     │   │   ├── queue.ts        # pg-boss PostgreSQL background job queues (ticket-classification, ticket-auto-resolve)
-    │   │   └── email-ingestion.ts # Inbound email processing, threading matching & ticket creation
+    │   │   ├── email-ingestion.ts # Inbound email processing, threading matching & ticket creation
+    │   │   └── email-sender.ts # Outbound transactional email delivery via Mailgun REST API with RFC threading headers
     │   ├── auth.ts             # Better Auth server configuration with Prisma adapter
     │   ├── db.ts               # Prisma client instance & PostgreSQL health check
     │   ├── index.ts            # Express server entry point, middleware & route mounting (GET /api/tickets filtering & sorting)
@@ -279,10 +280,12 @@ From `e:\claude_ai\Ticket Management System\Helpdesk`:
 
 ## 6. Key Conventions & Architecture Rules
 
-### 6.1 Email Ingestion & Threading
-- Extract `From`, `Subject`, `Body`, `Message-ID`, and `In-Reply-To` headers from inbound webhooks.
-- Match existing ticket threads using `[Ticket #XXXX]` subject tags or `In-Reply-To` / `References` headers.
-- **Anti-Loop Protection**: Always inspect `Auto-Submitted` headers (`auto-generated`, `auto-replied`) and ignore automated emails to prevent infinite loops.
+### 6.1 Email Ingestion & Threading (Mailgun)
+- **Mailgun Webhooks**: Route `/api/webhooks/mailgun` and `/api/webhooks/email` parse `multipart/form-data` and JSON payloads via `multer`.
+- **Signature Verification**: Validates Mailgun HMAC-SHA256 signatures (`timestamp` + `token` hashed with `MAILGUN_SIGNING_KEY` / `MAILGUN_API_KEY`) with 15-minute replay window protection.
+- **Header & Body Parsing**: Extracts `stripped-text` (preferred for replies to omit quote history), `stripped-html`, `Message-Id`, `In-Reply-To`, `References`, and attachment metadata.
+- **Thread Matching**: Matches existing tickets via `[Ticket #XXXX]` subject tags, `In-Reply-To` headers, or `References` headers matching logged Message-IDs.
+- **Anti-Loop Protection**: Always inspects `Auto-Submitted` headers (`auto-generated`, `auto-replied`), `X-Autoreply`, `Precedence: bulk/junk`, and subject patterns to drop loop bounces.
 
 ### 6.2 Authentication & Roles
 - **Roles**: `ADMIN` and `AGENT`.
