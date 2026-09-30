@@ -85,6 +85,7 @@ describe('Classification UI Components Unit Tests', () => {
       priority: 'MEDIUM',
       summary: '• Video playback buffering on Chrome\n• Recommended cache clearing',
       aiDraftResponse: 'Hello Alice,\n\nPlease try clearing your browser cache.',
+      assignedAgentId: null,
       createdAt: '2026-03-10T10:00:00.000Z',
       updatedAt: '2026-03-10T10:05:00.000Z',
     };
@@ -100,6 +101,7 @@ describe('Classification UI Components Unit Tests', () => {
       priority: 'LOW',
       summary: null,
       aiDraftResponse: null,
+      assignedAgentId: null,
       createdAt: '2026-03-10T10:00:00.000Z',
       updatedAt: '2026-03-10T10:05:00.000Z',
     };

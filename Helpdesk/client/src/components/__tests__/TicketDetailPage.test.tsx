@@ -466,6 +466,7 @@ describe('TicketDetailPage Component', () => {
           body: 'Your port 22 access has been whitelist approved.',
           senderType: 'AGENT',
           isInternalNote: false,
+          sendEmail: true,
         });
       });
 

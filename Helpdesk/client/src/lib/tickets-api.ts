@@ -24,6 +24,9 @@ export interface TicketMessage {
   isInternalNote: boolean;
   messageId?: string | null;
   inReplyTo?: string | null;
+  emailDispatched?: boolean;
+  emailMessageId?: string | null;
+  emailError?: string | null;
   createdAt: string;
 }
 
@@ -73,6 +76,8 @@ export interface AddTicketMessagePayload {
   senderType?: SenderType;
   senderEmail?: string;
   isInternalNote?: boolean;
+  sendEmail?: boolean;
+  statusUpdate?: TicketStatus;
 }
 
 export interface PolishReplyPayload {
@@ -320,4 +325,44 @@ export const ticketsApi = {
       throw new Error(message);
     }
   },
+
+  /**
+   * Send outbound email to customer via Mailgun
+   */
+  async sendEmail(payload: SendEmailPayload): Promise<SendEmailResponse> {
+    try {
+      const response = await apiClient.post<SendEmailResponse>(
+        '/api/emails/send',
+        payload
+      );
+      return response.data;
+    } catch (error: any) {
+      const message =
+        error.response?.data?.error ||
+        error.response?.data?.message ||
+        error.message ||
+        'Failed to send email via Mailgun';
+      throw new Error(message);
+    }
+  },
 };
+
+export interface SendEmailPayload {
+  ticketId?: number;
+  to: string;
+  toName?: string;
+  subject: string;
+  text: string;
+  html?: string;
+  statusUpdate?: TicketStatus;
+}
+
+export interface SendEmailResponse {
+  success: boolean;
+  messageId?: string;
+  provider?: string;
+  ticket?: Ticket | null;
+  error?: string;
+  details?: any;
+}
+

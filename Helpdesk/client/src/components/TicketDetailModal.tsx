@@ -13,8 +13,6 @@ import { ReplyThred } from './ReplyThred';
 import { ErrorMessage } from './ErrorMessage';
 import { UpdateTicket } from './UpdateTicket';
 import { TicketSummaryCard } from './TicketSummaryCard';
-import { AutoResolveCard } from './AutoResolveCard';
-import { ClassificationCard } from './ClassificationCard';
 import {
   X,
   User,
@@ -56,13 +54,15 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({
             <TicketStatusBadge status={ticket.status} size="sm" />
             <TicketPriorityBadge priority={ticket.priority} size="sm" />
           </div>
-          <button
-            onClick={onClose}
-            className="p-1 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
-            title="Close modal"
-          >
-            <X className="h-4 w-4" />
-          </button>
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={onClose}
+              className="p-1 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+              title="Close modal"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
         </div>
 
         {/* Modal Body: 2-Column Split Container */}
@@ -104,12 +104,6 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({
               {/* AI Issue & Conversation Summary Card */}
               <TicketSummaryCard ticket={ticket} onError={setActionError} />
 
-              {/* AI Ticket Classification Card */}
-              <ClassificationCard ticket={ticket} />
-
-              {/* Knowledge Base Auto-Resolution Card */}
-              <AutoResolveCard ticket={ticket} />
-
               {/* Conversation Thread */}
               <ReplyThred
                 messages={ticket.messages}
@@ -147,3 +141,4 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({
     </div>
   );
 };
+

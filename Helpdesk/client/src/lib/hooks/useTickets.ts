@@ -9,6 +9,8 @@ import {
   PolishReplyPayload,
   ListTicketsParams,
   PaginatedTicketsResponse,
+  SendEmailPayload,
+  SendEmailResponse,
 } from '../tickets-api';
 
 export const TICKETS_QUERY_KEY = ['tickets'] as const;
@@ -146,5 +148,26 @@ export function useClassifyTicket() {
     },
   });
 }
+
+/**
+ * Mutation hook to send an outbound email to a customer via Mailgun
+ */
+export function useSendMailgunEmail() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: SendEmailPayload) => ticketsApi.sendEmail(payload),
+    onSuccess: (data, variables) => {
+      if (variables.ticketId) {
+        if (data.ticket) {
+          queryClient.setQueryData(['tickets', variables.ticketId], data.ticket);
+        }
+        queryClient.invalidateQueries({ queryKey: ['tickets', variables.ticketId] });
+      }
+      queryClient.invalidateQueries({ queryKey: TICKETS_QUERY_KEY });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+    },
+  });
+}
+
 
 

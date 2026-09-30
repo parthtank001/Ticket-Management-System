@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import type { Ticket } from '../lib/types';
-import { useAddTicketMessage, usePolishReply } from '../lib/hooks/useTickets';
+import { useAddTicketMessage, usePolishReply, useTicket } from '../lib/hooks/useTickets';
 import {
   Send,
   Loader2,
@@ -34,8 +34,12 @@ export const TicketReplyForm: React.FC<TicketReplyFormProps> = ({
   const [replyBody, setReplyBody] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
   const [isPolished, setIsPolished] = useState(false);
+  const [successInfo, setSuccessInfo] = useState<string | null>(null);
 
   const activeTicketId = propTicket?.id ?? propTicketId;
+  const { data: fetchedTicket } = useTicket(propTicket ? undefined : activeTicketId);
+  const activeTicket = propTicket || fetchedTicket;
+  const recipientName = activeTicket?.studentName;
   const addMessageMutation = useAddTicketMessage();
   const polishReplyMutation = usePolishReply();
 
@@ -49,8 +53,8 @@ export const TicketReplyForm: React.FC<TicketReplyFormProps> = ({
     try {
       const result = await polishReplyMutation.mutateAsync({
         text: replyBody.trim(),
-        studentName: propTicket?.studentName,
-        category: propTicket?.category || undefined,
+        studentName: recipientName,
+        category: activeTicket?.category || undefined,
       });
 
       if (result.polishedReply) {
@@ -76,17 +80,25 @@ export const TicketReplyForm: React.FC<TicketReplyFormProps> = ({
     }
 
     setFormError(null);
+    setSuccessInfo(null);
     try {
-      await addMessageMutation.mutateAsync({
+      const res: any = await addMessageMutation.mutateAsync({
         ticketId: activeTicketId,
         payload: {
           body: replyBody.trim(),
           senderType: 'AGENT',
           isInternalNote: false,
+          sendEmail: true,
         },
       });
+
       setReplyBody('');
       setIsPolished(false);
+
+      const msgIdNotice = res?.emailMessageId ? ` (ID: ${res.emailMessageId})` : '';
+      setSuccessInfo(`✓ Reply sent and recorded${msgIdNotice}`);
+      setTimeout(() => setSuccessInfo(null), 5000);
+
       onSuccess?.();
     } catch (err: any) {
       const errorMsg = err.message || 'Failed to post message reply';
@@ -99,22 +111,33 @@ export const TicketReplyForm: React.FC<TicketReplyFormProps> = ({
 
   const formContent = (
     <div className={`space-y-3 ${className}`}>
+      {/* Success Notification Banner */}
+      {successInfo && (
+        <div className="flex items-center gap-1.5 p-2 bg-emerald-50 border border-emerald-200 text-emerald-800 text-[11px] rounded-lg animate-in fade-in duration-200 font-medium">
+          <Check className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+          <span>{successInfo}</span>
+        </div>
+      )}
+
       {/* Error Banner */}
       <ErrorMessage message={formError} />
 
       {/* Header bar */}
       {showHeader && (
-        <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2">
           <h2 className="text-[10px] font-bold text-slate-700 uppercase tracking-wider flex items-center space-x-1.5">
             <Reply className="h-3.5 w-3.5 text-indigo-600" />
             <span>Submit a Reply</span>
           </h2>
-          {isPolished && (
-            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-violet-700 bg-violet-50 border border-violet-200/80 px-2 py-0.5 rounded-full transition-all">
-              <Check className="h-2.5 w-2.5 text-violet-600" />
-              <span>Polished with AI (gpt-5-nano)</span>
-            </span>
-          )}
+
+          <div className="flex items-center space-x-1.5 ml-auto">
+            {isPolished && (
+              <span className="inline-flex items-center gap-1 text-[10px] font-bold text-violet-700 bg-violet-50 border border-violet-200/80 px-2 py-0.5 rounded-full transition-all">
+                <Check className="h-2.5 w-2.5 text-violet-600" />
+                <span>Polished with AI (gpt-5-nano)</span>
+              </span>
+            )}
+          </div>
         </div>
       )}
 
@@ -134,11 +157,8 @@ export const TicketReplyForm: React.FC<TicketReplyFormProps> = ({
           />
         </div>
 
-        <div className="flex items-center justify-between pt-0.5">
-          <p className="text-[10px] text-slate-400">
-            Replies will be sent to the student and recorded in the ticket thread.
-          </p>
-          <div className="flex items-center space-x-2">
+        <div className="flex flex-wrap items-center justify-end gap-2 pt-0.5">
+          <div className="flex items-center space-x-2 sm:ml-auto">
             {replyBody && (
               <button
                 type="button"

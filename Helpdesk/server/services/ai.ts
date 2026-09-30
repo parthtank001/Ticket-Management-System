@@ -1,10 +1,12 @@
+import 'dotenv/config';
 import { generateText } from 'ai';
-import { createOpenAI, openai } from '@ai-sdk/openai';
-import { Category, Priority } from '@helpdesk/core';
+import { createOpenAI } from '@ai-sdk/openai';
+import { Category, Priority, heuristicPolishReply, extractFirstName, stripHeadersAndFooters } from '@helpdesk/core';
 import { prisma } from '../db';
 import { enqueueTicketClassification } from './queue';
 import { loadKnowledgeBaseContent } from './escalation-policy';
 import { evaluateKnowledgeBaseMatch } from './knowledge-base-matcher';
+import { sendOutboundEmail } from './email-sender';
 
 export interface AIClassificationResult {
   category: Category;
@@ -17,20 +19,7 @@ export interface AIClassificationResult {
   hasAiError?: boolean;
 }
 
-/**
- * Helper to extract only the first name from a full name (e.g. "Alice Johnson" -> "Alice", "Smith, John" -> "John")
- */
-export function extractFirstName(studentName?: string): string {
-  if (!studentName || !studentName.trim()) return 'Student';
-  const trimmed = studentName.trim();
-  if (trimmed.includes(',')) {
-    const parts = trimmed.split(',').map((p) => p.trim()).filter(Boolean);
-    if (parts.length > 1 && parts[1]) {
-      return parts[1].split(/\s+/)[0] || parts[0] || 'Student';
-    }
-  }
-  return trimmed.split(/\s+/)[0] || 'Student';
-}
+export { extractFirstName, stripHeadersAndFooters };
 
 /**
  * Heuristic fallback classifier and draft generator for offline or non-API key runs.
@@ -128,18 +117,11 @@ Respond ONLY with valid JSON in this exact structure:
         model: openaiProvider('gpt-5-nano'),
         prompt,
         maxRetries: 0,
-        abortSignal: AbortSignal.timeout(6000),
+        abortSignal: AbortSignal.timeout(3500),
       });
       responseText = text?.trim() || '';
     } catch (primaryErr: any) {
-      console.warn('gpt-5-nano attempt failed for classification, trying gpt-4o-mini fallback:', primaryErr?.message || primaryErr);
-      const { text } = await generateText({
-        model: openaiProvider('gpt-4o-mini'),
-        prompt,
-        maxRetries: 0,
-        abortSignal: AbortSignal.timeout(6000),
-      });
-      responseText = text?.trim() || '';
+      // Fall through to heuristic parse
     }
 
     // Extract JSON block if enclosed in markdown backticks
@@ -203,73 +185,28 @@ export interface PolishReplyOptions {
   category?: string;
 }
 
+export { heuristicPolishReply };
+
 /**
- * Intelligent heuristic polish function used when offline, in test mode, or when API call fails/quota exceeded.
+ * Polishes and improves a support agent's draft reply using AI (OpenAI via Vercel AI SDK).
+ * Instructs the AI model to rewrite the message body professionally, naturally, and concisely
+ * while strictly preserving original meaning, facts, and instructions without generating greetings or signatures.
+ * The application then constructs and adds the single standardized greeting and signature.
+ * Automatically falls back to rule-based heuristicPolishReply on API error, timeout, quota limits, or invalid response.
  */
-export function heuristicPolishReply(
+export async function aiPolishReply(
   replyText: string,
-  studentName?: string
-): string {
-  if (!replyText || !replyText.trim()) return '';
-  let cleaned = replyText.trim();
-  const firstName = extractFirstName(studentName);
-
-  // Fix common abbreviations and lowercase 'i'
-  cleaned = cleaned.replace(/\bi\b/g, 'I');
-  cleaned = cleaned.replace(/\bim\b/gi, "I'm");
-  cleaned = cleaned.replace(/\bcant\b/gi, 'cannot');
-  cleaned = cleaned.replace(/\bdont\b/gi, 'do not');
-  cleaned = cleaned.replace(/\bwont\b/gi, 'will not');
-  cleaned = cleaned.replace(/\bive\b/gi, "I have");
-  cleaned = cleaned.replace(/\bill\b/gi, "I will");
-  cleaned = cleaned.replace(/\bpls\b|\bplz\b/gi, 'please');
-  cleaned = cleaned.replace(/\bthx\b|\bthanx\b/gi, 'thank you');
-  cleaned = cleaned.replace(/\bvpn\b/gi, 'VPN');
-  cleaned = cleaned.replace(/\bapi\b/gi, 'API');
-  cleaned = cleaned.replace(/\bpdf\b/gi, 'PDF');
-  cleaned = cleaned.replace(/\burl\b/gi, 'URL');
-  cleaned = cleaned.replace(/\bid\b/gi, 'ID');
-
-  // Strip dangling trailing "thanks" / "thank you" / "regards" / signatures so we can place clean signoff
-  cleaned = cleaned.replace(/[\s,.-]+(thanks|thank you|thx|cheers|regards|best regards|code with mosh support)[\s,.-]*$/i, '');
-
-  // Strip any raw starting greeting (e.g. "hi alice,", "hello,", "dear customer,", "hey there,")
-  if (firstName && firstName !== 'Student') {
-    const nameEscaped = firstName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const nameRegex = new RegExp(`^(hello|hi|dear|greetings|hey)\\s+(?:${nameEscaped}|customer|student|there|all|team)?([,\\s!:-]+)`, 'i');
-    cleaned = cleaned.replace(nameRegex, '').trim();
-  }
-  cleaned = cleaned.replace(/^(hello|hi|dear|greetings|hey)\\s*(?:customer|student|there|all|team)?([,\\s!:-]+)/i, '').trim();
-
-  // Capitalize sentence beginnings
-  cleaned = cleaned.replace(/(^\s*|\.\s+|\?\s+|\!\s+)([a-z])/g, (_, p1, p2) => p1 + p2.toUpperCase());
-
-  // Ensure sentence ends with a period if no terminal punctuation
-  if (!/[.!?]$/.test(cleaned)) {
-    cleaned += '.';
-  }
-
-  // Always address the customer by only their first name
-  const greeting = `Hello ${firstName},\n\n`;
-
-  // Professional and customer-friendly signoff
-  const hasSignoff = /(best regards|sincerely|warm regards|code with mosh support)/i.test(cleaned);
-  const signoff = hasSignoff ? '' : `\n\nBest regards,\nCode with Mosh Support`;
-
-  return `${greeting}${cleaned}${signoff}`.trim();
-}
-
-/**
- * Polishes and improves a support agent's draft reply using gpt-5-nano via Vercel AI SDK (@ai-sdk/openai).
- */
-export async function polishReplyWithAi(options: PolishReplyOptions): Promise<string> {
-  const { replyText, studentName, category } = options;
-
+  studentName?: string,
+  category?: string
+): Promise<string> {
   if (!replyText || !replyText.trim()) {
     return '';
   }
 
-  const firstName = extractFirstName(studentName);
+  const cleanedInput = stripHeadersAndFooters(replyText);
+  if (!cleanedInput) {
+    return '';
+  }
 
   const apiKey =
     process.env.OPENAI_API_KEY ||
@@ -283,69 +220,101 @@ export async function polishReplyWithAi(options: PolishReplyOptions): Promise<st
     apiKey === 'mock-openai-key' ||
     apiKey.length < 10
   ) {
-    return heuristicPolishReply(replyText, studentName);
+    return heuristicPolishReply(replyText, studentName, category);
   }
+
+  const firstName = extractFirstName(studentName);
+
+  const prompt = `You are a professional student support email editor.
+
+Your task is to polish an existing support response.
+
+Rewrite the response so that it is:
+
+- Professional
+- Natural and human-sounding
+- Clear and concise
+- Grammatically correct
+- Polite and empathetic
+- Appropriate for a student support team
+
+IMPORTANT RULES:
+
+1. Preserve the exact meaning of the original response.
+2. Do not invent information.
+3. Do not add solutions, policies, links, dates, refunds, technical details, or promises that are not present in the original response.
+4. Do not change the actual resolution or instructions.
+5. Improve grammar, spelling, punctuation, wording, and readability.
+6. Remove unnecessary repetition.
+7. Keep the response concise.
+8. Do not make the response sound robotic or overly formal.
+9. Do not include a greeting such as "Hello John".
+10. Do not include a signature or closing such as "Best regards".
+11. Return ONLY the polished response.
+12. If the original response is already clear and professional, make only minor improvements.
+13. Never mention that you are an AI or that the response was generated or polished by AI.
+
+Student name:
+${studentName?.trim() || 'Student'}
+
+Support category:
+${category?.trim() || 'General Support'}
+
+Original support response:
+${cleanedInput}
+
+Return ONLY the final polished response.`;
 
   try {
     const openaiProvider = createOpenAI({
       apiKey: apiKey.trim(),
     });
 
-    const prompt = `You are an expert customer service communication coach and editor for Code with Mosh Support.
-Polish and improve the following support agent's draft reply to a student/customer.
+    const modelName = process.env.AI_MODEL || 'gpt-4o-mini';
 
-Guidelines:
-1. Salutation & Greeting: Always address the customer directly by ONLY their first name at the very beginning of the reply (e.g., "Hello ${firstName},"). Do NOT include their last name in the greeting.
-2. Tone: Ensure a professional, customer-friendly, empathetic, clear, and courteous tone.
-3. Formatting & Structure: Format with clean paragraphs, appropriate line breaks, and clear bullet points where helpful.
-4. Grammar & Clarity: Fix any spelling, grammar, punctuation, and phrasing issues while maintaining natural conversational flow.
-5. Content Integrity: Retain all original instructions, facts, links, numbers, and solutions without fabricating new details.
-6. Sign-off: Always sign the email with Code with Mosh Support:
-Best regards,
-Code with Mosh Support
-7. Output: Return ONLY the final polished reply text directly. Do NOT include greetings about the prompt, explanations, multiple options, bullet points about what you changed, or markdown blockquotes. Output only the single polished message.
+    const { text } = await generateText({
+      model: openaiProvider(modelName),
+      prompt,
+      maxRetries: 0,
+      abortSignal: AbortSignal.timeout(5000),
+    });
 
-Context:
-- Customer First Name: ${firstName}
-${category ? `- Ticket Category: ${category}` : ''}
+    let rawPolished = text?.trim() || '';
 
-Agent's Draft:
-${replyText}`;
-
-    // Primary attempt with gpt-5-nano
-    try {
-      const { text } = await generateText({
-        model: openaiProvider('gpt-5-nano'),
-        prompt,
-        maxRetries: 0,
-        abortSignal: AbortSignal.timeout(6000),
-      });
-
-      const polished = text?.trim();
-      if (polished && polished.length > 0) {
-        return polished;
-      }
-    } catch (primaryErr: any) {
-      console.warn('gpt-5-nano attempt failed, trying gpt-4o-mini fallback:', primaryErr?.message || primaryErr);
-      // Secondary attempt with gpt-4o-mini
-      const { text } = await generateText({
-        model: openaiProvider('gpt-4o-mini'),
-        prompt,
-        maxRetries: 0,
-        abortSignal: AbortSignal.timeout(6000),
-      });
-
-      const polished = text?.trim();
-      if (polished && polished.length > 0) {
-        return polished;
-      }
+    // Strip markdown code block wrapping if present
+    if (rawPolished.startsWith('```')) {
+      rawPolished = rawPolished.replace(/^```[a-zA-Z]*\n?/, '').replace(/\n?```$/, '').trim();
+    }
+    // Strip surrounding quotes if present
+    if (
+      (rawPolished.startsWith('"') && rawPolished.endsWith('"')) ||
+      (rawPolished.startsWith("'") && rawPolished.endsWith("'"))
+    ) {
+      rawPolished = rawPolished.slice(1, -1).trim();
     }
 
-    return heuristicPolishReply(replyText, studentName);
+    // Strip any accidental greetings or signatures returned by the AI
+    const cleanedPolishedBody = stripHeadersAndFooters(rawPolished);
+
+    if (!cleanedPolishedBody) {
+      return heuristicPolishReply(replyText, studentName, category);
+    }
+
+    const greeting = `Hello ${firstName},\n\n`;
+    const signoff = `\n\nBest regards,\nCode with Mosh Support`;
+
+    return `${greeting}${cleanedPolishedBody}${signoff}`;
   } catch (error: any) {
-    console.warn('AI Polish with gpt-5-nano failed or timed out, using fallback:', error?.message || error);
-    return heuristicPolishReply(replyText, studentName);
+    console.warn('AI Polish Reply failed, using heuristic fallback:', error?.message || error);
+    return heuristicPolishReply(replyText, studentName, category);
   }
+}
+
+/**
+ * Options-object wrapper for aiPolishReply for backward compatibility.
+ */
+export async function polishReplyWithAi(options: PolishReplyOptions): Promise<string> {
+  return aiPolishReply(options.replyText, options.studentName, options.category);
 }
 
 export interface MessageSummaryContext {
@@ -506,10 +475,10 @@ Return ONLY the structured summary text without conversational prefixes or meta 
 
     try {
       const { text } = await generateText({
-        model: openaiProvider('gpt-5-nano'),
+        model: openaiProvider('gpt-4o-mini'),
         prompt,
         maxRetries: 0,
-        abortSignal: AbortSignal.timeout(7000),
+        abortSignal: AbortSignal.timeout(3500),
       });
 
       const cleaned = text?.trim();
@@ -517,18 +486,7 @@ Return ONLY the structured summary text without conversational prefixes or meta 
         return cleaned;
       }
     } catch (primaryErr: any) {
-      console.warn('gpt-5-nano attempt failed for summarization, trying gpt-4o-mini fallback:', primaryErr?.message || primaryErr);
-      const { text } = await generateText({
-        model: openaiProvider('gpt-4o-mini'),
-        prompt,
-        maxRetries: 0,
-        abortSignal: AbortSignal.timeout(7000),
-      });
-
-      const cleaned = text?.trim();
-      if (cleaned && cleaned.length > 0) {
-        return cleaned;
-      }
+      // Fall through to heuristic summary
     }
 
     return heuristicSummarizeTicketAndHistory(ticket);
@@ -659,6 +617,44 @@ export async function classifyTicketInBackground(
     console.info(
       `[AI Classification] Successfully classified Ticket #${ticketId} via GPT: Category=${updatedTicket?.category || 'N/A'}, Priority=${updatedTicket?.priority || 'N/A'}`
     );
+
+    // Send outbound auto-resolution email reply to student upon auto-resolution
+    if (result.canAutoResolve && ticket.studentEmail) {
+      try {
+        const resolutionReply = result.resolutionAnswer || result.aiDraftResponse;
+        const sendResult = await sendOutboundEmail({
+          to: ticket.studentEmail,
+          toName: ticket.studentName,
+          subject: ticket.subject,
+          text: resolutionReply,
+          ticketId: ticket.id,
+        });
+
+        if (sendResult?.success) {
+          try {
+            await prisma.webhookLog.create({
+              data: {
+                source: 'mailgun_outbound',
+                payload: JSON.stringify({
+                  to: ticket.studentEmail,
+                  toName: ticket.studentName,
+                  subject: `[Ticket #${ticket.id}] ${ticket.subject}`,
+                  messageId: sendResult.messageId,
+                  autoResolution: true,
+                }),
+                status: 'sent',
+                ticketId: ticket.id,
+              },
+            });
+          } catch (logErr) {
+            // Ignore webhook logging errors
+          }
+          console.info(`[AI Auto-Resolution] Dispatched auto-resolution email to ${ticket.studentEmail} (Message-ID: ${sendResult.messageId})`);
+        }
+      } catch (emailErr) {
+        console.warn(`[AI Auto-Resolution Warning] Failed to send email for Ticket #${ticketId}:`, emailErr);
+      }
+    }
 
     return updatedTicket;
   } catch (error: any) {

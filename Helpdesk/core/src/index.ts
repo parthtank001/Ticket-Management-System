@@ -5,4 +5,5 @@ export * from './schemas/auto-resolve';
 export * from './schemas/classification';
 export * from './schemas/dashboard';
 export * from './email-parser';
+export * from './polish';
 

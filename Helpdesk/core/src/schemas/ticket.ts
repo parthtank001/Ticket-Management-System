@@ -104,6 +104,8 @@ export const createTicketMessageSchema = z.object({
   senderType: z.enum(['STUDENT', 'AGENT', 'SYSTEM']).optional().default('AGENT'),
   senderEmail: z.string().email('Valid sender email is required.').optional(),
   isInternalNote: z.boolean().optional().default(false),
+  sendEmail: z.boolean().optional().default(true),
+  statusUpdate: z.enum(['OPEN', 'NEW', 'PROCESSING', 'RESOLVED', 'CLOSED']).optional(),
   messageId: z.string().optional(),
   inReplyTo: z.string().optional(),
 });
@@ -211,5 +213,32 @@ export interface PaginatedTicketsResponse {
   pageSize: number;
   totalPages: number;
 }
+
+/**
+ * Zod validation schema for sending outbound emails via Mailgun
+ */
+export const sendEmailSchema = z.object({
+  ticketId: z.number().int().positive().optional(),
+  to: z
+    .string({ message: 'Recipient email is required.' })
+    .trim()
+    .min(1, 'Recipient email cannot be empty.')
+    .max(255, 'Recipient email is too long.')
+    .email('A valid recipient email address is required.'),
+  toName: z.string().trim().max(100).optional(),
+  subject: z
+    .string({ message: 'Email subject is required.' })
+    .trim()
+    .min(1, 'Email subject cannot be empty.')
+    .max(300, 'Email subject cannot exceed 300 characters.'),
+  text: z
+    .string({ message: 'Email body is required.' })
+    .trim()
+    .min(1, 'Email body cannot be empty.'),
+  html: z.string().optional(),
+  statusUpdate: z.enum(['OPEN', 'NEW', 'PROCESSING', 'RESOLVED', 'CLOSED']).optional(),
+});
+
+export type SendEmailPayload = z.infer<typeof sendEmailSchema>;
 
 

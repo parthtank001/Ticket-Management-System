@@ -420,4 +420,63 @@ describe('Email Ingestion (Receiving) & Email Sender (Sending) Suite', () => {
       );
     });
   });
+
+  // ==========================================
+  // 4. OUTBOUND EMAIL SCHEMA & DISPATCH TESTS
+  // ==========================================
+  describe('4. Outbound Email Schema & Dispatch', () => {
+    it('successfully sends outbound email with ticket context and updates ticket thread in DB', async () => {
+      const mockTicket = {
+        id: 200,
+        subject: 'Inquiry regarding Python certificate',
+        studentEmail: 'student@example.com',
+        studentName: 'Student User',
+        body: 'Initial inquiry text',
+        status: 'OPEN',
+      };
+
+      (prisma.ticket.findUnique as any).mockResolvedValue(mockTicket);
+      (prisma.ticket.update as any).mockResolvedValue({
+        ...mockTicket,
+        body: 'Initial inquiry text\n\n--- [Outbound Email to student@example.com (agent@example.com)] ---\nYour certificate is now available.',
+        status: 'RESOLVED',
+      });
+      (prisma.webhookLog.create as any).mockResolvedValue({ id: 'log-outbound-1' });
+
+      const mockHttpClient: any = {
+        post: vi.fn().mockResolvedValue({
+          data: {
+            id: '<20260928.outbound123@sandboxea1b3904caa14591a5186d29afc8d1a1.mailgun.org>',
+            message: 'Queued. Thank you.',
+          },
+        }),
+      };
+
+      process.env.MAILGUN_API_KEY = 'test-mg-key-123';
+      process.env.MAILGUN_DOMAIN = 'sandboxea1b3904caa14591a5186d29afc8d1a1.mailgun.org';
+
+      const sendResult = await sendOutboundEmail({
+        to: 'student@example.com',
+        toName: 'Student User',
+        subject: '[Ticket #200] Certificate Available',
+        text: 'Your certificate is now available.',
+        ticketId: 200,
+        httpClient: mockHttpClient,
+      });
+
+      expect(sendResult.success).toBe(true);
+      expect(sendResult.provider).toBe('mailgun');
+      expect(sendResult.messageId).toContain('outbound123');
+      expect(mockHttpClient.post).toHaveBeenCalledWith(
+        expect.stringContaining('https://api.mailgun.net/v3/sandboxea1b3904caa14591a5186d29afc8d1a1.mailgun.org/messages'),
+        expect.any(String),
+        expect.objectContaining({
+          headers: expect.objectContaining({
+            Authorization: expect.stringContaining('Basic '),
+          }),
+        })
+      );
+    });
+  });
 });
+

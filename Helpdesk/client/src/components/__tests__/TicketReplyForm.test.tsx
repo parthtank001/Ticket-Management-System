@@ -72,6 +72,7 @@ describe('TicketReplyForm Component', () => {
           body: 'Reply message',
           senderType: 'AGENT',
           isInternalNote: false,
+          sendEmail: true,
         });
       });
     });
@@ -228,6 +229,7 @@ describe('TicketReplyForm Component', () => {
           body: 'Your ticket has been approved.',
           senderType: 'AGENT',
           isInternalNote: false,
+          sendEmail: true,
         });
       });
 
@@ -354,3 +356,4 @@ describe('TicketReplyForm Component', () => {
     });
   });
 });
+

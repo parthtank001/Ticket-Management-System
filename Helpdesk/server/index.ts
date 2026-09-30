@@ -1,6 +1,6 @@
+import 'dotenv/config';
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
 import { toNodeHandler } from 'better-auth/node';
 import { auth } from './auth';
 import { requireAuth } from './middleware/auth';
@@ -20,6 +20,7 @@ import {
   autoResolveTicketSchema,
 } from './schemas';
 import {
+  aiPolishReply,
   polishReplyWithAi,
   summarizeTicketAndHistory,
   classifyAndDraftInquiry,
@@ -29,10 +30,9 @@ import {
 import {
   autoResolveSingleTicket,
 } from './services/auto-resolve';
-import { initQueue, stopQueue, isQueueReady, scheduleTicketAutoResolve } from './services/queue';
+import { sendOutboundEmail } from './services/email-sender';
+import { initQueue, stopQueue, isQueueReady, scheduleTicketAutoResolve, enqueueEmailSend } from './services/queue';
 import { deployStoredFunctions } from './db/stored-procedures';
-
-dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -437,10 +437,18 @@ app.post('/api/tickets/:id/messages', requireAuth, async (req: Request, res: Res
     return res.status(400).json({ error: validationResult.error.issues[0].message });
   }
 
-  const { body, bodyHtml, isInternalNote, senderType, senderEmail: customSenderEmail } = validationResult.data;
+  const {
+    body,
+    bodyHtml,
+    isInternalNote,
+    senderType,
+    senderEmail: customSenderEmail,
+    sendEmail = true,
+    statusUpdate,
+  } = validationResult.data;
 
   const existingTicket = await prisma.ticket.findUnique({ where: { id } });
-    if (!existingTicket) {
+  if (!existingTicket) {
     return res.status(404).json({ error: 'Ticket not found' });
   }
 
@@ -459,10 +467,80 @@ app.post('/api/tickets/:id/messages', requireAuth, async (req: Request, res: Res
     ? `${existingTicket.body}\n\n--- ${replyPrefix} (${finalSenderEmail}) ---\n${body}`
     : body;
 
-  await prisma.ticket.update({
+  const ticketUpdateData: any = { body: appendedBody };
+  if (statusUpdate) {
+    ticketUpdateData.status = statusUpdate;
+  }
+
+  const updatedTicket = await prisma.ticket.update({
     where: { id },
-    data: { body: appendedBody },
+    data: ticketUpdateData,
   });
+
+  // If this is an agent reply (and NOT an internal note), send an email to the student via Mailgun / pg-boss queue
+  let emailDispatched = false;
+  let emailMessageId: string | null = null;
+  let emailError: string | null = null;
+
+  if (finalSenderType === 'AGENT' && !isInternalNote && existingTicket.studentEmail && sendEmail !== false) {
+    const emailSubject = `[Ticket #${existingTicket.id}] Re: ${existingTicket.subject}`;
+    try {
+      if (req.query.async === 'true') {
+        await enqueueEmailSend({
+          options: {
+            to: existingTicket.studentEmail,
+            toName: existingTicket.studentName || undefined,
+            subject: emailSubject,
+            text: body,
+            html: bodyHtml || undefined,
+          },
+          ticketId: existingTicket.id,
+          userEmail: finalSenderEmail,
+          userName: req.user?.name || 'Support Agent',
+          skipBodyUpdate: true,
+        });
+        emailDispatched = true;
+        console.info(`[Messages] Enqueued email reply for Ticket #${existingTicket.id} to ${existingTicket.studentEmail}`);
+      } else {
+        const sendResult = await sendOutboundEmail({
+          to: existingTicket.studentEmail,
+          toName: existingTicket.studentName || undefined,
+          subject: emailSubject,
+          text: body,
+          html: bodyHtml || undefined,
+          ticketId: existingTicket.id,
+        });
+
+        if (sendResult.success) {
+          emailDispatched = true;
+          emailMessageId = sendResult.messageId || null;
+
+          await prisma.webhookLog.create({
+            data: {
+              source: 'mailgun_outbound',
+              payload: JSON.stringify({
+                to: existingTicket.studentEmail,
+                toName: existingTicket.studentName,
+                subject: emailSubject,
+                messageId: sendResult.messageId,
+                senderEmail: finalSenderEmail,
+                senderName: req.user?.name || 'Support Agent',
+              }),
+              status: 'sent',
+              ticketId: existingTicket.id,
+            },
+          });
+          console.info(`[Messages] Sent outbound email reply for Ticket #${existingTicket.id} to ${existingTicket.studentEmail} (Message-ID: ${sendResult.messageId})`);
+        } else {
+          emailError = sendResult.error || 'Failed to dispatch outbound email';
+          console.warn(`[Messages Warning] Could not dispatch email reply for Ticket #${existingTicket.id}:`, emailError);
+        }
+      }
+    } catch (sendErr: any) {
+      emailError = sendErr?.message || 'Failed to dispatch outbound email';
+      console.warn(`[Messages Warning] Could not dispatch email reply for Ticket #${existingTicket.id}:`, emailError);
+    }
+  }
 
   const newMessage = {
     id: `msg-${Date.now()}`,
@@ -472,6 +550,11 @@ app.post('/api/tickets/:id/messages', requireAuth, async (req: Request, res: Res
     body,
     bodyHtml: bodyHtml ?? null,
     isInternalNote: finalSenderType === 'AGENT' ? Boolean(isInternalNote) : false,
+    emailDispatched,
+    emailMessageId,
+    emailError,
+    recipientEmail: existingTicket.studentEmail,
+    ticket: updatedTicket,
     createdAt: new Date().toISOString(),
   };
 
@@ -488,11 +571,11 @@ app.post('/api/tickets/polish-reply', requireAuth, async (req: Request, res: Res
   const { text, studentName, category } = validationResult.data;
 
   try {
-    const polishedReply = await polishReplyWithAi({
-      replyText: text,
+    const polishedReply = await aiPolishReply(
+      text,
       studentName,
-      category,
-    });
+      category
+    );
 
     res.json({
       polishedReply,

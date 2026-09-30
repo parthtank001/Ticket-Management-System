@@ -48,6 +48,7 @@ describe('dashboardApi Service Unit Tests', () => {
       RESOLVED: 15,
       CLOSED: 2,
     },
+    ticketsPerDay: [],
     recentTickets: [],
   };
 

@@ -67,7 +67,7 @@ export const ClassificationCard: React.FC<ClassificationCardProps> = ({
     }
   };
 
-  const handleCopyDraft = (textToCopy?: string) => {
+  const handleCopyDraft = (textToCopy?: string | null) => {
     const text = textToCopy || ticket.aiDraftResponse || evaluationResult?.aiDraftResponse;
     if (!text) return;
     navigator.clipboard.writeText(text);

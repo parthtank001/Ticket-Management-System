@@ -3,12 +3,30 @@ import dotenv from 'dotenv';
 import { prisma } from '../db';
 import { classifyTicketInBackground, BackgroundClassifyOptions } from './ai';
 import { autoResolveSingleTicket } from './auto-resolve';
-import type { AutoResolveTicketInput } from '@helpdesk/core';
+import { sendOutboundEmail, SendEmailOptions } from './email-sender';
+import { ingestInboundEmail } from './email-ingestion';
+import type { AutoResolveTicketInput, TicketStatus } from '@helpdesk/core';
 
 dotenv.config();
 
 export const QUEUE_TICKET_CLASSIFICATION = 'ticket-classification';
 export const QUEUE_TICKET_AUTO_RESOLVE = 'ticket-auto-resolve';
+export const QUEUE_EMAIL_SEND = 'email-send';
+export const QUEUE_EMAIL_INBOUND = 'email-inbound';
+
+export interface SendEmailJobData {
+  options: SendEmailOptions;
+  ticketId?: number;
+  statusUpdate?: TicketStatus;
+  userEmail?: string;
+  userName?: string;
+  skipBodyUpdate?: boolean;
+}
+
+export interface InboundEmailJobData {
+  payload: any;
+  receivedAt?: number;
+}
 
 let bossInstance: PgBoss | null = null;
 let isStarted = false;
@@ -122,7 +140,101 @@ export async function initQueue(): Promise<PgBoss | null> {
       }
     );
 
-    console.info(`[pg-boss] Workers registered for queues "${QUEUE_TICKET_CLASSIFICATION}" and "${QUEUE_TICKET_AUTO_RESOLVE}".`);
+    // Create / ensure email-send queue exists
+    await boss.createQueue(QUEUE_EMAIL_SEND, {
+      retryLimit: 3,
+      retryDelay: 5,
+      retryBackoff: true,
+      expireInSeconds: 300,
+    });
+
+    // Create / ensure email-inbound queue exists
+    await boss.createQueue(QUEUE_EMAIL_INBOUND, {
+      retryLimit: 3,
+      retryDelay: 5,
+      retryBackoff: true,
+      expireInSeconds: 300,
+    });
+
+    // Register worker for outbound email sending
+    await boss.work<SendEmailJobData>(
+      QUEUE_EMAIL_SEND,
+      { batchSize: 1 },
+      async (jobs) => {
+        for (const job of jobs) {
+          const { options, ticketId, statusUpdate, userEmail, userName } = job.data;
+          console.info(`[pg-boss Worker] Processing outbound email job ${job.id} to ${options.to}...`);
+          try {
+            const sendResult = await sendOutboundEmail(options);
+            if (!sendResult.success) {
+              throw new Error(sendResult.error || 'Failed to dispatch email via Mailgun');
+            }
+
+            if (ticketId) {
+              const existingTicket = await prisma.ticket.findUnique({ where: { id: ticketId } });
+              if (existingTicket) {
+                const senderEmail = userEmail || 'agent@example.com';
+                const updateData: any = {};
+                if (!job.data.skipBodyUpdate) {
+                  const replyBlock = `\n\n--- [Outbound Email to ${options.to} (${senderEmail})] ---\n${options.text}`;
+                  updateData.body = existingTicket.body ? `${existingTicket.body}${replyBlock}` : options.text;
+                }
+                if (statusUpdate) {
+                  updateData.status = statusUpdate;
+                }
+
+                if (Object.keys(updateData).length > 0) {
+                  await prisma.ticket.update({
+                    where: { id: ticketId },
+                    data: updateData,
+                  });
+                }
+
+                await prisma.webhookLog.create({
+                  data: {
+                    source: 'mailgun_outbound',
+                    payload: JSON.stringify({
+                      to: options.to,
+                      toName: options.toName,
+                      subject: options.subject,
+                      messageId: sendResult.messageId,
+                      senderEmail,
+                      senderName: userName,
+                    }),
+                    status: 'sent',
+                    ticketId,
+                  },
+                });
+              }
+            }
+          } catch (jobErr) {
+            console.error(`[pg-boss Worker Error] Outbound email job ${job.id} failed:`, jobErr);
+            throw jobErr; // Trigger pg-boss retry policy
+          }
+        }
+      }
+    );
+
+    // Register worker for inbound email processing
+    await boss.work<InboundEmailJobData>(
+      QUEUE_EMAIL_INBOUND,
+      { batchSize: 1 },
+      async (jobs) => {
+        for (const job of jobs) {
+          const { payload } = job.data;
+          console.info(`[pg-boss Worker] Processing inbound email job ${job.id}...`);
+          try {
+            const result = await ingestInboundEmail(payload);
+            console.info(`[pg-boss Worker] Inbound email job ${job.id} finished with status: ${result.status}`);
+          } catch (jobErr) {
+            console.error(`[pg-boss Worker Error] Inbound email job ${job.id} failed:`, jobErr);
+            throw jobErr;
+          }
+        }
+      }
+    );
+
+    console.info(`[pg-boss] Workers registered for queues "${QUEUE_TICKET_CLASSIFICATION}", "${QUEUE_TICKET_AUTO_RESOLVE}", "${QUEUE_EMAIL_SEND}", and "${QUEUE_EMAIL_INBOUND}".`);
     return boss;
   } catch (err: any) {
     console.error('[pg-boss Init Error] Failed to initialize pg-boss queue:', err?.message || err);
@@ -234,6 +346,126 @@ export function scheduleTicketAutoResolve(
 }
 
 /**
+ * Enqueues an outbound email send job into the pg-boss queue.
+ * If pg-boss is unavailable, falls back to non-blocking event loop execution.
+ */
+export async function enqueueEmailSend(data: SendEmailJobData): Promise<string | null> {
+  if (isQueueReady() && bossInstance) {
+    try {
+      const jobId = await bossInstance.send(
+        QUEUE_EMAIL_SEND,
+        data,
+        {
+          retryLimit: 3,
+          retryDelay: 5,
+          retryBackoff: true,
+          expireInSeconds: 300,
+        }
+      );
+
+      console.info(`[pg-boss Queue] Enqueued outbound email job ${jobId} to ${data.options.to}`);
+      return jobId;
+    } catch (sendErr: any) {
+      console.warn(`[pg-boss Queue Warning] Failed to enqueue outbound email job, using event-loop fallback:`, sendErr?.message || sendErr);
+    }
+  }
+
+  // Graceful fallback to non-blocking event-loop execution
+  setImmediate(async () => {
+    try {
+      const sendResult = await sendOutboundEmail(data.options);
+      if (data.ticketId && sendResult.success) {
+        const existingTicket = await prisma.ticket.findUnique({ where: { id: data.ticketId } });
+        if (existingTicket) {
+          const senderEmail = data.userEmail || 'agent@example.com';
+          const updateData: any = {};
+          if (!data.skipBodyUpdate) {
+            const replyBlock = `\n\n--- [Outbound Email to ${data.options.to} (${senderEmail})] ---\n${data.options.text}`;
+            updateData.body = existingTicket.body ? `${existingTicket.body}${replyBlock}` : data.options.text;
+          }
+          if (data.statusUpdate) updateData.status = data.statusUpdate;
+          if (Object.keys(updateData).length > 0) {
+            await prisma.ticket.update({ where: { id: data.ticketId }, data: updateData });
+          }
+          await prisma.webhookLog.create({
+            data: {
+              source: 'mailgun_outbound',
+              payload: JSON.stringify({
+                to: data.options.to,
+                toName: data.options.toName,
+                subject: data.options.subject,
+                messageId: sendResult.messageId,
+                senderEmail,
+                senderName: data.userName,
+              }),
+              status: 'sent',
+              ticketId: data.ticketId,
+            },
+          });
+        }
+      }
+    } catch (err) {
+      console.error('[Email Send Fallback Exception]:', err);
+    }
+  });
+
+  return null;
+}
+
+/**
+ * Schedules an outbound email send job to the pg-boss queue.
+ */
+export function scheduleEmailSend(data: SendEmailJobData): void {
+  enqueueEmailSend(data).catch((err) => {
+    console.error('[Schedule Email Send Error]:', err);
+  });
+}
+
+/**
+ * Enqueues an inbound email ingestion task into the pg-boss queue.
+ * If pg-boss is unavailable, falls back to non-blocking event-loop execution.
+ */
+export async function enqueueInboundEmail(data: InboundEmailJobData): Promise<string | null> {
+  if (isQueueReady() && bossInstance) {
+    try {
+      const jobId = await bossInstance.send(
+        QUEUE_EMAIL_INBOUND,
+        data,
+        {
+          retryLimit: 3,
+          retryDelay: 5,
+          retryBackoff: true,
+          expireInSeconds: 300,
+        }
+      );
+
+      console.info(`[pg-boss Queue] Enqueued inbound email job ${jobId}`);
+      return jobId;
+    } catch (sendErr: any) {
+      console.warn(`[pg-boss Queue Warning] Failed to enqueue inbound email job, using event-loop fallback:`, sendErr?.message || sendErr);
+    }
+  }
+
+  // Graceful fallback to non-blocking event-loop execution
+  setImmediate(() => {
+    ingestInboundEmail(data.payload).catch((err) => {
+      console.error('[Inbound Email Fallback Exception]:', err);
+    });
+  });
+
+  return null;
+}
+
+/**
+ * Schedules inbound email processing by dispatching to the pg-boss queue.
+ */
+export function scheduleInboundEmail(data: InboundEmailJobData): void {
+  enqueueInboundEmail(data).catch((err) => {
+    console.error('[Schedule Inbound Email Error]:', err);
+  });
+}
+
+/**
  * Gracefully shuts down the pg-boss job queue instance.
  */
 export async function stopQueue(): Promise<void> {
@@ -250,3 +482,4 @@ export async function stopQueue(): Promise<void> {
     }
   }
 }
+

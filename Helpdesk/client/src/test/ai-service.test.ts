@@ -1,7 +1,11 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { generateText } from 'ai';
 import {
   extractFirstName,
+  stripHeadersAndFooters,
   heuristicPolishReply,
+  aiPolishReply,
+  polishReplyWithAi,
   heuristicClassifyAndDraft,
   heuristicSummarizeTicketAndHistory,
   classifyAndDraftInquiry,
@@ -11,6 +15,10 @@ import {
 } from '../../../server/services/ai';
 import { prisma } from '../../../server/db';
 
+vi.mock('ai', () => ({
+  generateText: vi.fn(),
+}));
+
 vi.mock('../../../server/db', () => ({
   prisma: {
     ticket: {
@@ -19,6 +27,9 @@ vi.mock('../../../server/db', () => ({
     },
     user: {
       findFirst: vi.fn(),
+    },
+    webhookLog: {
+      create: vi.fn(),
     },
   },
   checkDatabaseConnection: vi.fn(),
@@ -55,6 +66,242 @@ describe('AI Support Service Unit Tests', () => {
       expect(extractFirstName(undefined)).toBe('Student');
       expect(extractFirstName('')).toBe('Student');
       expect(extractFirstName('   ')).toBe('Student');
+    });
+  });
+
+  describe('stripHeadersAndFooters Helper', () => {
+    it('strips leading greetings correctly', () => {
+      expect(stripHeadersAndFooters('Hello Emma,\n\nFixed it try again.')).toBe('Fixed it try again.');
+      expect(stripHeadersAndFooters('Hi there,\nwe fixed the issue')).toBe('we fixed the issue');
+      expect(stripHeadersAndFooters('Good morning John,\nplease check')).toBe('please check');
+      expect(stripHeadersAndFooters('Dear Customer, please verify account')).toBe('please verify account');
+    });
+
+    it('strips trailing signatures correctly', () => {
+      expect(stripHeadersAndFooters('Fixed it try again.\n\nBest regards,\nCode with Mosh Support')).toBe('Fixed it try again.');
+      expect(stripHeadersAndFooters('Done.\n\nThanks,\nSupport Team')).toBe('Done.');
+      expect(stripHeadersAndFooters('All set.\n\nSincerely,\nAlice')).toBe('All set.');
+    });
+
+    it('handles raw text without headers or footers', () => {
+      expect(stripHeadersAndFooters('We resolved your issue.')).toBe('We resolved your issue.');
+    });
+  });
+
+  describe('aiPolishReply Function', () => {
+    const originalEnv = process.env;
+
+    beforeEach(() => {
+      vi.resetAllMocks();
+      process.env = { ...originalEnv, OPENAI_API_KEY: 'sk-mock-valid-openai-api-key-999999999' };
+    });
+
+    afterEach(() => {
+      process.env = originalEnv;
+    });
+
+    it('1. Normal AI polishing: polishes draft reply and adds standardized greeting and signoff', async () => {
+      vi.mocked(generateText).mockResolvedValueOnce({
+        text: 'We have reviewed your account and successfully resolved the issue. Please feel free to reach out if you need any further assistance.',
+      } as any);
+
+      const result = await aiPolishReply(
+        'hi i checked your account. problem is fixed now. let me know if you need anything',
+        'John Doe',
+        'Technical Issue'
+      );
+
+      expect(result).toBe(
+        'Hello John,\n\nWe have reviewed your account and successfully resolved the issue. Please feel free to reach out if you need any further assistance.\n\nBest regards,\nCode with Mosh Support'
+      );
+      expect(generateText).toHaveBeenCalledTimes(1);
+    });
+
+    it('2. Empty reply: returns empty string immediately without calling AI model', async () => {
+      expect(await aiPolishReply('')).toBe('');
+      expect(await aiPolishReply('   ')).toBe('');
+      expect(await aiPolishReply('\n\t')).toBe('');
+      expect(generateText).not.toHaveBeenCalled();
+    });
+
+    it('3. AI API failure -> falls back to heuristic polishing without throwing error', async () => {
+      vi.mocked(generateText).mockRejectedValueOnce(new Error('OpenAI API 500 Internal Server Error'));
+
+      const result = await aiPolishReply(
+        'pls check the pdf url and let me know if cant login',
+        'Emma Watson',
+        'TECHNICAL_QUESTION'
+      );
+
+      expect(result).toContain('Hello Emma,\n\n');
+      expect(result).toContain('Please check the PDF URL and let me know if cannot login.');
+      expect(result).toContain('\n\nBest regards,\nCode with Mosh Support');
+    });
+
+    it('4. AI timeout -> falls back to heuristic polishing', async () => {
+      vi.mocked(generateText).mockRejectedValueOnce(new DOMException('The operation timed out', 'TimeoutError'));
+
+      const result = await aiPolishReply(
+        'pls check the pdf url and let me know if cant login',
+        'Alice Johnson',
+        'TECHNICAL_QUESTION'
+      );
+
+      expect(result).toBe(
+        'Hello Alice,\n\nPlease check the PDF URL and let me know if cannot login.\n\nBest regards,\nCode with Mosh Support'
+      );
+    });
+
+    it('5. AI returns empty or whitespace response -> falls back to heuristic polishing', async () => {
+      vi.mocked(generateText).mockResolvedValueOnce({ text: '   ' } as any);
+
+      const result = await aiPolishReply(
+        'we processed your refund thanks',
+        'Lucas Vance',
+        'REFUND_REQUEST'
+      );
+
+      expect(result).toContain('Hello Lucas,\n\n');
+      expect(result).toContain('We processed your refund.');
+      expect(result).toContain('\n\nBest regards,\nCode with Mosh Support');
+    });
+
+    it('6. Response already contains a greeting: prevents duplicate greetings in final output', async () => {
+      vi.mocked(generateText).mockResolvedValueOnce({
+        text: 'The reported video streaming glitch has been resolved on our servers.',
+      } as any);
+
+      // Input has a greeting
+      const result = await aiPolishReply(
+        'Hello Emma,\n\nFixed it try again.',
+        'Emma Watson',
+        'Technical'
+      );
+
+      // Count greeting occurrences
+      const greetingMatches = result.match(/Hello Emma,/g);
+      expect(greetingMatches).toHaveLength(1);
+      expect(result.startsWith('Hello Emma,\n\n')).toBe(true);
+      expect(result).toContain('The reported video streaming glitch has been resolved on our servers.');
+      expect(result.endsWith('\n\nBest regards,\nCode with Mosh Support')).toBe(true);
+    });
+
+    it('7. Response already contains a signature: prevents duplicate signatures in final output', async () => {
+      vi.mocked(generateText).mockResolvedValueOnce({
+        text: 'We have updated your registered email address as requested.',
+      } as any);
+
+      // Input has a signature
+      const result = await aiPolishReply(
+        'we updated your email. Best regards,\nCode with Mosh Support',
+        'Sophia Davis',
+        'Account Settings'
+      );
+
+      // Count signature occurrences
+      const signatureMatches = result.match(/Best regards,\nCode with Mosh Support/g);
+      expect(signatureMatches).toHaveLength(1);
+      expect(result.startsWith('Hello Sophia,\n\n')).toBe(true);
+      expect(result).toContain('We have updated your registered email address as requested.');
+      expect(result.endsWith('\n\nBest regards,\nCode with Mosh Support')).toBe(true);
+    });
+
+    it('8. Student name is missing: defaults to "Hello Student," greeting', async () => {
+      vi.mocked(generateText).mockResolvedValueOnce({
+        text: 'Your course completion certificate is now available to download from your student dashboard.',
+      } as any);
+
+      const result = await aiPolishReply(
+        'certificate has been sent check dashboard',
+        undefined,
+        'General'
+      );
+
+      expect(result.startsWith('Hello Student,\n\n')).toBe(true);
+      expect(result).toContain('Your course completion certificate is now available to download from your student dashboard.');
+      expect(result.endsWith('\n\nBest regards,\nCode with Mosh Support')).toBe(true);
+    });
+
+    it('9. Category is missing: polishes successfully without category provided', async () => {
+      vi.mocked(generateText).mockResolvedValueOnce({
+        text: 'We have resolved the issue with your account. Everything is functioning properly now.',
+      } as any);
+
+      const result = await aiPolishReply(
+        'checked your account and everything looks good',
+        'Daniel'
+      );
+
+      expect(result.startsWith('Hello Daniel,\n\n')).toBe(true);
+      expect(result).toContain('We have resolved the issue with your account.');
+      expect(result.endsWith('\n\nBest regards,\nCode with Mosh Support')).toBe(true);
+    });
+
+    it('10. AI response must not alter the original resolution/instructions', async () => {
+      const technicalInstructions = 'Please clear your browser cookies and navigate to https://codewithmosh.com/login using Google Chrome.';
+      vi.mocked(generateText).mockResolvedValueOnce({
+        text: technicalInstructions,
+      } as any);
+
+      const result = await aiPolishReply(
+        'go to https://codewithmosh.com/login on chrome and clear cookies',
+        'David',
+        'Technical'
+      );
+
+      expect(result).toContain(technicalInstructions);
+      expect(result).toContain('https://codewithmosh.com/login');
+      expect(result).toContain('Google Chrome');
+    });
+
+    it('handles AI output that accidentally includes greeting and signoff by cleaning duplicates', async () => {
+      vi.mocked(generateText).mockResolvedValueOnce({
+        text: 'Hello David,\n\nWe have updated your billing method.\n\nBest regards,\nCode with Mosh Support',
+      } as any);
+
+      const result = await aiPolishReply(
+        'updated your billing method',
+        'David Miller',
+        'Billing'
+      );
+
+      expect(result).toBe(
+        'Hello David,\n\nWe have updated your billing method.\n\nBest regards,\nCode with Mosh Support'
+      );
+      const greetingMatches = result.match(/Hello David,/g);
+      expect(greetingMatches).toHaveLength(1);
+      const signoffMatches = result.match(/Best regards,\nCode with Mosh Support/g);
+      expect(signoffMatches).toHaveLength(1);
+    });
+
+    it('works via polishReplyWithAi wrapper object interface', async () => {
+      vi.mocked(generateText).mockResolvedValueOnce({
+        text: 'Your lifetime access remains permanently active on your account.',
+      } as any);
+
+      const result = await polishReplyWithAi({
+        replyText: 'lifetime access is active',
+        studentName: 'Sarah Connor',
+        category: 'General',
+      });
+
+      expect(result).toBe(
+        'Hello Sarah,\n\nYour lifetime access remains permanently active on your account.\n\nBest regards,\nCode with Mosh Support'
+      );
+    });
+
+    it('falls back to heuristic polish when API key is missing or is placeholder', async () => {
+      process.env = { ...originalEnv, OPENAI_API_KEY: '' };
+
+      const result = await aiPolishReply(
+        'pls check the pdf url and let me know if cant login',
+        'Alex Mercer'
+      );
+
+      expect(result).toBe(
+        'Hello Alex,\n\nPlease check the PDF URL and let me know if cannot login.\n\nBest regards,\nCode with Mosh Support'
+      );
+      expect(generateText).not.toHaveBeenCalled();
     });
   });
 

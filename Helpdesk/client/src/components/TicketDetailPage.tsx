@@ -12,8 +12,6 @@ import { ReplyThred } from './ReplyThred';
 import { ErrorMessage } from './ErrorMessage';
 import { UpdateTicket } from './UpdateTicket';
 import { TicketSummaryCard } from './TicketSummaryCard';
-import { AutoResolveCard } from './AutoResolveCard';
-import { ClassificationCard } from './ClassificationCard';
 import { TicketDetailSkeleton } from './ui/skeleton';
 import {
   ArrowLeft,
@@ -90,7 +88,7 @@ export const TicketDetailPage: React.FC<TicketDetailPageProps> = ({
           <span>Back to Tickets</span>
         </button>
 
-        <div className="flex items-center space-x-1.5">
+        <div className="flex items-center space-x-2">
           <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 font-bold text-[10px] border border-indigo-200/60">
             <Hash className="h-3 w-3 mr-0.5" />
             Ticket #{ticket.id}
@@ -145,12 +143,6 @@ export const TicketDetailPage: React.FC<TicketDetailPageProps> = ({
 
           {/* AI Issue & Conversation Summary Card */}
           <TicketSummaryCard ticket={ticket} onError={setActionError} />
-
-          {/* AI Ticket Classification Card */}
-          <ClassificationCard ticket={ticket} />
-
-          {/* Knowledge Base Auto-Resolution Card */}
-          <AutoResolveCard ticket={ticket} />
 
           {/* Conversation & Reply Thread */}
           <ReplyThred
