@@ -30,12 +30,7 @@ export const authClient = {
    */
   async getSession(): Promise<SessionResponse> {
     try {
-      const origin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:5173';
-      const response = await apiClient.get<SessionResponse>('/api/auth/get-session', {
-        headers: {
-          Origin: origin,
-        },
-      });
+      const response = await apiClient.get<SessionResponse>('/api/auth/get-session');
 
       if (response.data && response.data.user) {
         return {
@@ -55,15 +50,9 @@ export const authClient = {
    */
   async signIn(email: string, password: string): Promise<{ success: boolean; error?: string; user?: AuthUser }> {
     try {
-      const origin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:5173';
       const response = await apiClient.post<{ user?: AuthUser; message?: string; error?: string }>(
         '/api/auth/sign-in/email',
-        { email, password },
-        {
-          headers: {
-            Origin: origin,
-          },
-        }
+        { email, password }
       );
 
       return {
@@ -88,15 +77,9 @@ export const authClient = {
    */
   async signOut(): Promise<boolean> {
     try {
-      const origin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:5173';
       const response = await apiClient.post(
         '/api/auth/sign-out',
-        {},
-        {
-          headers: {
-            Origin: origin,
-          },
-        }
+        {}
       );
 
       return response.status >= 200 && response.status < 300;

@@ -5,6 +5,7 @@ import { classifyTicketInBackground, BackgroundClassifyOptions } from './ai';
 import { autoResolveSingleTicket } from './auto-resolve';
 import { sendOutboundEmail, SendEmailOptions } from './email-sender';
 import { ingestInboundEmail } from './email-ingestion';
+import { captureServerException } from '../instrument';
 import type { AutoResolveTicketInput, TicketStatus } from '@helpdesk/core';
 
 dotenv.config();
@@ -65,6 +66,7 @@ export async function initQueue(): Promise<PgBoss | null> {
 
     boss.on('error', (error) => {
       console.error('[pg-boss System Error]:', error?.message || error);
+      captureServerException(error, { tags: { component: 'pg-boss' } });
     });
 
     await boss.start();
@@ -100,6 +102,10 @@ export async function initQueue(): Promise<PgBoss | null> {
             await classifyTicketInBackground(ticketId, options);
           } catch (jobErr) {
             console.error(`[pg-boss Worker Error] Failed processing classification job ${job.id} for Ticket #${ticketId}:`, jobErr);
+            captureServerException(jobErr, {
+              tags: { queue: QUEUE_TICKET_CLASSIFICATION, jobId: job.id },
+              extra: { ticketId, options },
+            });
             try {
               await prisma.ticket.update({
                 where: { id: ticketId },
@@ -126,6 +132,10 @@ export async function initQueue(): Promise<PgBoss | null> {
             await autoResolveSingleTicket(ticketId, options);
           } catch (jobErr) {
             console.error(`[pg-boss Worker Error] Failed processing auto-resolve job ${job.id} for Ticket #${ticketId}:`, jobErr);
+            captureServerException(jobErr, {
+              tags: { queue: QUEUE_TICKET_AUTO_RESOLVE, jobId: job.id },
+              extra: { ticketId, options },
+            });
             try {
               await prisma.ticket.update({
                 where: { id: ticketId },

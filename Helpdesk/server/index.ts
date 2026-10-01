@@ -1,6 +1,8 @@
+import './instrument';
 import 'dotenv/config';
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
+import { Sentry, isSentryEnabled, flushSentry } from './instrument';
 import { toNodeHandler } from 'better-auth/node';
 import { auth } from './auth';
 import { requireAuth } from './middleware/auth';
@@ -42,7 +44,31 @@ if (isProductionEnvironment()) {
   app.set('trust proxy', 1);
 }
 
-app.use(cors({ origin: 'http://localhost:5173', credentials: true }));
+const allowedOrigins = [
+  'http://localhost:5173',
+  'http://127.0.0.1:5173',
+  'http://localhost:5174',
+  'http://127.0.0.1:5174',
+  'http://localhost:3000',
+  'http://127.0.0.1:3000',
+  'http://localhost:5000',
+  'http://127.0.0.1:5000',
+  ...(process.env.TRUSTED_ORIGIN ? process.env.TRUSTED_ORIGIN.split(',').map((o) => o.trim()) : []),
+];
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      // Allow requests with no origin (like curl, mobile, server-side tests) or trusted origins
+      if (!origin || allowedOrigins.includes(origin) || process.env.NODE_ENV !== 'production') {
+        callback(null, true);
+      } else {
+        callback(new Error('CORS request blocked'));
+      }
+    },
+    credentials: true,
+  })
+);
 
 // Apply rate limiting (enforced only in production environment)
 app.use('/api/', apiLimiter);
@@ -94,8 +120,30 @@ app.use('/api/auto-resolve', autoResolveRouter);
 app.use('/api/classify', classificationRouter);
 app.use('/api/classification', classificationRouter);
 
-// Mount Dashboard Analytics Routes
-app.use('/api/dashboard', dashboardRouter);
+app.get(['/debug-sentry', '/api/debug-sentry'], async (req: Request, res: Response) => {
+  const error = new Error('Sentry error for testing purposes');
+  console.error('[Debug Sentry] Triggered test exception:', error.message);
+
+  let eventId = 'sentry-not-configured';
+  if (isSentryEnabled) {
+    eventId = Sentry.captureException(error, {
+      tags: { testEvent: 'true', platform: 'express' },
+      extra: { path: req.path, timestamp: new Date().toISOString() },
+    });
+    console.log(`[Debug Sentry] Captured Event ID: ${eventId}`);
+    await flushSentry(2000);
+  }
+
+  res.status(500).json({
+    error: error.message,
+    eventId,
+    sentryEnabled: isSentryEnabled,
+    instructions: isSentryEnabled
+      ? 'Event was dispatched and flushed to Sentry.io. Search for this Event ID in your Sentry Issues.'
+      : 'Sentry DSN is not configured or disabled. Check SENTRY_DSN in .env',
+  });
+});
+
 
 // List Active Agents for ticket assignment (Authenticated agents & admins)
 app.get('/api/agents', requireAuth, async (req: Request, res: Response) => {
@@ -731,12 +779,59 @@ app.post('/api/tickets/:id/auto-resolve', requireAuth, async (req: Request, res:
   res.json(result);
 });
 
+// Live Sentry Verification Endpoint
+app.get('/api/test-sentry-error', async (req: Request, res: Response) => {
+  try {
+    throw new Error(`[Sentry Live Test] Server exception triggered at ${new Date().toISOString()}`);
+  } catch (err: any) {
+    const eventId = isSentryEnabled
+      ? Sentry.captureException(err, {
+          tags: { testEvent: 'true', platform: 'express-server' },
+          extra: { triggerUrl: req.originalUrl, timestamp: new Date().toISOString() },
+        })
+      : 'sentry-not-configured';
+
+    await flushSentry(2000);
+
+    res.json({
+      message: isSentryEnabled
+        ? 'Live test error captured and dispatched to Sentry.io'
+        : 'Sentry DSN is not configured. Set SENTRY_DSN in .env to stream errors to sentry.io.',
+      eventId,
+      sentryEnabled: isSentryEnabled,
+      timestamp: new Date().toISOString(),
+      instructions: isSentryEnabled
+        ? 'Check your Sentry.io dashboard under Issues or search for this Event ID.'
+        : 'Add your SENTRY_DSN to .env and restart the server to see live errors on sentry.io.',
+    });
+  }
+});
+
+// Mount Sentry error handler before custom error middleware
+Sentry.setupExpressErrorHandler(app);
+
 // Centralized Error Handling Middleware (Express 5 automatically forwards async promise rejections here)
-app.use((err: any, req: Request, res: Response, next: NextFunction) => {
+app.use(async (err: any, req: Request, res: Response, next: NextFunction) => {
   console.error('Unhandled API Error:', err);
   const status = err.status || err.statusCode || 500;
   const message = err.message || 'Internal Server Error';
-  res.status(status).json({ error: message });
+
+  let eventId: string | undefined;
+  if (status >= 500 && isSentryEnabled) {
+    try {
+      eventId = Sentry.captureException(err, {
+        extra: { path: req.path, method: req.method },
+      });
+      await flushSentry(2000);
+    } catch (sentryErr) {
+      console.warn('Sentry error flush failed:', sentryErr);
+    }
+  }
+
+  res.status(status).json({
+    error: message,
+    ...(eventId ? { sentryEventId: eventId } : {}),
+  });
 });
 
 const server = app.listen(PORT, async () => {

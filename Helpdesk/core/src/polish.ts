@@ -274,7 +274,7 @@ export function stripHeadersAndFooters(text: string): string {
 
   // Strip trailing sign-offs
   cleaned = cleaned.replace(
-    /(?:\n\s*|\s+)(?:best regards|warm regards|kind regards|regards|sincerely|thanks|thank you|cheers|best|yours truly|code with helpdesk|support team|helpdesk support team)[,\s\S]*$/i,
+    /(?:\n\s*|\s+)(?:best regards|warm regards|kind regards|regards|sincerely|thanks|thank you|cheers|best|yours truly|code with mosh support|code with helpdesk|support team|helpdesk support team)[,\s\S]*$/i,
     ''
   );
 
@@ -351,7 +351,7 @@ export function heuristicPolishReply(
 
   // 5. Wrap in salutation and sign-off
   const greeting = `Hello ${firstName},\n\n`;
-  const signoff = `\n\nBest regards,\nCode with helpdesk`;
+  const signoff = `\n\nBest regards,\nCode with Mosh Support`;
 
   return `${greeting}${formattedBody}${signoff}`;
 }

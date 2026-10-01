@@ -2,12 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { useSession, useSignOut } from './lib/hooks/useAuth';
 import { AuthUser } from './lib/auth-client';
 import type { Role } from './lib/types';
+import { setSentryUser, triggerClientTestError } from './lib/sentry';
 import { Navbar } from './components/Navbar';
 import { LoginPage } from './components/LoginPage';
 import { HomePage } from './components/HomePage';
 import { TicketsPage } from './components/TicketsPage';
 import { TicketDetailPage } from './components/TicketDetailPage';
 import { UsersPage } from './components/UsersPage';
+import { SentryDebugPage } from './components/SentryDebugPage';
 import { Ticket } from 'lucide-react';
 import { Skeleton } from './components/ui/skeleton';
 
@@ -17,6 +19,14 @@ export default function App() {
   const [currentPath, setCurrentPath] = useState<string>(window.location.pathname);
 
   const user: AuthUser | null = sessionData?.user || null;
+
+  // Synchronize authenticated user profile with Sentry scope & expose console debug helper
+  useEffect(() => {
+    setSentryUser(user);
+    if (typeof window !== 'undefined') {
+      (window as any).triggerTestSentryError = triggerClientTestError;
+    }
+  }, [user]);
 
   // Sync state on browser back/forward buttons
   useEffect(() => {
@@ -91,6 +101,31 @@ export default function App() {
     );
   }
 
+  // If user navigates directly to /debug-sentry, allow access even before login for quick verification
+  if (currentPath === '/debug-sentry' || currentPath === '/debug') {
+    return (
+      <div className="min-h-screen bg-slate-100 text-slate-900 flex flex-col font-sans">
+        <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-slate-200 px-4 lg:px-8 py-3 shadow-xs flex items-center justify-between">
+          <div className="flex items-center space-x-3 cursor-pointer" onClick={() => navigateTo('/')}>
+            <div className="h-9 w-9 rounded-xl bg-indigo-600 flex items-center justify-center shadow-sm text-white">
+              <Ticket className="h-4.5 w-4.5" />
+            </div>
+            <h2 className="text-sm font-bold text-slate-900 tracking-tight">Helpdesk AI</h2>
+          </div>
+          <button
+            onClick={() => navigateTo('/')}
+            className="px-3 py-1.5 bg-indigo-50 text-indigo-700 text-xs font-semibold rounded-lg hover:bg-indigo-100"
+          >
+            ← Back to Home
+          </button>
+        </header>
+        <main className="flex-1">
+          <SentryDebugPage />
+        </main>
+      </div>
+    );
+  }
+
   // If user is not logged in, show Login Page
   if (!user) {
     return <LoginPage onLoginSuccess={() => navigateTo('/')} />;
@@ -98,6 +133,10 @@ export default function App() {
 
   // Determine active view component based on route
   const renderMainContent = () => {
+    if (currentPath === '/debug-sentry' || currentPath === '/debug') {
+      return <SentryDebugPage />;
+    }
+
     if (currentPath === '/users') {
       const isAdmin = user?.role === 'ADMIN';
       if (!isAdmin) {

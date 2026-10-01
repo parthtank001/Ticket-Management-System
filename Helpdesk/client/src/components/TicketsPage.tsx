@@ -36,6 +36,7 @@ export const TicketsPage: React.FC<TicketsPageProps> = ({ user, onNavigate }) =>
   // Combine sorting, active filter, and pagination parameters for reactive React Query caching
   const serverQueryParams = useMemo(() => {
     const primary = sorting && sorting.length > 0 ? sorting[0] : null;
+ 
     return {
       sortBy: primary ? primary.id : 'createdAt',
       sortOrder: primary && !primary.desc ? ('asc' as const) : ('desc' as const),
