@@ -100,19 +100,13 @@ export const UpdateTicket: React.FC<UpdateTicketProps> = ({
 
   const isSlate = variant === 'slate';
 
-  const cardBgClass = isSlate
-    ? 'bg-slate-50/80 border border-slate-200/80 rounded-xl p-3 shadow-xs'
-    : 'bg-white border border-slate-200/80 rounded-xl p-3.5 shadow-xs';
+  const cardBgClass = 'bg-white dark:bg-slate-900/80 backdrop-blur-md border border-slate-200/80 dark:border-slate-800/80 rounded-xl p-3.5 shadow-xs dark:shadow-[0_4px_20px_rgba(0,0,0,0.3)]';
 
-  const selectBgClass = isSlate
-    ? 'w-full bg-white hover:bg-slate-50 focus:bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-[11px] text-slate-800 focus:outline-none focus:ring-1 focus:ring-indigo-500/20 font-medium cursor-pointer transition-colors'
-    : 'w-full bg-slate-50/60 hover:bg-slate-50 focus:bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-[11px] text-slate-800 focus:outline-none focus:ring-1 focus:ring-indigo-500/20 focus:border-indigo-500 font-medium cursor-pointer transition-colors';
+  const selectBgClass = 'w-full bg-slate-50 hover:bg-white focus:bg-white dark:bg-slate-950/80 dark:hover:bg-slate-950 dark:focus:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-2.5 py-1.5 text-[11px] text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500/30 focus:border-indigo-500 font-medium cursor-pointer transition-colors';
 
-  const inactiveBtnClass = isSlate
-    ? 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50'
-    : 'bg-slate-50 text-slate-700 border border-slate-200 hover:bg-slate-100';
+  const inactiveBtnClass = 'bg-slate-100 text-slate-700 border border-slate-200 hover:bg-slate-200 hover:text-slate-900 dark:bg-slate-800/80 dark:text-slate-300 dark:border-slate-700/60 dark:hover:bg-slate-750 dark:hover:text-white';
 
-  const dividerClass = isSlate ? 'border-b border-slate-200/60' : 'border-b border-slate-100';
+  const dividerClass = 'border-b border-slate-100 dark:border-slate-800/80';
 
   return (
     <div className={`space-y-3.5 ${className}`}>
@@ -121,7 +115,7 @@ export const UpdateTicket: React.FC<UpdateTicketProps> = ({
 
       {/* Status Quick Action Card */}
       <div className={`${cardBgClass} space-y-2`}>
-        <span className="text-[10px] font-bold text-slate-700 uppercase tracking-wider block">
+        <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">
           Update Status:
         </span>
         <div className="grid grid-cols-3 gap-1.5">
@@ -131,7 +125,7 @@ export const UpdateTicket: React.FC<UpdateTicketProps> = ({
             disabled={ticket.status === 'OPEN' || updateTicketMutation.isPending}
             className={`w-full py-1 rounded-md text-[11px] font-bold transition-all text-center cursor-pointer ${
               ticket.status === 'OPEN'
-                ? 'bg-sky-600 text-white shadow-2xs cursor-default'
+                ? 'bg-indigo-600 text-white shadow-xs dark:shadow-[0_0_10px_rgba(99,102,241,0.3)] cursor-default'
                 : inactiveBtnClass
             }`}
           >
@@ -143,7 +137,7 @@ export const UpdateTicket: React.FC<UpdateTicketProps> = ({
             disabled={ticket.status === 'RESOLVED' || updateTicketMutation.isPending}
             className={`w-full py-1 rounded-md text-[11px] font-bold transition-all text-center cursor-pointer ${
               ticket.status === 'RESOLVED'
-                ? 'bg-emerald-600 text-white shadow-2xs cursor-default'
+                ? 'bg-emerald-600 text-white shadow-xs dark:shadow-[0_0_10px_rgba(16,185,129,0.3)] cursor-default'
                 : inactiveBtnClass
             }`}
           >
@@ -155,7 +149,7 @@ export const UpdateTicket: React.FC<UpdateTicketProps> = ({
             disabled={ticket.status === 'CLOSED' || updateTicketMutation.isPending}
             className={`w-full py-1 rounded-md text-[11px] font-bold transition-all text-center cursor-pointer ${
               ticket.status === 'CLOSED'
-                ? 'bg-slate-700 text-white shadow-2xs cursor-default'
+                ? 'bg-slate-700 text-white shadow-xs cursor-default'
                 : inactiveBtnClass
             }`}
           >
@@ -167,8 +161,8 @@ export const UpdateTicket: React.FC<UpdateTicketProps> = ({
       {/* Ticket Properties Card (All Drop-down Lists) */}
       <div className={`${cardBgClass} space-y-3`}>
         <div className={`flex items-center space-x-1.5 pb-1.5 ${dividerClass}`}>
-          <SlidersHorizontal className="h-3.5 w-3.5 text-indigo-600" />
-          <h2 className="text-[10px] font-bold text-slate-800 uppercase tracking-wider">
+          <SlidersHorizontal className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
+          <h2 className="text-[10px] font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
             Ticket Properties
           </h2>
         </div>
@@ -177,7 +171,7 @@ export const UpdateTicket: React.FC<UpdateTicketProps> = ({
         <div className="space-y-1">
           <label
             htmlFor={`${idPrefix}-category-select`}
-            className="block text-[11px] font-semibold text-slate-700"
+            className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300"
           >
             Category
           </label>
@@ -189,10 +183,10 @@ export const UpdateTicket: React.FC<UpdateTicketProps> = ({
             aria-label="Category selector"
             className={selectBgClass}
           >
-            <option value="">Uncategorized</option>
-            <option value="GENERAL_QUESTION">General Question</option>
-            <option value="TECHNICAL_QUESTION">Technical Question</option>
-            <option value="REFUND_REQUEST">Refund Request</option>
+            <option value="" className="bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-200">Uncategorized</option>
+            <option value="GENERAL_QUESTION" className="bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-200">General Question</option>
+            <option value="TECHNICAL_QUESTION" className="bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-200">Technical Question</option>
+            <option value="REFUND_REQUEST" className="bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-200">Refund Request</option>
           </select>
         </div>
 
@@ -200,7 +194,7 @@ export const UpdateTicket: React.FC<UpdateTicketProps> = ({
         <div className="space-y-1">
           <label
             htmlFor={`${idPrefix}-assignee-select`}
-            className="block text-[11px] font-semibold text-slate-700"
+            className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300"
           >
             Assignee
           </label>
@@ -212,9 +206,9 @@ export const UpdateTicket: React.FC<UpdateTicketProps> = ({
             aria-label="Assignee selector"
             className={selectBgClass}
           >
-            <option value="">Unassigned</option>
+            <option value="" className="bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-200">Unassigned</option>
             {agents.map((ag) => (
-              <option key={ag.id} value={ag.id}>
+              <option key={ag.id} value={ag.id} className="bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-200">
                 {ag.name} ({ag.role})
               </option>
             ))}
@@ -225,7 +219,7 @@ export const UpdateTicket: React.FC<UpdateTicketProps> = ({
         <div className="space-y-1">
           <label
             htmlFor={`${idPrefix}-priority-select`}
-            className="block text-[11px] font-semibold text-slate-700"
+            className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300"
           >
             Priority
           </label>
@@ -237,10 +231,10 @@ export const UpdateTicket: React.FC<UpdateTicketProps> = ({
             aria-label="Priority selector"
             className={selectBgClass}
           >
-            <option value="LOW">Low</option>
-            <option value="MEDIUM">Medium</option>
-            <option value="HIGH">High</option>
-            <option value="URGENT">Urgent</option>
+            <option value="LOW" className="bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-200">Low</option>
+            <option value="MEDIUM" className="bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-200">Medium</option>
+            <option value="HIGH" className="bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-200">High</option>
+            <option value="URGENT" className="bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-200">Urgent</option>
           </select>
         </div>
       </div>

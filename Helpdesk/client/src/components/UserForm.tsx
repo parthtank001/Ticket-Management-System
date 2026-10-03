@@ -186,23 +186,26 @@ export const UserForm: React.FC<UserFormProps> = ({
       role="dialog"
       aria-modal="true"
       onClick={handleClose}
-      className="fixed inset-0 z-50 bg-slate-950/40 backdrop-blur-xs flex items-center justify-center p-4"
+      className="fixed inset-0 z-50 bg-slate-950/60 dark:bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-150 font-sans"
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="bg-white rounded-xl shadow-xl border border-slate-200 max-w-md w-full p-5 space-y-4 animate-in fade-in zoom-in-95 duration-150"
+        className="bg-white dark:bg-[#0D1527]/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-slate-200 dark:border-cyan-500/20 max-w-md w-full p-6 space-y-4 animate-in fade-in zoom-in-95 duration-150 relative overflow-hidden text-slate-800 dark:text-slate-200"
       >
+        {/* Glow effect */}
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-48 h-1 bg-gradient-to-r from-transparent via-indigo-500 dark:via-cyan-500 to-transparent opacity-60" />
+
         {/* Modal Header */}
         <div className="flex items-start justify-between">
-          <div className="flex items-center space-x-2.5">
-            <div className="h-8 w-8 rounded-lg bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 shrink-0">
+          <div className="flex items-center space-x-3">
+            <div className="h-9 w-9 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-200/80 dark:bg-cyan-500/10 dark:border-cyan-500/30 dark:text-cyan-400 flex items-center justify-center shrink-0 shadow-xs">
               {isEdit ? <Pencil className="h-4 w-4" /> : <UserPlus className="h-4 w-4" />}
             </div>
             <div>
-              <h3 className="text-sm font-bold text-slate-900">
+              <h3 className="text-base font-bold text-slate-900 dark:text-slate-100 tracking-tight">
                 {isEdit ? 'Edit User' : 'Add New User'}
               </h3>
-              <p className="text-[11px] text-slate-500">
+              <p className="text-xs text-slate-500 dark:text-slate-400">
                 {isEdit
                   ? 'Update user account details and permissions.'
                   : 'Create a new user account with role permissions.'}
@@ -211,7 +214,7 @@ export const UserForm: React.FC<UserFormProps> = ({
           </div>
           <button
             onClick={handleClose}
-            className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 transition-colors"
+            className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-white/5 transition-colors cursor-pointer"
             title="Close"
           >
             <X className="h-4 w-4" />
@@ -220,23 +223,23 @@ export const UserForm: React.FC<UserFormProps> = ({
 
         {/* General Error Banner */}
         {generalError && (
-          <div className="flex items-center space-x-1.5 bg-red-50 border border-red-200 text-red-800 px-2.5 py-1.5 rounded-lg text-[11px]">
-            <AlertCircle className="h-3.5 w-3.5 text-red-600 shrink-0" />
+          <div className="flex items-center space-x-2 bg-rose-50 dark:bg-rose-500/10 border border-rose-200 dark:border-rose-500/30 text-rose-700 dark:text-rose-300 px-3 py-2 rounded-lg text-xs">
+            <AlertCircle className="h-4 w-4 text-rose-600 dark:text-rose-400 shrink-0" />
             <span>{generalError}</span>
           </div>
         )}
 
         {/* User Form */}
-        <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-3" noValidate>
+        <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-3.5" noValidate>
           {/* Full Name */}
-          <div className="space-y-1">
+          <div className="space-y-1.5">
             <div className="flex items-center justify-between">
-              <Label htmlFor="create-name" className="text-xs font-semibold text-slate-700">
+              <Label htmlFor="create-name" className="text-xs font-semibold text-slate-700 dark:text-slate-300">
                 Full Name
               </Label>
             </div>
             <div className="relative">
-              <UserIcon className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
+              <UserIcon className="absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-400 dark:text-slate-500 pointer-events-none" />
               <Input
                 id="create-name"
                 type="text"
@@ -244,27 +247,25 @@ export const UserForm: React.FC<UserFormProps> = ({
                 aria-invalid={errors.name ? 'true' : 'false'}
                 {...register('name')}
                 className={cn(
-                  'pl-8 text-xs h-8.5 transition-colors',
-                  errors.name
-                    ? 'border-red-500 focus-visible:ring-red-500 focus-visible:border-red-500 bg-red-50/20'
-                    : 'border-slate-200 focus-visible:ring-indigo-500'
+                  'pl-9 text-xs h-9 transition-colors bg-slate-50 dark:bg-[#080C14]/80 border-slate-200 dark:border-slate-700/80 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-600 focus-visible:ring-indigo-500 dark:focus-visible:ring-cyan-500 focus-visible:border-indigo-500 dark:focus-visible:border-cyan-500',
+                  errors.name && 'border-rose-500/60 focus-visible:ring-rose-500 focus-visible:border-rose-500 bg-rose-50 dark:bg-rose-500/10 text-rose-700 dark:text-rose-200'
                 )}
               />
             </div>
             {errors.name && (
-              <p className="text-[10px] text-red-600 font-medium">{errors.name.message}</p>
+              <p className="text-[11px] text-rose-600 dark:text-rose-400 font-medium">{errors.name.message}</p>
             )}
           </div>
 
           {/* Email Address */}
-          <div className="space-y-1">
+          <div className="space-y-1.5">
             <div className="flex items-center justify-between">
-              <Label htmlFor="create-email" className="text-xs font-semibold text-slate-700">
+              <Label htmlFor="create-email" className="text-xs font-semibold text-slate-700 dark:text-slate-300">
                 Email Address
               </Label>
             </div>
             <div className="relative">
-              <Mail className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
+              <Mail className="absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-400 dark:text-slate-500 pointer-events-none" />
               <Input
                 id="create-email"
                 type="email"
@@ -272,30 +273,28 @@ export const UserForm: React.FC<UserFormProps> = ({
                 aria-invalid={errors.email ? 'true' : 'false'}
                 {...register('email')}
                 className={cn(
-                  'pl-8 text-xs h-8.5 transition-colors',
-                  errors.email
-                    ? 'border-red-500 focus-visible:ring-red-500 focus-visible:border-red-500 bg-red-50/20'
-                    : 'border-slate-200 focus-visible:ring-indigo-500'
+                  'pl-9 text-xs h-9 transition-colors bg-slate-50 dark:bg-[#080C14]/80 border-slate-200 dark:border-slate-700/80 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-600 focus-visible:ring-indigo-500 dark:focus-visible:ring-cyan-500 focus-visible:border-indigo-500 dark:focus-visible:border-cyan-500',
+                  errors.email && 'border-rose-500/60 focus-visible:ring-rose-500 focus-visible:border-rose-500 bg-rose-50 dark:bg-rose-500/10 text-rose-700 dark:text-rose-200'
                 )}
               />
             </div>
             {errors.email && (
-              <p className="text-[10px] text-red-600 font-medium">{errors.email.message}</p>
+              <p className="text-[11px] text-rose-600 dark:text-rose-400 font-medium">{errors.email.message}</p>
             )}
           </div>
 
           {/* Password */}
-          <div className="space-y-1">
+          <div className="space-y-1.5">
             <div className="flex items-center justify-between">
-              <Label htmlFor="create-password" className="text-xs font-semibold text-slate-700">
+              <Label htmlFor="create-password" className="text-xs font-semibold text-slate-700 dark:text-slate-300">
                 {isEdit ? 'New Password' : 'Password'}
               </Label>
-              <span className="text-[10px] text-slate-400">
+              <span className="text-[10px] text-slate-400 dark:text-slate-500">
                 {isEdit ? 'Leave blank to keep current' : 'Min. 8 characters'}
               </span>
             </div>
             <div className="relative">
-              <Lock className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
+              <Lock className="absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-400 dark:text-slate-500 pointer-events-none" />
               <Input
                 id="create-password"
                 type={showPassword ? 'text' : 'password'}
@@ -303,35 +302,33 @@ export const UserForm: React.FC<UserFormProps> = ({
                 aria-invalid={errors.password ? 'true' : 'false'}
                 {...register('password')}
                 className={cn(
-                  'pl-8 pr-8 text-xs h-8.5 transition-colors',
-                  errors.password
-                    ? 'border-red-500 focus-visible:ring-red-500 focus-visible:border-red-500 bg-red-50/20'
-                    : 'border-slate-200 focus-visible:ring-indigo-500'
+                  'pl-9 pr-9 text-xs h-9 transition-colors bg-slate-50 dark:bg-[#080C14]/80 border-slate-200 dark:border-slate-700/80 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-600 focus-visible:ring-indigo-500 dark:focus-visible:ring-cyan-500 focus-visible:border-indigo-500 dark:focus-visible:border-cyan-500',
+                  errors.password && 'border-rose-500/60 focus-visible:ring-rose-500 focus-visible:border-rose-500 bg-rose-50 dark:bg-rose-500/10 text-rose-700 dark:text-rose-200'
                 )}
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600"
+                className="absolute right-3 top-2.5 text-slate-400 hover:text-indigo-600 dark:text-slate-500 dark:hover:text-cyan-400 transition-colors"
                 title={showPassword ? 'Hide password' : 'Show password'}
               >
                 {showPassword ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
               </button>
             </div>
             {errors.password && (
-              <p className="text-[10px] text-red-600 font-medium">{errors.password.message}</p>
+              <p className="text-[11px] text-rose-600 dark:text-rose-400 font-medium">{errors.password.message}</p>
             )}
           </div>
 
           {/* Form Actions */}
-          <div className="flex items-center justify-end space-x-2 pt-3 border-t border-slate-100">
+          <div className="flex items-center justify-end space-x-2.5 pt-4 border-t border-slate-200/80 dark:border-slate-800/80">
             <Button
               type="button"
               variant="outline"
               size="sm"
               onClick={handleClose}
               disabled={isPending}
-              className="h-8 text-xs"
+              className="h-8.5 text-xs border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white bg-transparent cursor-pointer"
             >
               Cancel
             </Button>
@@ -339,7 +336,7 @@ export const UserForm: React.FC<UserFormProps> = ({
               type="submit"
               size="sm"
               disabled={isPending}
-              className="h-8 text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white"
+              className="h-8.5 text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white dark:bg-gradient-to-r dark:from-cyan-500 dark:to-blue-600 dark:hover:from-cyan-400 dark:hover:to-blue-500 dark:text-slate-950 shadow-xs border-0 cursor-pointer"
             >
               {isPending ? (
                 <>

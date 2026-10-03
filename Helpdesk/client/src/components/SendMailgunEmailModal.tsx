@@ -192,28 +192,31 @@ export const SendMailgunEmailModal: React.FC<SendMailgunEmailModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150 font-sans"
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/60 dark:bg-black/80 backdrop-blur-xs animate-in fade-in duration-150 font-sans"
       role="dialog"
       aria-modal="true"
       aria-labelledby="send-email-modal-title"
     >
-      <div className="bg-white rounded-2xl shadow-2xl border border-slate-200/90 w-full max-w-2xl max-h-[92vh] flex flex-col overflow-hidden text-slate-800">
+      <div className="bg-white dark:bg-[#0D1527]/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-slate-200 dark:border-cyan-500/20 w-full max-w-2xl max-h-[92vh] flex flex-col overflow-hidden text-slate-900 dark:text-slate-200">
+        {/* Glow effect */}
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-64 h-1 bg-gradient-to-r from-transparent via-cyan-500 to-transparent opacity-70" />
+
         {/* Modal Header */}
-        <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-100 bg-linear-to-r from-slate-50 via-white to-indigo-50/30">
+        <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-200 dark:border-slate-800/80 bg-slate-50/70 dark:bg-linear-to-r dark:from-[#080C14] dark:via-[#0D1527] dark:to-cyan-950/20">
           <div className="flex items-center space-x-2.5">
-            <div className="h-8 w-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center shadow-xs">
+            <div className="h-8 w-8 rounded-lg bg-cyan-50 dark:bg-cyan-500/10 border border-cyan-200 dark:border-cyan-500/30 text-cyan-600 dark:text-cyan-400 flex items-center justify-center shadow-xs">
               <Mail className="h-4 w-4" />
             </div>
             <div>
               <div className="flex items-center space-x-2">
-                <h2 id="send-email-modal-title" className="text-sm font-bold text-slate-900">
+                <h2 id="send-email-modal-title" className="text-sm font-bold text-slate-900 dark:text-slate-100 tracking-tight">
                   Send Email via Mailgun
                 </h2>
-                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200/80">
+                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-500/30">
                   Mailgun Sandbox
                 </span>
               </div>
-              <p className="text-[11px] text-slate-500">
+              <p className="text-[11px] text-slate-500 dark:text-slate-400">
                 {ticket
                   ? `Replying to Ticket #${ticket.id} (${ticket.studentName})`
                   : 'Compose and dispatch an outbound email'}
@@ -224,7 +227,7 @@ export const SendMailgunEmailModal: React.FC<SendMailgunEmailModalProps> = ({
             type="button"
             onClick={onClose}
             disabled={isBusy}
-            className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
+            className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-white/5 transition-colors cursor-pointer"
             aria-label="Close dialog"
           >
             <X className="h-4 w-4" />
@@ -235,12 +238,12 @@ export const SendMailgunEmailModal: React.FC<SendMailgunEmailModalProps> = ({
         <form onSubmit={handleSubmit} noValidate className="flex-1 overflow-y-auto p-5 space-y-4 text-xs">
           {/* Success Banner */}
           {successInfo && (
-            <div className="flex items-start space-x-2.5 p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 animate-in zoom-in-95 duration-150">
-              <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
+            <div className="flex items-start space-x-2.5 p-3 rounded-xl bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/30 text-emerald-800 dark:text-emerald-300 animate-in zoom-in-95 duration-150">
+              <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
               <div>
                 <p className="font-bold text-[11px]">Email successfully delivered via Mailgun!</p>
                 {successInfo.messageId && (
-                  <p className="text-[10px] text-emerald-700 font-mono mt-0.5 truncate max-w-lg">
+                  <p className="text-[10px] text-emerald-700 dark:text-emerald-400 font-mono mt-0.5 truncate max-w-lg">
                     Message-ID: {successInfo.messageId}
                   </p>
                 )}
@@ -255,8 +258,8 @@ export const SendMailgunEmailModal: React.FC<SendMailgunEmailModalProps> = ({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {/* To Email */}
             <div>
-              <label htmlFor="recipient-email" className="block text-[11px] font-bold text-slate-700 mb-1 flex items-center space-x-1">
-                <AtSign className="h-3 w-3 text-slate-400" />
+              <label htmlFor="recipient-email" className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1 flex items-center space-x-1">
+                <AtSign className="h-3 w-3 text-slate-400 dark:text-slate-500" />
                 <span>To (Recipient Email) *</span>
               </label>
               <input
@@ -270,14 +273,14 @@ export const SendMailgunEmailModal: React.FC<SendMailgunEmailModalProps> = ({
                 }}
                 placeholder="student@example.com"
                 disabled={isBusy}
-                className="w-full text-xs rounded-lg border border-slate-200 px-3 py-2 bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-sans"
+                className="w-full text-xs rounded-lg border border-slate-200 dark:border-slate-700/80 px-3 py-2 bg-white dark:bg-[#080C14]/90 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 dark:focus:ring-cyan-500/30 focus:border-indigo-600 dark:focus:border-cyan-500 transition-all font-sans"
               />
             </div>
 
             {/* Recipient Name */}
             <div>
-              <label htmlFor="recipient-name" className="block text-[11px] font-bold text-slate-700 mb-1 flex items-center space-x-1">
-                <User className="h-3 w-3 text-slate-400" />
+              <label htmlFor="recipient-name" className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1 flex items-center space-x-1">
+                <User className="h-3 w-3 text-slate-400 dark:text-slate-500" />
                 <span>Recipient Name</span>
               </label>
               <input
@@ -287,15 +290,15 @@ export const SendMailgunEmailModal: React.FC<SendMailgunEmailModalProps> = ({
                 onChange={(e) => setToName(e.target.value)}
                 placeholder="Student / Customer Name"
                 disabled={isBusy}
-                className="w-full text-xs rounded-lg border border-slate-200 px-3 py-2 bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-sans"
+                className="w-full text-xs rounded-lg border border-slate-200 dark:border-slate-700/80 px-3 py-2 bg-white dark:bg-[#080C14]/90 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 dark:focus:ring-cyan-500/30 focus:border-indigo-600 dark:focus:border-cyan-500 transition-all font-sans"
               />
             </div>
           </div>
 
           {/* Subject Field */}
           <div>
-            <label htmlFor="email-subject" className="block text-[11px] font-bold text-slate-700 mb-1 flex items-center space-x-1">
-              <Tag className="h-3 w-3 text-slate-400" />
+            <label htmlFor="email-subject" className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1 flex items-center space-x-1">
+              <Tag className="h-3 w-3 text-slate-400 dark:text-slate-500" />
               <span>Subject *</span>
             </label>
             <input
@@ -309,12 +312,12 @@ export const SendMailgunEmailModal: React.FC<SendMailgunEmailModalProps> = ({
               }}
               placeholder="[Ticket #123] Regarding your support inquiry"
               disabled={isBusy}
-              className="w-full text-xs rounded-lg border border-slate-200 px-3 py-2 bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-sans"
+              className="w-full text-xs rounded-lg border border-slate-200 dark:border-slate-700/80 px-3 py-2 bg-white dark:bg-[#080C14]/90 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 dark:focus:ring-cyan-500/30 focus:border-indigo-600 dark:focus:border-cyan-500 transition-all font-sans"
             />
           </div>
 
           {/* AI Assistance & Quick Templates Bar */}
-          <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-slate-100">
+          <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-200 dark:border-slate-800/80">
             <div className="flex flex-wrap items-center gap-1.5">
               {/* Quick Template Selector */}
               <div className="relative inline-block">
@@ -327,11 +330,11 @@ export const SendMailgunEmailModal: React.FC<SendMailgunEmailModalProps> = ({
                     }
                   }}
                   disabled={isBusy}
-                  className="text-[10px] font-semibold bg-slate-50 hover:bg-slate-100 border border-slate-200/90 text-slate-700 rounded-lg px-2.5 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer transition-colors"
+                  className="text-[10px] font-semibold bg-slate-100 dark:bg-[#080C14] hover:bg-slate-200 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 rounded-lg px-2.5 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:focus:ring-cyan-500 cursor-pointer transition-colors"
                 >
                   <option value="">Insert Template...</option>
                   {EMAIL_TEMPLATES.map((tmpl) => (
-                    <option key={tmpl.id} value={tmpl.id}>
+                    <option key={tmpl.id} value={tmpl.id} className="bg-white dark:bg-[#0D1527] text-slate-900 dark:text-slate-200">
                       {tmpl.title}
                     </option>
                   ))}
@@ -344,9 +347,9 @@ export const SendMailgunEmailModal: React.FC<SendMailgunEmailModalProps> = ({
                   type="button"
                   onClick={handleInsertAiDraft}
                   disabled={isBusy}
-                  className="inline-flex items-center space-x-1 text-[10px] font-semibold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/70 rounded-lg px-2.5 py-1 transition-colors cursor-pointer"
+                  className="inline-flex items-center space-x-1 text-[10px] font-semibold bg-purple-50 hover:bg-purple-100 dark:bg-purple-500/10 dark:hover:bg-purple-500/20 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-500/30 rounded-lg px-2.5 py-1 transition-colors cursor-pointer"
                 >
-                  <FileText className="h-3 w-3" />
+                  <FileText className="h-3 w-3 text-purple-600 dark:text-purple-400" />
                   <span>Insert AI Draft</span>
                 </button>
               )}
@@ -355,21 +358,21 @@ export const SendMailgunEmailModal: React.FC<SendMailgunEmailModalProps> = ({
             {/* Polish with AI Button */}
             <div className="flex items-center space-x-2">
               {isPolished && (
-                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-violet-700 bg-violet-50 border border-violet-200 px-2 py-0.5 rounded-full animate-in fade-in">
-                  <Check className="h-2.5 w-2.5 text-violet-600" />
-                  <span>Polished with AI (gpt-5-nano)</span>
+                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-500/10 border border-purple-200 dark:border-purple-500/30 px-2 py-0.5 rounded-full animate-in fade-in">
+                  <Check className="h-2.5 w-2.5 text-purple-600 dark:text-purple-400" />
+                  <span>Polished with AI</span>
                 </span>
               )}
               <button
                 type="button"
                 onClick={handlePolishWithAi}
                 disabled={isBusy || !body.trim()}
-                className="inline-flex items-center space-x-1 text-[10px] font-bold text-violet-700 bg-violet-50 hover:bg-violet-100 disabled:opacity-50 disabled:cursor-not-allowed border border-violet-200 px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
+                className="inline-flex items-center space-x-1 text-[10px] font-bold text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-500/10 hover:bg-purple-100 dark:hover:bg-purple-500/20 disabled:opacity-50 disabled:cursor-not-allowed border border-purple-200 dark:border-purple-500/30 px-2.5 py-1 rounded-lg transition-colors cursor-pointer shadow-xs"
               >
                 {polishReplyMutation.isPending ? (
-                  <Loader2 className="h-3 w-3 animate-spin text-violet-600" />
+                  <Loader2 className="h-3 w-3 animate-spin text-purple-600 dark:text-purple-400" />
                 ) : (
-                  <Sparkles className="h-3 w-3 text-violet-600" />
+                  <Sparkles className="h-3 w-3 text-purple-600 dark:text-purple-400" />
                 )}
                 <span>Polish with AI</span>
               </button>
@@ -390,16 +393,16 @@ export const SendMailgunEmailModal: React.FC<SendMailgunEmailModalProps> = ({
               }}
               placeholder="Write your email message to the student here..."
               disabled={isBusy}
-              className="w-full text-xs rounded-xl border border-slate-200 p-3 bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-sans resize-y leading-relaxed"
+              className="w-full text-xs rounded-xl border border-slate-200 dark:border-slate-700/80 p-3 bg-white dark:bg-[#080C14]/90 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 dark:focus:ring-cyan-500/30 focus:border-indigo-600 dark:focus:border-cyan-500 transition-all font-sans resize-y leading-relaxed"
             />
           </div>
 
           {/* Optional Ticket Status Transition */}
           {ticket && (
-            <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50/80 border border-slate-200/60">
+            <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-[#080C14]/60 border border-slate-200 dark:border-slate-800/80">
               <div>
-                <p className="font-bold text-[11px] text-slate-800">Update Ticket Status on Send</p>
-                <p className="text-[10px] text-slate-500">
+                <p className="font-bold text-[11px] text-slate-800 dark:text-slate-200">Update Ticket Status on Send</p>
+                <p className="text-[10px] text-slate-500 dark:text-slate-400">
                   Optionally change the ticket status once the email is dispatched.
                 </p>
               </div>
@@ -408,7 +411,7 @@ export const SendMailgunEmailModal: React.FC<SendMailgunEmailModalProps> = ({
                 value={statusUpdate}
                 onChange={(e) => setStatusUpdate(e.target.value as TicketStatus | '')}
                 disabled={isBusy}
-                className="text-[11px] font-semibold bg-white border border-slate-200 text-slate-800 rounded-lg px-2.5 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer"
+                className="text-[11px] font-semibold bg-white dark:bg-[#0D1527] border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 rounded-lg px-2.5 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:focus:ring-cyan-500 cursor-pointer"
               >
                 <option value="">Keep current ({ticket.status})</option>
                 <option value="RESOLVED">Mark as RESOLVED</option>
@@ -420,16 +423,16 @@ export const SendMailgunEmailModal: React.FC<SendMailgunEmailModalProps> = ({
         </form>
 
         {/* Modal Footer */}
-        <div className="flex items-center justify-between px-5 py-3 border-t border-slate-100 bg-slate-50">
-          <p className="text-[10px] text-slate-400 hidden sm:block">
-            Dispatches directly via Mailgun SMTP / REST API.
+        <div className="flex items-center justify-between px-5 py-3.5 border-t border-slate-200 dark:border-slate-800/80 bg-slate-50/70 dark:bg-[#080C14]/60">
+          <p className="text-[10px] text-slate-500 hidden sm:block">
+            Dispatches directly via Mailgun REST API.
           </p>
           <div className="flex items-center space-x-2.5 ml-auto">
             <button
               type="button"
               onClick={onClose}
               disabled={isBusy}
-              className="px-3 py-1.5 rounded-lg border border-slate-200 text-slate-700 bg-white hover:bg-slate-100 text-[11px] font-semibold transition-colors cursor-pointer"
+              className="px-3.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 bg-transparent hover:bg-slate-100 dark:hover:bg-slate-800 text-[11px] font-semibold transition-colors cursor-pointer"
             >
               Cancel
             </button>
@@ -437,7 +440,7 @@ export const SendMailgunEmailModal: React.FC<SendMailgunEmailModalProps> = ({
               type="button"
               onClick={handleSubmit}
               disabled={isBusy || Boolean(successInfo)}
-              className="inline-flex items-center space-x-1.5 px-4 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-[11px] font-bold transition-colors shadow-xs cursor-pointer"
+              className="inline-flex items-center space-x-1.5 px-4 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-600 dark:hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-[11px] font-bold transition-all shadow-xs cursor-pointer"
             >
               {sendEmailMutation.isPending ? (
                 <>

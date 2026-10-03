@@ -26,6 +26,7 @@
     "seed": "ts-node prisma/seed.ts"
   },
   "dependencies": {
+    "@ai-sdk/google": "^4.0.87",
     "@ai-sdk/openai": "^4.0.71",
     "@helpdesk/core": "file:./core",
     "@prisma/client": "^5.22.0",

@@ -114,7 +114,7 @@ describe('SendMailgunEmailModal Component', () => {
         category: 'TECHNICAL_QUESTION',
       });
       expect(bodyTextarea).toHaveValue('Hello Parth, We have investigated your account and resolved the login issue.');
-      expect(screen.getByText(/Polished with AI \(gpt-5-nano\)/i)).toBeInTheDocument();
+      expect(screen.getByText(/Polished with AI/i)).toBeInTheDocument();
     });
   });
 

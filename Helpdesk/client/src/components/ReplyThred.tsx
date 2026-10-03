@@ -150,11 +150,11 @@ export const ReplyThred: React.FC<ReplyThredProps> = ({
                   {msg.bodyHtml ? (
                     <div
                       data-testid="message-body-html"
-                      className="prose prose-sm max-w-none text-slate-800 break-words"
+                      className="prose prose-slate dark:prose-invert prose-sm max-w-none text-slate-700 dark:text-slate-200 break-words font-normal"
                       dangerouslySetInnerHTML={{ __html: sanitizeHtml(msg.bodyHtml) }}
                     />
                   ) : (
-                    <div className="whitespace-pre-wrap leading-relaxed">{msg.body}</div>
+                    <div className="whitespace-pre-wrap leading-relaxed text-slate-700 dark:text-slate-200 font-normal">{msg.body}</div>
                   )}
                 </div>
               </div>

@@ -137,48 +137,48 @@ export const TicketsPage: React.FC<TicketsPageProps> = ({ user, onNavigate }) =>
     <div className="max-w-5xl mx-auto py-4 px-4 sm:px-6 font-sans space-y-3">
       {/* Header Bar */}
       <div className="flex items-center justify-between">
-        <h1 className="text-sm font-bold text-slate-900 tracking-tight">
-          Ticket
+        <h1 aria-label="Ticket" className="text-sm font-bold text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
+          <span>Tickets</span>
         </h1>
         <div className="flex items-center gap-2">
           <button
             type="button"
             onClick={() => setIsBatchClassifyOpen(true)}
-            className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 rounded-md text-[11px] font-bold transition-colors cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-purple-50 dark:bg-purple-950/60 hover:bg-purple-100 dark:hover:bg-purple-900/60 text-purple-700 dark:text-purple-300 border border-purple-200/80 dark:border-purple-800/60 rounded-md text-[11px] font-bold transition-all shadow-xs dark:shadow-[0_0_10px_rgba(168,85,247,0.12)] cursor-pointer"
           >
-            <Brain className="w-3.5 h-3.5 text-indigo-600" />
+            <Brain className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
             <span>Batch Classify</span>
           </button>
           <button
             type="button"
             onClick={() => setIsBatchModalOpen(true)}
-            className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/60 rounded-md text-[11px] font-bold transition-colors cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-indigo-50 dark:bg-indigo-950/60 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200/80 dark:border-indigo-800/60 rounded-md text-[11px] font-bold transition-all shadow-xs dark:shadow-[0_0_10px_rgba(99,102,241,0.12)] cursor-pointer"
           >
-            <Bot className="w-3.5 h-3.5 text-indigo-600" />
+            <Bot className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
             <span>Batch Auto-Resolve</span>
           </button>
         </div>
       </div>
 
       {/* Filter & Search Toolbar */}
-      <div className="bg-white border border-slate-200/80 rounded-md p-1 shadow-xs w-fit">
+      <div className="bg-white dark:bg-slate-900/80 backdrop-blur-sm border border-slate-200/80 dark:border-slate-800/80 rounded-lg p-1.5 shadow-xs dark:shadow-[0_4px_20px_rgba(0,0,0,0.25)] w-fit">
         <div className="flex flex-wrap items-center gap-1.5">
           {/* Search Input */}
           <div className="relative w-44 sm:w-52 flex items-center">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 dark:text-slate-500 pointer-events-none" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => handleSearchChange(e.target.value)}
               placeholder="Search tickets..."
-              className="w-full pl-8 pr-7 py-1 text-[11px] bg-slate-50/70 hover:bg-slate-50 focus:bg-white border border-slate-200 rounded text-slate-800 placeholder-slate-400 placeholder:text-[11px] focus:outline-none focus:ring-1 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors h-7"
+              className="w-full pl-8 pr-7 py-1 text-[11px] bg-slate-50 dark:bg-slate-950/70 hover:bg-white dark:hover:bg-slate-950 focus:bg-white dark:focus:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 placeholder:text-[11px] focus:outline-none focus:ring-1 focus:ring-indigo-500/30 focus:border-indigo-500 transition-colors h-7"
               aria-label="Search tickets"
             />
             {searchQuery && (
               <button
                 type="button"
                 onClick={handleClearFilters}
-                className="absolute right-1.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 rounded-full"
+                className="absolute right-1.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300 p-0.5 rounded-full"
                 aria-label="Clear search"
               >
                 <X className="h-3 w-3" />
@@ -193,7 +193,7 @@ export const TicketsPage: React.FC<TicketsPageProps> = ({ user, onNavigate }) =>
               value={statusFilter}
               onChange={(e) => handleStatusChange(e.target.value)}
               aria-label="Filter by status"
-              className="h-7 text-[11px] bg-slate-50/70 hover:bg-slate-50 focus:bg-white border border-slate-200 rounded px-2 text-slate-700 focus:outline-none focus:ring-1 focus:ring-indigo-500/20 focus:border-indigo-500 font-medium cursor-pointer"
+              className="h-7 text-[11px] bg-slate-50 dark:bg-slate-950/70 hover:bg-white dark:hover:bg-slate-950 focus:bg-white dark:focus:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded px-2 text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-1 focus:ring-indigo-500/30 focus:border-indigo-500 font-medium cursor-pointer"
             >
               <option value="ALL">All Statuses</option>
               <option value="OPEN">Open</option>
@@ -208,7 +208,7 @@ export const TicketsPage: React.FC<TicketsPageProps> = ({ user, onNavigate }) =>
               value={categoryFilter}
               onChange={(e) => handleCategoryChange(e.target.value)}
               aria-label="Filter by category"
-              className="h-7 text-[11px] bg-slate-50/70 hover:bg-slate-50 focus:bg-white border border-slate-200 rounded px-2 text-slate-700 focus:outline-none focus:ring-1 focus:ring-indigo-500/20 focus:border-indigo-500 font-medium cursor-pointer"
+              className="h-7 text-[11px] bg-slate-50 dark:bg-slate-950/70 hover:bg-white dark:hover:bg-slate-950 focus:bg-white dark:focus:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded px-2 text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-1 focus:ring-indigo-500/30 focus:border-indigo-500 font-medium cursor-pointer"
             >
               <option value="ALL">All Categories</option>
               <option value="GENERAL_QUESTION">General Question</option>

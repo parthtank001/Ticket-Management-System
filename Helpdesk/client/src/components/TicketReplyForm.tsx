@@ -113,8 +113,8 @@ export const TicketReplyForm: React.FC<TicketReplyFormProps> = ({
     <div className={`space-y-3 ${className}`}>
       {/* Success Notification Banner */}
       {successInfo && (
-        <div className="flex items-center gap-1.5 p-2 bg-emerald-50 border border-emerald-200 text-emerald-800 text-[11px] rounded-lg animate-in fade-in duration-200 font-medium">
-          <Check className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+        <div className="flex items-center gap-1.5 p-2 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800/60 text-emerald-800 dark:text-emerald-300 text-[11px] rounded-lg animate-in fade-in duration-200 font-medium shadow-xs dark:shadow-[0_0_10px_rgba(16,185,129,0.15)]">
+          <Check className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
           <span>{successInfo}</span>
         </div>
       )}
@@ -124,17 +124,17 @@ export const TicketReplyForm: React.FC<TicketReplyFormProps> = ({
 
       {/* Header bar */}
       {showHeader && (
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2">
-          <h2 className="text-[10px] font-bold text-slate-700 uppercase tracking-wider flex items-center space-x-1.5">
-            <Reply className="h-3.5 w-3.5 text-indigo-600" />
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/80 dark:border-slate-800/80 pb-2">
+          <h2 className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center space-x-1.5">
+            <Reply className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
             <span>Submit a Reply</span>
           </h2>
 
           <div className="flex items-center space-x-1.5 ml-auto">
             {isPolished && (
-              <span className="inline-flex items-center gap-1 text-[10px] font-bold text-violet-700 bg-violet-50 border border-violet-200/80 px-2 py-0.5 rounded-full transition-all">
-                <Check className="h-2.5 w-2.5 text-violet-600" />
-                <span>Polished with AI (gpt-5-nano)</span>
+              <span className="inline-flex items-center gap-1 text-[10px] font-bold text-purple-700 bg-purple-50 border border-purple-200/80 dark:bg-purple-950/60 dark:border-purple-800/60 dark:text-purple-300 px-2 py-0.5 rounded-full transition-all">
+                <Check className="h-2.5 w-2.5 text-purple-600 dark:text-purple-400" />
+                <span>Polished with AI</span>
               </span>
             )}
           </div>
@@ -153,11 +153,20 @@ export const TicketReplyForm: React.FC<TicketReplyFormProps> = ({
             }}
             placeholder="Write a reply to the student..."
             rows={3}
-            className="w-full text-[11px] rounded-lg border border-slate-200 px-3 py-2 bg-white text-slate-900 focus:outline-none focus:ring-1 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all placeholder:text-slate-400 resize-none font-sans"
+            className="w-full text-[11px] rounded-lg border border-slate-200 dark:border-slate-800 px-3 py-2 bg-slate-50 dark:bg-slate-950/80 text-slate-900 dark:text-slate-100 focus:bg-white dark:focus:bg-slate-950 focus:outline-none focus:ring-1 focus:ring-indigo-500/30 focus:border-indigo-500 transition-all placeholder:text-slate-400 dark:placeholder:text-slate-500 resize-none font-sans"
           />
         </div>
 
-        <div className="flex flex-wrap items-center justify-end gap-2 pt-0.5">
+        <div className="flex flex-wrap items-center justify-between gap-2 pt-0.5">
+          <div className="flex items-center space-x-1.5">
+            {!showHeader && isPolished && (
+              <span className="inline-flex items-center gap-1 text-[10px] font-bold text-purple-700 bg-purple-50 border border-purple-200/80 dark:bg-purple-950/60 dark:border-purple-800/60 dark:text-purple-300 px-2 py-0.5 rounded-full transition-all">
+                <Check className="h-2.5 w-2.5 text-purple-600 dark:text-purple-400" />
+                <span>Polished with AI</span>
+              </span>
+            )}
+          </div>
+
           <div className="flex items-center space-x-2 sm:ml-auto">
             {replyBody && (
               <button
@@ -168,7 +177,7 @@ export const TicketReplyForm: React.FC<TicketReplyFormProps> = ({
                   setIsPolished(false);
                 }}
                 disabled={isBusy}
-                className="text-[10px] text-slate-500 hover:text-slate-700 px-2 py-1 rounded transition-colors cursor-pointer"
+                className="text-[10px] text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 px-2 py-1 rounded transition-colors cursor-pointer"
               >
                 Clear
               </button>
@@ -177,7 +186,7 @@ export const TicketReplyForm: React.FC<TicketReplyFormProps> = ({
               <button
                 type="button"
                 onClick={onClose}
-                className="px-2.5 py-1 rounded-lg text-[11px] font-semibold text-slate-600 hover:bg-slate-200/60 transition-colors cursor-pointer"
+                className="px-2.5 py-1 rounded-lg text-[11px] font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
               >
                 Close
               </button>
@@ -186,25 +195,25 @@ export const TicketReplyForm: React.FC<TicketReplyFormProps> = ({
               type="button"
               onClick={handlePolishReply}
               disabled={isBusy || !replyBody.trim()}
-              title="Polish draft reply with AI (gpt-5-nano)"
-              className="inline-flex items-center space-x-1.5 px-3 py-1.5 bg-violet-50 hover:bg-violet-100 text-violet-700 border border-violet-200/80 rounded-lg text-[11px] font-bold transition-all shadow-2xs disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+              title="Polish draft reply with AI"
+              className="inline-flex items-center space-x-1.5 px-3 py-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200/80 dark:bg-purple-950/60 dark:hover:bg-purple-900/60 dark:text-purple-300 dark:border-purple-800/60 rounded-lg text-[11px] font-bold transition-all shadow-xs dark:shadow-[0_0_10px_rgba(168,85,247,0.15)] disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
             >
               {polishReplyMutation.isPending ? (
-                <Loader2 className="h-3 w-3 animate-spin text-violet-600" />
+                <Loader2 className="h-3 w-3 animate-spin text-purple-600 dark:text-purple-400" />
               ) : (
-                <Sparkles className="h-3 w-3 text-violet-600" />
+                <Sparkles className="h-3 w-3 text-purple-600 dark:text-purple-400" />
               )}
               <span>{polishReplyMutation.isPending ? 'Polishing...' : 'Polish'}</span>
             </button>
             <button
               type="submit"
               disabled={isBusy || !replyBody.trim()}
-              className="inline-flex items-center space-x-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-[11px] font-bold transition-all shadow-xs disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+              className="inline-flex items-center space-x-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-[11px] font-bold transition-all shadow-xs dark:shadow-[0_0_12px_rgba(99,102,241,0.25)] disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
             >
               {addMessageMutation.isPending ? (
-                <Loader2 className="h-3 w-3 animate-spin" />
+                <Loader2 className="h-3 w-3 animate-spin text-white" />
               ) : (
-                <Send className="h-3 w-3" />
+                <Send className="h-3 w-3 text-white" />
               )}
               <span>Send Reply</span>
             </button>
@@ -216,7 +225,7 @@ export const TicketReplyForm: React.FC<TicketReplyFormProps> = ({
 
   if (showCardWrapper) {
     return (
-      <div className="bg-white border border-slate-200/80 rounded-xl p-3.5 shadow-xs">
+      <div className="bg-white border border-slate-200/80 dark:bg-slate-900/80 dark:border-slate-800/80 rounded-xl p-3.5 shadow-xs dark:shadow-[0_4px_20px_rgba(0,0,0,0.3)]">
         {formContent}
       </div>
     );

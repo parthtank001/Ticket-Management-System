@@ -127,32 +127,38 @@ describe('HomePage / Dashboard Component Unit Tests', () => {
     expect(screen.getByText(/Daily inbound volume distribution/i)).toBeInTheDocument();
   });
 
-  it('navigates to /tickets when clicking the Total Tickets card', async () => {
+  it('does not trigger navigation when clicking the Total Tickets card', async () => {
     const user = userEvent.setup();
     const onNavigateMock = vi.fn();
     vi.mocked(dashboardApi.getStats).mockResolvedValueOnce(mockStats);
 
     renderWithQuery(<HomePage user={mockAdmin} onNavigate={onNavigateMock} />);
 
-    const totalTicketsCard = (await screen.findByText('Total Tickets')).closest('div[class*="cursor-pointer"]');
-    expect(totalTicketsCard).toBeInTheDocument();
+    const totalTicketsHeading = await screen.findByText('Total Tickets');
+    const totalTicketsCard = totalTicketsHeading.closest('div');
+    expect(totalTicketsCard).not.toHaveClass('cursor-pointer');
 
-    await user.click(totalTicketsCard!);
-    expect(onNavigateMock).toHaveBeenCalledWith('/tickets');
+    if (totalTicketsCard) {
+      await user.click(totalTicketsCard);
+    }
+    expect(onNavigateMock).not.toHaveBeenCalled();
   });
 
-  it('navigates to /tickets when clicking the Open Tickets card', async () => {
+  it('does not trigger navigation when clicking the Open Tickets card', async () => {
     const user = userEvent.setup();
     const onNavigateMock = vi.fn();
     vi.mocked(dashboardApi.getStats).mockResolvedValueOnce(mockStats);
 
     renderWithQuery(<HomePage user={mockAdmin} onNavigate={onNavigateMock} />);
 
-    const openTicketsCard = (await screen.findByText('Open Tickets')).closest('div[class*="cursor-pointer"]');
-    expect(openTicketsCard).toBeInTheDocument();
+    const openTicketsHeading = await screen.findByText('Open Tickets');
+    const openTicketsCard = openTicketsHeading.closest('div');
+    expect(openTicketsCard).not.toHaveClass('cursor-pointer');
 
-    await user.click(openTicketsCard!);
-    expect(onNavigateMock).toHaveBeenCalledWith('/tickets');
+    if (openTicketsCard) {
+      await user.click(openTicketsCard);
+    }
+    expect(onNavigateMock).not.toHaveBeenCalled();
   });
 
   it('renders administrator workspace greeting for Admin role', async () => {

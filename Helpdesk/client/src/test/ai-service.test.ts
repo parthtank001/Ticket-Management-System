@@ -12,6 +12,8 @@ import {
   classifyTicketInBackground,
   scheduleTicketClassification,
   getAiAgentUser,
+  getActiveAiModel,
+  isNonEmptyApiKey,
 } from '../../../server/services/ai';
 import { prisma } from '../../../server/db';
 
@@ -93,7 +95,14 @@ describe('AI Support Service Unit Tests', () => {
 
     beforeEach(() => {
       vi.resetAllMocks();
-      process.env = { ...originalEnv, OPENAI_API_KEY: 'sk-mock-valid-openai-api-key-999999999' };
+      process.env = {
+        ...originalEnv,
+        AI_PROVIDER: 'openai',
+        OPENAI_API_KEY: 'sk-mock-valid-openai-api-key-999999999',
+        GEMINI_API_KEY: '',
+        GOOGLE_GENERATIVE_AI_API_KEY: '',
+        AI_API_KEY: '',
+      };
     });
 
     afterEach(() => {
@@ -290,8 +299,38 @@ describe('AI Support Service Unit Tests', () => {
       );
     });
 
+    it('polishes reply using Google Gemini when GEMINI_API_KEY is configured', async () => {
+      process.env = {
+        ...originalEnv,
+        AI_PROVIDER: 'gemini',
+        GEMINI_API_KEY: 'AQ.Ab8RN6Iu8jIIi0DfT286YGTRPZF-mock-key-12345',
+        OPENAI_API_KEY: '',
+      };
+
+      vi.mocked(generateText).mockResolvedValueOnce({
+        text: 'We have processed your refund. The amount will reflect in your account within 3-5 business days.',
+      } as any);
+
+      const result = await aiPolishReply(
+        'refund processed will take 3-5 days',
+        'Emma Watson',
+        'REFUND_REQUEST'
+      );
+
+      expect(result).toBe(
+        'Hello Emma,\n\nWe have processed your refund. The amount will reflect in your account within 3-5 business days.\n\nBest regards,\nCode with Mosh Support'
+      );
+      expect(generateText).toHaveBeenCalledTimes(1);
+    });
+
     it('falls back to heuristic polish when API key is missing or is placeholder', async () => {
-      process.env = { ...originalEnv, OPENAI_API_KEY: '' };
+      process.env = {
+        ...originalEnv,
+        OPENAI_API_KEY: '',
+        GEMINI_API_KEY: '',
+        GOOGLE_GENERATIVE_AI_API_KEY: '',
+        AI_API_KEY: '',
+      };
 
       const result = await aiPolishReply(
         'pls check the pdf url and let me know if cant login',
@@ -302,6 +341,64 @@ describe('AI Support Service Unit Tests', () => {
         'Hello Alex,\n\nPlease check the PDF URL and let me know if cannot login.\n\nBest regards,\nCode with Mosh Support'
       );
       expect(generateText).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('getActiveAiModel and Provider Resolution', () => {
+    const originalEnv = process.env;
+
+    afterEach(() => {
+      process.env = originalEnv;
+    });
+
+    it('returns Gemini provider when GEMINI_API_KEY is present and valid', () => {
+      process.env = {
+        ...originalEnv,
+        AI_PROVIDER: 'gemini',
+        GEMINI_API_KEY: 'AQ.Ab8RN6Iu8jIIi0DfT286YGTRPZF-mock-key-12345',
+        OPENAI_API_KEY: '',
+      };
+
+      const modelConfig = getActiveAiModel();
+      expect(modelConfig).not.toBeNull();
+      expect(modelConfig?.provider).toBe('gemini');
+      expect(modelConfig?.modelName).toBe(process.env.GEMINI_MODEL || 'gemini-3.5-flash');
+    });
+
+    it('returns OpenAI provider when only OPENAI_API_KEY is configured', () => {
+      process.env = {
+        ...originalEnv,
+        AI_PROVIDER: 'openai',
+        GEMINI_API_KEY: '',
+        OPENAI_API_KEY: 'sk-mock-valid-openai-key-9999999999',
+      };
+
+      const modelConfig = getActiveAiModel();
+      expect(modelConfig).not.toBeNull();
+      expect(modelConfig?.provider).toBe('openai');
+      expect(modelConfig?.modelName).toBe('gpt-4o-mini');
+    });
+
+    it('returns null when no valid API keys are configured', () => {
+      process.env = {
+        ...originalEnv,
+        GEMINI_API_KEY: '',
+        GOOGLE_GENERATIVE_AI_API_KEY: '',
+        OPENAI_API_KEY: '',
+        AI_API_KEY: '',
+      };
+
+      const modelConfig = getActiveAiModel();
+      expect(modelConfig).toBeNull();
+    });
+
+    it('validates API key with isNonEmptyApiKey correctly', () => {
+      expect(isNonEmptyApiKey(undefined)).toBe(false);
+      expect(isNonEmptyApiKey('')).toBe(false);
+      expect(isNonEmptyApiKey('12345')).toBe(false);
+      expect(isNonEmptyApiKey('test-openai-key')).toBe(false);
+      expect(isNonEmptyApiKey('AQ.Ab8RN6Iu8jIIi0DfT286YGTRPZF-mock-key-12345')).toBe(true);
+      expect(isNonEmptyApiKey('sk-proj-valid-openai-key-sample-123456789')).toBe(true);
     });
   });
 

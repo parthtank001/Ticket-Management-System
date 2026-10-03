@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import { generateText } from 'ai';
 import { createOpenAI } from '@ai-sdk/openai';
+import { createGoogle } from '@ai-sdk/google';
 import { Category, Priority, heuristicPolishReply, extractFirstName, stripHeadersAndFooters } from '@helpdesk/core';
 import { prisma } from '../db';
 import { enqueueTicketClassification } from './queue';
@@ -20,6 +21,94 @@ export interface AIClassificationResult {
 }
 
 export { extractFirstName, stripHeadersAndFooters };
+
+/**
+ * Validates whether an API key string is non-empty and not a dummy placeholder.
+ */
+export function isNonEmptyApiKey(key?: string): boolean {
+  if (!key) return false;
+  const trimmed = key.trim();
+  return (
+    trimmed.length >= 10 &&
+    trimmed !== '12345' &&
+    trimmed !== 'test-openai-key' &&
+    trimmed !== 'mock-openai-key' &&
+    trimmed !== 'mock-gemini-key'
+  );
+}
+
+export interface ActiveAiModelConfig {
+  provider: 'gemini' | 'openai';
+  model: any;
+  modelName: string;
+}
+
+/**
+ * Normalizes user-specified or environment Gemini model aliases to valid Gemini API model identifiers.
+ */
+export function normalizeGeminiModel(name?: string): string {
+  if (!name) return 'gemini-3.5-flash-lite';
+  const trimmed = name.trim();
+  const lower = trimmed.toLowerCase();
+  if (lower === 'gemini-pro' || lower === 'pro' || lower === 'gemini-1.5-pro' || lower === 'gemini-2.5-pro' || lower === 'gemini-pro-latest') {
+    return 'gemini-3.1-pro-preview';
+  }
+  if (lower === 'gemini-flash' || lower === 'flash' || lower === 'gemini-1.5-flash' || lower === 'gemini-2.0-flash' || lower === 'gemini-2.5-flash' || lower === 'gemini-3.5-flash') {
+    return 'gemini-3.5-flash-lite';
+  }
+  return trimmed;
+}
+
+/**
+ * Returns the active language model instance based on environment variables.
+ * Prefers Google Gemini if GEMINI_API_KEY / GOOGLE_GENERATIVE_AI_API_KEY is configured
+ * or if AI_PROVIDER is set to "gemini". Otherwise falls back to OpenAI if OPENAI_API_KEY is configured.
+ */
+export function getActiveAiModel(defaultModelName?: string): ActiveAiModelConfig | null {
+  const geminiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY;
+  const openaiKey = process.env.OPENAI_API_KEY || process.env.AI_API_KEY;
+  const providerPref = (process.env.AI_PROVIDER || 'gemini').toLowerCase().trim();
+
+  // 1. If Gemini is explicitly preferred or if only Gemini key is valid
+  if (
+    (providerPref === 'gemini' || !isNonEmptyApiKey(openaiKey)) &&
+    isNonEmptyApiKey(geminiKey)
+  ) {
+    const googleProvider = createGoogle({ apiKey: geminiKey!.trim() });
+    const rawModelName = process.env.GEMINI_MODEL || defaultModelName || 'gemini-3.5-flash-lite';
+    const modelName = normalizeGeminiModel(rawModelName);
+    return {
+      provider: 'gemini',
+      model: googleProvider(modelName),
+      modelName,
+    };
+  }
+
+  // 2. OpenAI provider if preferred or if only OpenAI key is valid
+  if (isNonEmptyApiKey(openaiKey)) {
+    const openaiProvider = createOpenAI({ apiKey: openaiKey!.trim() });
+    const modelName = process.env.OPENAI_MODEL || defaultModelName || 'gpt-4o-mini';
+    return {
+      provider: 'openai',
+      model: openaiProvider(modelName),
+      modelName,
+    };
+  }
+
+  // 3. Fallback to Gemini if valid key exists
+  if (isNonEmptyApiKey(geminiKey)) {
+    const googleProvider = createGoogle({ apiKey: geminiKey!.trim() });
+    const rawModelName = process.env.GEMINI_MODEL || defaultModelName || 'gemini-3.5-flash-lite';
+    const modelName = normalizeGeminiModel(rawModelName);
+    return {
+      provider: 'gemini',
+      model: googleProvider(modelName),
+      modelName,
+    };
+  }
+
+  return null;
+}
 
 /**
  * Heuristic fallback classifier and draft generator for offline or non-API key runs.
@@ -56,30 +145,24 @@ export function heuristicClassifyAndDraft(
 }
 
 /**
- * Classifies an incoming inquiry and generates a summary & draft response using gpt-5-nano via Vercel AI SDK (@ai-sdk/openai).
- * Falls back safely to rule-based heuristics if the API key is not configured or errors.
+ * Classifies an incoming inquiry and generates a summary & draft response using Google Gemini (or OpenAI fallback).
+ * Falls back safely to rule-based heuristics if no API key is configured or on error.
  */
 export async function classifyAndDraftInquiry(
   subject: string,
   body: string,
   studentName?: string
 ): Promise<AIClassificationResult> {
-  const apiKey =
-    process.env.OPENAI_API_KEY ||
-    process.env.AI_API_KEY;
+  const aiConfig = getActiveAiModel(process.env.AI_PROVIDER === 'gemini' ? 'gemini-3.5-flash-lite' : 'gpt-5-nano');
 
   // Fallback if no real API key configured or in test environments
-  if (!apiKey || apiKey === '12345' || apiKey === 'test-openai-key' || apiKey === 'mock-openai-key' || apiKey.length < 10) {
+  if (!aiConfig || process.env.NODE_ENV === 'test') {
     return heuristicClassifyAndDraft(subject, body, studentName);
   }
 
   const firstName = extractFirstName(studentName);
 
   try {
-    const openaiProvider = createOpenAI({
-      apiKey: apiKey.trim(),
-    });
-
     const kbContent = loadKnowledgeBaseContent();
 
     const prompt = `You are an AI customer support triage and auto-resolution assistant for Code with Mosh Support.
@@ -114,10 +197,10 @@ Respond ONLY with valid JSON in this exact structure:
     let responseText = '';
     try {
       const { text } = await generateText({
-        model: openaiProvider('gpt-5-nano'),
+        model: aiConfig.model,
         prompt,
         maxRetries: 0,
-        abortSignal: AbortSignal.timeout(3500),
+        abortSignal: AbortSignal.timeout(4000),
       });
       responseText = text?.trim() || '';
     } catch (primaryErr: any) {
@@ -170,7 +253,7 @@ Respond ONLY with valid JSON in this exact structure:
 
     return heuristicClassifyAndDraft(subject, body, studentName);
   } catch (error) {
-    console.warn('gpt-5-nano AI classification failed, using heuristic fallback:', error);
+    console.warn(`[${aiConfig.provider}] AI classification failed, using heuristic fallback:`, error);
     const fallback = heuristicClassifyAndDraft(subject, body, studentName);
     return {
       ...fallback,
@@ -188,7 +271,24 @@ export interface PolishReplyOptions {
 export { heuristicPolishReply };
 
 /**
- * Polishes and improves a support agent's draft reply using AI (OpenAI via Vercel AI SDK).
+ * Strips codeblocks, surrounding quotes, and leading/trailing greetings or signatures from raw LLM text output.
+ */
+export function cleanAiPolishedBody(raw: string): string {
+  let cleaned = (raw || '').trim();
+  if (cleaned.startsWith('```')) {
+    cleaned = cleaned.replace(/^```[a-zA-Z]*\n?/, '').replace(/\n?```$/, '').trim();
+  }
+  if (
+    (cleaned.startsWith('"') && cleaned.endsWith('"')) ||
+    (cleaned.startsWith("'") && cleaned.endsWith("'"))
+  ) {
+    cleaned = cleaned.slice(1, -1).trim();
+  }
+  return stripHeadersAndFooters(cleaned);
+}
+
+/**
+ * Polishes and improves a support agent's draft reply using AI (Google Gemini / OpenAI fallback via Vercel AI SDK).
  * Instructs the AI model to rewrite the message body professionally, naturally, and concisely
  * while strictly preserving original meaning, facts, and instructions without generating greetings or signatures.
  * The application then constructs and adds the single standardized greeting and signature.
@@ -208,93 +308,49 @@ export async function aiPolishReply(
     return '';
   }
 
-  const apiKey =
-    process.env.OPENAI_API_KEY ||
-    process.env.AI_API_KEY;
+  const aiConfig = getActiveAiModel('gemini-3.6-flash');
 
-  if (
-    !apiKey ||
-    apiKey.trim() === '' ||
-    apiKey === '12345' ||
-    apiKey === 'test-openai-key' ||
-    apiKey === 'mock-openai-key' ||
-    apiKey.length < 10
-  ) {
+  if (!aiConfig) {
     return heuristicPolishReply(replyText, studentName, category);
   }
 
   const firstName = extractFirstName(studentName);
 
-  const prompt = `You are a professional student support email editor.
+  const prompt = `You are an expert customer support email copywriter for Code with Mosh Support.
 
-Your task is to polish an existing support response.
+Your task is to take a draft reply written by a support agent and polish it into a concise, professional, and properly related response of EXACTLY 2 to 3 clear lines/sentences.
 
-Rewrite the response so that it is:
+GUIDELINES FOR THE 2-3 LINES:
+1. Sentence 1: Clearly acknowledge the inquiry and confirm the specific action taken or solution provided.
+2. Sentence 2: Provide the necessary instructions, verification steps, URL/link, or timeframe details.
+3. Sentence 3 (if applicable): Add a polite, courteous offer of further assistance.
 
-- Professional
-- Natural and human-sounding
-- Clear and concise
-- Grammatically correct
-- Polite and empathetic
-- Appropriate for a student support team
+STRICT RULES:
+1. Length: Keep the body text between 2 and 3 complete sentences. Do NOT write single-word fragments, and do NOT write long essays.
+2. Do NOT include any greeting (e.g., "Hello ...") or sign-off (e.g., "Best regards..."). Return ONLY the polished body text.
+3. Do NOT wrap output in markdown code blocks or quotes. Return plain text only.
+4. Preserve all factual details, procedures, URLs, credentials, and key context intact.
+5. Tone: Polite, empathetic, helpful, and professional.
 
-IMPORTANT RULES:
+Customer: ${studentName?.trim() || 'Student'}
+Category: ${category?.trim() || 'General Support'}
 
-1. Preserve the exact meaning of the original response.
-2. Do not invent information.
-3. Do not add solutions, policies, links, dates, refunds, technical details, or promises that are not present in the original response.
-4. Do not change the actual resolution or instructions.
-5. Improve grammar, spelling, punctuation, wording, and readability.
-6. Remove unnecessary repetition.
-7. Keep the response concise.
-8. Do not make the response sound robotic or overly formal.
-9. Do not include a greeting such as "Hello John".
-10. Do not include a signature or closing such as "Best regards".
-11. Return ONLY the polished response.
-12. If the original response is already clear and professional, make only minor improvements.
-13. Never mention that you are an AI or that the response was generated or polished by AI.
-
-Student name:
-${studentName?.trim() || 'Student'}
-
-Support category:
-${category?.trim() || 'General Support'}
-
-Original support response:
+Draft message to polish:
+"""
 ${cleanedInput}
+"""
 
-Return ONLY the final polished response.`;
+Polished 2-3 line message body:`;
 
   try {
-    const openaiProvider = createOpenAI({
-      apiKey: apiKey.trim(),
-    });
-
-    const modelName = process.env.AI_MODEL || 'gpt-4o-mini';
-
     const { text } = await generateText({
-      model: openaiProvider(modelName),
+      model: aiConfig.model,
       prompt,
       maxRetries: 0,
-      abortSignal: AbortSignal.timeout(5000),
+      abortSignal: AbortSignal.timeout(10000),
     });
 
-    let rawPolished = text?.trim() || '';
-
-    // Strip markdown code block wrapping if present
-    if (rawPolished.startsWith('```')) {
-      rawPolished = rawPolished.replace(/^```[a-zA-Z]*\n?/, '').replace(/\n?```$/, '').trim();
-    }
-    // Strip surrounding quotes if present
-    if (
-      (rawPolished.startsWith('"') && rawPolished.endsWith('"')) ||
-      (rawPolished.startsWith("'") && rawPolished.endsWith("'"))
-    ) {
-      rawPolished = rawPolished.slice(1, -1).trim();
-    }
-
-    // Strip any accidental greetings or signatures returned by the AI
-    const cleanedPolishedBody = stripHeadersAndFooters(rawPolished);
+    const cleanedPolishedBody = cleanAiPolishedBody(text);
 
     if (!cleanedPolishedBody) {
       return heuristicPolishReply(replyText, studentName, category);
@@ -305,7 +361,57 @@ Return ONLY the final polished response.`;
 
     return `${greeting}${cleanedPolishedBody}${signoff}`;
   } catch (error: any) {
-    console.warn('AI Polish Reply failed, using heuristic fallback:', error?.message || error);
+    console.warn(`[${aiConfig.provider}] AI Polish Reply primary attempt (${aiConfig.modelName}) failed, trying fallback:`, error?.message || error);
+
+    // Fallback 1: Gemini Waterfall across active models
+    const geminiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY;
+    if (isNonEmptyApiKey(geminiKey)) {
+      const fallbackModels = ['gemini-3.6-flash', 'gemini-3.5-flash-lite', 'gemini-flash-latest', 'gemini-3.7-flash', 'gemini-3.8-flash'].filter(
+        (m) => m !== aiConfig.modelName
+      );
+      const googleProvider = createGoogle({ apiKey: geminiKey!.trim() });
+      for (const fallbackModel of fallbackModels) {
+        try {
+          const { text: geminiText } = await generateText({
+            model: googleProvider(fallbackModel),
+            prompt,
+            maxRetries: 0,
+            abortSignal: AbortSignal.timeout(10000),
+          });
+          const cleanedGemini = cleanAiPolishedBody(geminiText);
+          if (cleanedGemini) {
+            const greeting = `Hello ${firstName},\n\n`;
+            const signoff = `\n\nBest regards,\nCode with Mosh Support`;
+            return `${greeting}${cleanedGemini}${signoff}`;
+          }
+        } catch (gemErr: any) {
+          console.warn(`[gemini-fallback] Attempt with ${fallbackModel} failed:`, gemErr?.message || gemErr);
+        }
+      }
+    }
+
+    // Fallback 2: OpenAI if configured
+    const openaiKey = process.env.OPENAI_API_KEY || process.env.AI_API_KEY;
+    if (isNonEmptyApiKey(openaiKey)) {
+      try {
+        const openaiProvider = createOpenAI({ apiKey: openaiKey!.trim() });
+        const { text: fallbackText } = await generateText({
+          model: openaiProvider('gpt-4o-mini'),
+          prompt,
+          maxRetries: 1,
+          abortSignal: AbortSignal.timeout(10000),
+        });
+        const cleanedFallback = cleanAiPolishedBody(fallbackText);
+        if (cleanedFallback) {
+          const greeting = `Hello ${firstName},\n\n`;
+          const signoff = `\n\nBest regards,\nCode with Mosh Support`;
+          return `${greeting}${cleanedFallback}${signoff}`;
+        }
+      } catch (secondaryErr: any) {
+        console.warn('[openai] Secondary AI Polish fallback also failed:', secondaryErr?.message || secondaryErr);
+      }
+    }
+
     return heuristicPolishReply(replyText, studentName, category);
   }
 }
@@ -412,30 +518,17 @@ export function heuristicSummarizeTicketAndHistory(ticket: TicketSummaryContext)
 }
 
 /**
- * Summarizes the ticket details and full conversation history using gpt-5-nano via Vercel AI SDK (@ai-sdk/openai).
+ * Summarizes the ticket details and full conversation history using Google Gemini (or OpenAI fallback).
  * Falls back safely to heuristic rule-based summarization when offline or if API is unreachable.
  */
 export async function summarizeTicketAndHistory(ticket: TicketSummaryContext): Promise<string> {
-  const apiKey =
-    process.env.OPENAI_API_KEY ||
-    process.env.AI_API_KEY;
+  const aiConfig = getActiveAiModel(process.env.AI_PROVIDER === 'gemini' ? 'gemini-3.8-flash' : 'gpt-4o-mini');
 
-  if (
-    !apiKey ||
-    apiKey.trim() === '' ||
-    apiKey === '12345' ||
-    apiKey === 'test-openai-key' ||
-    apiKey === 'mock-openai-key' ||
-    apiKey.length < 10
-  ) {
+  if (!aiConfig) {
     return heuristicSummarizeTicketAndHistory(ticket);
   }
 
   try {
-    const openaiProvider = createOpenAI({
-      apiKey: apiKey.trim(),
-    });
-
     const messagesFormatted = (ticket.messages || [])
       .map((m, idx) => {
         const senderLabel = m.isInternalNote
@@ -475,10 +568,10 @@ Return ONLY the structured summary text without conversational prefixes or meta 
 
     try {
       const { text } = await generateText({
-        model: openaiProvider('gpt-4o-mini'),
+        model: aiConfig.model,
         prompt,
         maxRetries: 0,
-        abortSignal: AbortSignal.timeout(3500),
+        abortSignal: AbortSignal.timeout(4000),
       });
 
       const cleaned = text?.trim();
@@ -491,7 +584,7 @@ Return ONLY the structured summary text without conversational prefixes or meta 
 
     return heuristicSummarizeTicketAndHistory(ticket);
   } catch (error: any) {
-    console.warn('AI Summarization failed or timed out, using fallback:', error?.message || error);
+    console.warn(`[${aiConfig.provider}] AI Summarization failed or timed out, using fallback:`, error?.message || error);
     return heuristicSummarizeTicketAndHistory(ticket);
   }
 }

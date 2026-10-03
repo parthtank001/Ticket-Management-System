@@ -50,20 +50,20 @@ export const TicketDetailPage: React.FC<TicketDetailPageProps> = ({
   if (!ticket) {
     return (
       <div className="max-w-md mx-auto py-10 px-4 font-sans">
-        <div className="bg-white border border-slate-200/80 rounded-xl p-6 text-center shadow-xs">
-          <div className="mx-auto h-10 w-10 rounded-full bg-rose-50 flex items-center justify-center text-rose-500 mb-2.5">
+        <div className="bg-white dark:bg-slate-900/80 backdrop-blur-md border border-slate-200/80 dark:border-slate-800/80 rounded-xl p-6 text-center shadow-xs">
+          <div className="mx-auto h-10 w-10 rounded-full bg-rose-50 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-800/60 flex items-center justify-center text-rose-600 dark:text-rose-400 mb-2.5">
             <Inbox className="h-5 w-5" />
           </div>
-          <h2 className="text-base font-bold text-slate-900 mb-1">
+          <h2 className="text-base font-bold text-slate-900 dark:text-white mb-1">
             Ticket Not Found
           </h2>
-          <p className="text-[11px] text-slate-500 max-w-xs mx-auto mb-4">
+          <p className="text-[11px] text-slate-600 dark:text-slate-400 max-w-xs mx-auto mb-4">
             The requested ticket {activeTicketId ? `#${activeTicketId} ` : ''}could not be found, or you may not have permission to view it.
           </p>
           <button
             type="button"
             onClick={() => onNavigate('/tickets')}
-            className="inline-flex items-center space-x-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition-colors shadow-xs cursor-pointer"
+            className="inline-flex items-center space-x-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold transition-all shadow-xs cursor-pointer"
           >
             <ArrowLeft className="h-3 w-3" />
             <span>Back to Tickets</span>
@@ -82,15 +82,15 @@ export const TicketDetailPage: React.FC<TicketDetailPageProps> = ({
         <button
           type="button"
           onClick={() => onNavigate('/tickets')}
-          className="inline-flex items-center space-x-1.5 px-2.5 py-1 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-lg text-[11px] font-semibold transition-colors shadow-2xs cursor-pointer group"
+          className="inline-flex items-center space-x-1.5 px-2.5 py-1 bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-lg text-[11px] font-semibold transition-colors shadow-xs cursor-pointer group"
         >
-          <ArrowLeft className="h-3 w-3 group-hover:-translate-x-0.5 transition-transform" />
+          <ArrowLeft className="h-3 w-3 group-hover:-translate-x-0.5 transition-transform text-slate-400 group-hover:text-indigo-600 dark:group-hover:text-indigo-400" />
           <span>Back to Tickets</span>
         </button>
 
         <div className="flex items-center space-x-2">
-          <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 font-bold text-[10px] border border-indigo-200/60">
-            <Hash className="h-3 w-3 mr-0.5" />
+          <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-indigo-50 dark:bg-indigo-950/70 text-indigo-700 dark:text-indigo-300 font-bold text-[10px] border border-indigo-200/80 dark:border-indigo-800/60 shadow-xs dark:shadow-[0_0_8px_rgba(99,102,241,0.2)] font-mono">
+            <Hash className="h-3 w-3 mr-0.5 text-indigo-600 dark:text-indigo-400" />
             Ticket #{ticket.id}
           </span>
           <TicketStatusBadge status={ticket.status} size="sm" />
@@ -112,22 +112,22 @@ export const TicketDetailPage: React.FC<TicketDetailPageProps> = ({
         {/* LEFT COLUMN: Main Content & Thread */}
         <div className="md:col-span-2 space-y-3.5">
           {/* Main Ticket Subject & Sender Information Card */}
-          <div className="bg-white border border-slate-200/80 rounded-xl p-4 shadow-xs space-y-3">
+          <div className="bg-white dark:bg-slate-900/80 backdrop-blur-md border border-slate-200/80 dark:border-slate-800/80 rounded-xl p-4 shadow-xs dark:shadow-[0_4px_20px_rgba(0,0,0,0.3)] space-y-3">
             <div>
-              <h1 className="text-sm sm:text-base font-bold text-slate-900 tracking-tight mb-1.5">
+              <h1 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white tracking-tight mb-1.5">
                 {ticket.subject}
               </h1>
-              <div className="flex flex-wrap items-center gap-2.5 text-[11px] text-slate-600 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+              <div className="flex flex-wrap items-center gap-2.5 text-[11px] text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-slate-950/60 p-2.5 rounded-lg border border-slate-200/80 dark:border-slate-800/80">
                 <div className="flex items-center space-x-1.5">
-                  <User className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-                  <span className="font-semibold text-slate-800">
+                  <User className="h-3.5 w-3.5 text-slate-400 dark:text-slate-500 shrink-0" />
+                  <span className="font-semibold text-slate-900 dark:text-slate-100">
                     {ticket.studentName}
                   </span>
-                  <span className="text-slate-400">&bull;</span>
-                  <span className="text-slate-500 truncate max-w-[160px]">{ticket.studentEmail}</span>
+                  <span className="text-slate-400 dark:text-slate-600">&bull;</span>
+                  <span className="text-slate-500 dark:text-slate-400 truncate max-w-[160px]">{ticket.studentEmail}</span>
                 </div>
-                <div className="flex items-center space-x-1.5 sm:ml-auto text-[10px] text-slate-500">
-                  <Calendar className="h-3 w-3 text-slate-400 shrink-0" />
+                <div className="flex items-center space-x-1.5 sm:ml-auto text-[10px] text-slate-500 dark:text-slate-400 font-mono">
+                  <Calendar className="h-3 w-3 text-slate-400 dark:text-slate-500 shrink-0" />
                   <span>Created {formattedCreatedDate}</span>
                 </div>
               </div>
@@ -135,7 +135,7 @@ export const TicketDetailPage: React.FC<TicketDetailPageProps> = ({
 
             {/* Ticket Initial Inquiry Body */}
             {ticket.body && (
-              <div className="text-xs text-slate-700 leading-relaxed whitespace-pre-wrap bg-slate-50/60 p-3 rounded-lg border border-slate-100/90 font-normal">
+              <div className="text-xs text-slate-700 dark:text-slate-200 leading-relaxed whitespace-pre-wrap bg-slate-50/70 dark:bg-slate-950/50 p-3 rounded-lg border border-slate-200/70 dark:border-slate-800/70 font-normal">
                 {ticket.body.split(/\n\n---\s*\[/)[0]}
               </div>
             )}

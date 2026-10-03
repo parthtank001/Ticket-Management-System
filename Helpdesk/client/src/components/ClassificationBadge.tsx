@@ -1,5 +1,5 @@
 import React from 'react';
-import { Sparkles, Brain, ShieldAlert, Tag, CheckCircle2 } from 'lucide-react';
+import { Sparkles, Brain, ShieldAlert, Tag } from 'lucide-react';
 import type { Category, Priority } from '../lib/types';
 import { cn } from '../lib/utils';
 import { CategoryBadge, PriorityBadge } from './TicketBadges';
@@ -31,11 +31,11 @@ export const ClassificationBadge: React.FC<ClassificationBadgeProps> = ({
         <div
           role="alert"
           className={cn(
-            'flex items-center gap-2 px-3 py-2 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs font-medium',
+            'flex items-center gap-2 px-3 py-2 rounded-lg bg-rose-50 dark:bg-rose-500/10 border border-rose-200 dark:border-rose-500/20 text-rose-700 dark:text-rose-300 text-xs font-medium',
             className
           )}
         >
-          <ShieldAlert className="w-4 h-4 text-rose-400 shrink-0" />
+          <ShieldAlert className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0" />
           <span>Escalation Rule Triggered: Routed to Senior Support</span>
         </div>
       );
@@ -44,11 +44,11 @@ export const ClassificationBadge: React.FC<ClassificationBadgeProps> = ({
     return (
       <span
         className={cn(
-          'inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-rose-500/10 text-rose-400 border border-rose-500/20',
+          'inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-rose-50 dark:bg-rose-500/10 text-rose-700 dark:text-rose-400 border border-rose-200 dark:border-rose-500/20',
           className
         )}
       >
-        <ShieldAlert className="w-3 h-3 text-rose-400" />
+        <ShieldAlert className="w-3 h-3 text-rose-600 dark:text-rose-400" />
         Escalated
       </span>
     );
@@ -58,18 +58,18 @@ export const ClassificationBadge: React.FC<ClassificationBadgeProps> = ({
     return (
       <div
         className={cn(
-          'flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-3 py-2 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-xs font-medium',
+          'flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-3 py-2 rounded-lg bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-200 dark:border-indigo-500/20 text-indigo-700 dark:text-indigo-300 text-xs font-medium',
           className
         )}
       >
         <div className="flex items-center gap-2">
-          <Brain className="w-4 h-4 text-indigo-400 shrink-0" />
+          <Brain className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
           <span>
             AI Classified: {category ? category.replace('_', ' ') : 'Pending'}{' '}
             {confidence ? `(${Math.round(confidence * 100)}% Confidence)` : ''}
           </span>
         </div>
-        {reasoning && <span className="text-slate-400 text-[11px] truncate max-w-xs">{reasoning}</span>}
+        {reasoning && <span className="text-slate-500 dark:text-slate-400 text-[11px] truncate max-w-xs">{reasoning}</span>}
       </div>
     );
   }
@@ -78,11 +78,11 @@ export const ClassificationBadge: React.FC<ClassificationBadgeProps> = ({
     return (
       <span
         className={cn(
-          'inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-indigo-500/10 text-indigo-400 border border-indigo-500/20',
+          'inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-500/20',
           className
         )}
       >
-        <Sparkles className="w-3 h-3 text-indigo-400" />
+        <Sparkles className="w-3 h-3 text-indigo-600 dark:text-indigo-400" />
         {confidence ? `${Math.round(confidence * 100)}%` : 'AI'}
       </span>
     );
@@ -93,8 +93,8 @@ export const ClassificationBadge: React.FC<ClassificationBadgeProps> = ({
       {category && <CategoryBadge category={category} />}
       {priority && <PriorityBadge priority={priority} />}
       {confidence !== undefined && (
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
-          <Sparkles className="w-3 h-3 text-indigo-400" />
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-500/20">
+          <Sparkles className="w-3 h-3 text-indigo-600 dark:text-indigo-400" />
           {Math.round(confidence * 100)}% Confidence
         </span>
       )}
@@ -103,9 +103,9 @@ export const ClassificationBadge: React.FC<ClassificationBadgeProps> = ({
           {tags.slice(0, 3).map((tag) => (
             <span
               key={tag}
-              className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-normal bg-slate-800 text-slate-400 border border-slate-700"
+              className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-normal bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700"
             >
-              <Tag className="w-2.5 h-2.5 text-slate-500" />
+              <Tag className="w-2.5 h-2.5 text-slate-400 dark:text-slate-500" />
               {tag}
             </span>
           ))}

@@ -79,21 +79,22 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 font-sans">
+    <div className="min-h-screen bg-slate-50 dark:bg-[#080C14] flex items-center justify-center p-4 font-sans selection:bg-indigo-500/20 selection:text-indigo-900 dark:selection:text-indigo-200">
       
-      {/* Centered shadcn Card */}
-      <Card className="w-full max-w-sm shadow-xl border-slate-200 bg-white">
+      {/* Centered Modern Glass Card */}
+      <Card className="w-full max-w-sm shadow-xl dark:shadow-[0_0_40px_rgba(0,0,0,0.8)] border-slate-200/80 dark:border-slate-800/90 bg-white/95 dark:bg-slate-900/90 backdrop-blur-md rounded-2xl overflow-hidden">
         
         {/* Card Header */}
         <CardHeader className="text-center space-y-2 pb-4">
-          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-slate-900 text-white shadow-md">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-600 text-white shadow-md">
             <Ticket className="h-6 w-6" />
           </div>
           <div>
-            <CardTitle className="text-xl font-bold tracking-tight text-slate-900">
-              Helpdesk Platform
+            <CardTitle className="text-xl font-extrabold tracking-tight text-slate-900 dark:text-white flex items-center justify-center gap-2">
+              <span>Helpdesk Platform</span>
+              <span className="h-1.5 w-1.5 rounded-full bg-indigo-500 animate-pulse" />
             </CardTitle>
-            <CardDescription className="text-slate-500 text-xs mt-1">
+            <CardDescription className="text-slate-500 dark:text-slate-400 text-xs mt-1">
               Sign in to access your workspace
             </CardDescription>
           </div>
@@ -102,8 +103,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
         <CardContent className="space-y-4">
           {/* Error Alert */}
           {errorMessage && (
-            <Alert variant="destructive" className="py-2.5 px-3 text-xs bg-red-50 text-red-800 border-red-200">
-              <AlertCircle className="h-4 w-4 text-red-600 shrink-0" />
+            <Alert variant="destructive" className="py-2.5 px-3 text-xs bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800/60 shadow-xs">
+              <AlertCircle className="h-4 w-4 text-rose-600 dark:text-rose-400 shrink-0" />
               <AlertDescription className="font-medium ml-2">
                 {errorMessage}
               </AlertDescription>
@@ -113,11 +114,11 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-3.5" noValidate>
             {/* Email Field */}
             <div className="space-y-1.5">
-              <Label htmlFor="email" className="text-xs font-semibold text-slate-700">
+              <Label htmlFor="email" className="text-xs font-semibold text-slate-700 dark:text-slate-300">
                 Work Email
               </Label>
               <div className="relative">
-                <Mail className="absolute left-3 top-2.5 h-4 w-4 text-slate-400 pointer-events-none" />
+                <Mail className="absolute left-3 top-2.5 h-4 w-4 text-slate-400 dark:text-slate-500 pointer-events-none" />
                 <Input
                   id="email"
                   type="email"
@@ -125,25 +126,25 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
                   {...register('email')}
                   placeholder="admin@example.com"
                   className={cn(
-                    'pl-9 h-9 text-xs transition-colors',
+                    'pl-9 h-9 text-xs transition-colors bg-white dark:bg-slate-950/80 border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus-visible:ring-1 focus-visible:ring-indigo-500/30 focus-visible:border-indigo-600',
                     errors.email
-                      ? 'border-red-500 focus-visible:ring-red-500 focus-visible:border-red-500 bg-red-50/20'
-                      : 'bg-slate-50/50'
+                      ? 'border-rose-500 focus-visible:ring-rose-500/30 focus-visible:border-rose-500 bg-rose-50 dark:bg-rose-950/20'
+                      : ''
                   )}
                 />
               </div>
               {errors.email && (
-                <p className="text-red-500 text-[11px] font-medium">{errors.email.message}</p>
+                <p className="text-rose-600 dark:text-rose-400 text-[11px] font-medium">{errors.email.message}</p>
               )}
             </div>
 
             {/* Password Field */}
             <div className="space-y-1.5">
-              <Label htmlFor="password" className="text-xs font-semibold text-slate-700">
+              <Label htmlFor="password" className="text-xs font-semibold text-slate-700 dark:text-slate-300">
                 Password
               </Label>
               <div className="relative">
-                <Lock className="absolute left-3 top-2.5 h-4 w-4 text-slate-400 pointer-events-none" />
+                <Lock className="absolute left-3 top-2.5 h-4 w-4 text-slate-400 dark:text-slate-500 pointer-events-none" />
                 <Input
                   id="password"
                   type={showPassword ? 'text' : 'password'}
@@ -151,23 +152,23 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
                   {...register('password')}
                   placeholder="••••••••••••"
                   className={cn(
-                    'pl-9 pr-9 h-9 text-xs transition-colors',
+                    'pl-9 pr-9 h-9 text-xs transition-colors bg-white dark:bg-slate-950/80 border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus-visible:ring-1 focus-visible:ring-indigo-500/30 focus-visible:border-indigo-600',
                     errors.password
-                      ? 'border-red-500 focus-visible:ring-red-500 focus-visible:border-red-500 bg-red-50/20'
-                      : 'bg-slate-50/50'
+                      ? 'border-rose-500 focus-visible:ring-rose-500/30 focus-visible:border-rose-500 bg-rose-50 dark:bg-rose-950/20'
+                      : ''
                   )}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600 focus:outline-none transition-colors"
+                  className="absolute right-2.5 top-2.5 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 focus:outline-none transition-colors cursor-pointer"
                   tabIndex={-1}
                 >
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
               </div>
               {errors.password && (
-                <p className="text-red-500 text-[11px] font-medium">{errors.password.message}</p>
+                <p className="text-rose-600 dark:text-rose-400 text-[11px] font-medium">{errors.password.message}</p>
               )}
             </div>
 
@@ -175,16 +176,16 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
             <Button
               type="submit"
               disabled={isLoading}
-              className="w-full h-9 mt-1 bg-slate-900 hover:bg-slate-800 text-white font-medium text-xs shadow-sm transition-all active:scale-[0.99]"
+              className="w-full h-9 mt-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-xs transition-all active:scale-[0.99] cursor-pointer rounded-lg"
             >
               {isLoading ? (
                 <>
-                  <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
+                  <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5 text-white" />
                   <span>Signing in...</span>
                 </>
               ) : (
                 <>
-                  <LogIn className="h-3.5 w-3.5 mr-1.5" />
+                  <LogIn className="h-3.5 w-3.5 mr-1.5 text-white" />
                   <span>Sign In to Workspace</span>
                 </>
               )}
@@ -193,12 +194,12 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
         </CardContent>
 
         {/* Quick Demo Footer */}
-        <CardFooter className="flex flex-col pt-2 border-t border-slate-100 bg-slate-50/50 rounded-b-xl">
+        <CardFooter className="flex flex-col pt-3 border-t border-slate-200/80 dark:border-slate-800/80 bg-slate-50/70 dark:bg-slate-950/60 rounded-b-2xl">
           <div className="w-full flex items-center justify-between mb-2">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+            <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
               Demo Quick Select
             </span>
-            <Badge variant="outline" className="text-[10px] py-0 px-1.5 font-mono text-slate-500">
+            <Badge variant="outline" className="text-[10px] py-0 px-1.5 font-mono text-indigo-700 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800/60 bg-indigo-50 dark:bg-indigo-950/40">
               Demo Credentials
             </Badge>
           </div>
@@ -207,25 +208,25 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
             <button
               type="button"
               onClick={() => handleQuickFill('admin@example.com', 'password123')}
-              className="p-2 bg-white hover:bg-indigo-50/80 border border-slate-200 hover:border-indigo-300 rounded-lg text-left transition-all group"
+              className="p-2 bg-white dark:bg-slate-900/80 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 hover:border-indigo-300 dark:hover:border-indigo-500/50 rounded-xl text-left transition-all group cursor-pointer shadow-2xs"
             >
               <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-slate-800 group-hover:text-indigo-600">Admin</span>
-                <ShieldCheck className="h-3.5 w-3.5 text-indigo-600" />
+                <span className="text-xs font-semibold text-slate-900 dark:text-slate-200 group-hover:text-indigo-600 dark:group-hover:text-indigo-400">Admin</span>
+                <ShieldCheck className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
               </div>
-              <p className="text-[10px] font-mono text-slate-500 mt-0.5 truncate">admin@example.com</p>
+              <p className="text-[10px] font-mono text-slate-400 dark:text-slate-500 mt-0.5 truncate">admin@example.com</p>
             </button>
 
             <button
               type="button"
               onClick={() => handleQuickFill('agent@example.com', 'password123')}
-              className="p-2 bg-white hover:bg-emerald-50/80 border border-slate-200 hover:border-emerald-300 rounded-lg text-left transition-all group"
+              className="p-2 bg-white dark:bg-slate-900/80 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 hover:border-emerald-300 dark:hover:border-emerald-500/50 rounded-xl text-left transition-all group cursor-pointer shadow-2xs"
             >
               <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-slate-800 group-hover:text-emerald-600">Agent</span>
-                <UserCheck className="h-3.5 w-3.5 text-emerald-600" />
+                <span className="text-xs font-semibold text-slate-900 dark:text-slate-200 group-hover:text-emerald-600 dark:group-hover:text-emerald-400">Agent</span>
+                <UserCheck className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
               </div>
-              <p className="text-[10px] font-mono text-slate-500 mt-0.5 truncate">agent@example.com</p>
+              <p className="text-[10px] font-mono text-slate-400 dark:text-slate-500 mt-0.5 truncate">agent@example.com</p>
             </button>
           </div>
         </CardFooter>
