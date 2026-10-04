@@ -1,0 +1,101 @@
+# Render Blueprint Specification for AI Ticket Management & Helpdesk System
+# Deploy in 1-click on Render: https://render.com
+
+services:
+  - type: web
+    name: helpdesk-ai-system
+    runtime: node
+    plan: free # Change to starter or standard for always-on instance without cold starts
+    buildCommand: npm install && npm --prefix client install --legacy-peer-deps && npx prisma generate && npm run build
+    startCommand: npx prisma migrate deploy && npm start
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+
+      # PostgreSQL Database Connection (automatically linked from managed database below)
+      - key: DATABASE_URL
+        fromDatabase:
+          name: helpdesk-postgres
+          property: connectionString
+
+      # Authentication Security
+      - key: BETTER_AUTH_SECRET
+        generateValue: true
+
+      - key: BETTER_AUTH_URL
+        fromService:
+          type: web
+          name: helpdesk-ai-system
+          property: host
+
+      # AI Provider Configuration (Default: Gemini / Fallback: OpenAI)
+      - key: AI_PROVIDER
+        value: gemini
+
+      - key: GEMINI_MODEL
+        value: gemini-3.5-flash-lite
+
+      - key: GEMINI_API_KEY
+        sync: false # Render dashboard will prompt for your API key
+
+      - key: OPENAI_API_KEY
+        sync: false # Optional: Set if using OpenAI models
+
+      # Initial Default Admin & Agent Credentials (Auto-provisioned on first boot)
+      - key: ADMIN_EMAIL
+        value: admin@example.com
+
+      - key: ADMIN_PASSWORD
+        generateValue: true
+
+      - key: AGENT_EMAIL
+        value: agent@example.com
+
+      - key: AGENT_PASSWORD
+        generateValue: true
+
+      - key: AI_AGENT_EMAIL
+        value: ai@example.com
+
+      - key: AI_AGENT_PASSWORD
+        generateValue: true
+
+      # Email Integration (Mailgun - Inbound & Outbound)
+      - key: SUPPORT_EMAIL
+        value: support@example.com
+
+      - key: MAILGUN_API_KEY
+        sync: false
+
+      - key: MAILGUN_DOMAIN
+        sync: false
+
+      - key: MAILGUN_SIGNING_KEY
+        sync: false
+
+      - key: MAILGUN_HOST
+        value: api.mailgun.net
+
+      # Webhooks & Security
+      - key: WEBHOOK_SECRET
+        generateValue: true
+
+      # Sentry Telemetry & Error Tracking (Optional)
+      - key: SENTRY_DSN
+        sync: false
+
+      - key: SENTRY_ENVIRONMENT
+        value: production
+
+      - key: SENTRY_TRACES_SAMPLE_RATE
+        value: "0.2"
+
+databases:
+  # Managed PostgreSQL Database
+  - name: helpdesk-postgres
+    plan: free # Change to starter for persistent high-throughput workloads
+    databaseName: helpdesk
+    user: helpdesk
+    ipAllowList: [] # Allows connections from all Render services within the account
