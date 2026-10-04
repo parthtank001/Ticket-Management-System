@@ -17,6 +17,9 @@ services:
       - key: NODE_VERSION
         value: "22"
 
+      - key: NODE_OPTIONS
+        value: "--max-old-space-size=450"
+
       # PostgreSQL Database Connection (automatically linked from managed database below)
       - key: DATABASE_URL
         fromDatabase:

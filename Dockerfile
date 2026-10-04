@@ -40,4 +40,4 @@ COPY --from=builder /app/Helpdesk /app/Helpdesk
 
 EXPOSE 5000
 
-CMD ["sh", "-c", "npx prisma migrate deploy && npx ts-node server/index.ts"]
+CMD ["sh", "-c", "npx prisma migrate deploy && npx tsx server/index.ts"]
