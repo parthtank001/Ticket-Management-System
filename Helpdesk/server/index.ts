@@ -877,15 +877,11 @@ const server = app.listen(PORT, async () => {
   await deployStoredFunctions();
   await initQueue();
 
-  // Auto-seed default Admin & AI Agent accounts on first deployment if table is empty
+  // Ensure default Admin, Agent, and AI Agent credentials are fully synced on startup
   try {
-    const userCount = await prisma.user.count();
-    if (userCount === 0) {
-      console.log('🌱 Database is empty. Running initial user seed for Admin, Agent, and AI Agent...');
-      await seedDatabase(prisma);
-    }
+    await seedDatabase(prisma);
   } catch (seedErr: any) {
-    console.warn('⚠️ Auto-seed check notice (continuing):', seedErr?.message || seedErr);
+    console.warn('⚠️ Auto-seed credentials sync notice (continuing):', seedErr?.message || seedErr);
   }
 });
 

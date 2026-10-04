@@ -48,19 +48,19 @@ services:
         value: admin@example.com
 
       - key: ADMIN_PASSWORD
-        generateValue: true
+        value: password123
 
       - key: AGENT_EMAIL
         value: agent@example.com
 
       - key: AGENT_PASSWORD
-        generateValue: true
+        value: password123
 
       - key: AI_AGENT_EMAIL
         value: ai@example.com
 
       - key: AI_AGENT_PASSWORD
-        generateValue: true
+        value: password123
 
       # Email Integration (Mailgun - Inbound & Outbound)
       - key: SUPPORT_EMAIL
