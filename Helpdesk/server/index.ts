@@ -13,6 +13,9 @@ import emailsRouter from './routes/emails';
 import autoResolveRouter from './routes/auto-resolve';
 import classificationRouter from './routes/classification';
 import dashboardRouter from './routes/dashboard';
+import path from 'path';
+import fs from 'fs';
+import { seedDatabase } from '../prisma/seed';
 import type { Category, Priority, TicketStatus, SenderType } from '@helpdesk/core';
 import {
   createTicketSchema,
@@ -39,7 +42,7 @@ import { deployStoredFunctions } from './db/stored-procedures';
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Trust reverse proxy in production (e.g. Nginx, Load Balancers) for accurate client IP identification
+// Trust reverse proxy in production (e.g. Render, Nginx, Load Balancers) for accurate client IP identification
 if (isProductionEnvironment()) {
   app.set('trust proxy', 1);
 }
@@ -53,6 +56,8 @@ const allowedOrigins = [
   'http://127.0.0.1:3000',
   'http://localhost:5000',
   'http://127.0.0.1:5000',
+  ...(process.env.RENDER_EXTERNAL_URL ? [process.env.RENDER_EXTERNAL_URL.trim()] : []),
+  ...(process.env.BETTER_AUTH_URL ? [process.env.BETTER_AUTH_URL.trim()] : []),
   ...(process.env.TRUSTED_ORIGIN ? process.env.TRUSTED_ORIGIN.split(',').map((o) => o.trim()) : []),
 ];
 
@@ -119,6 +124,9 @@ app.use('/api/auto-resolve', autoResolveRouter);
 // Mount Classification Routes
 app.use('/api/classify', classificationRouter);
 app.use('/api/classification', classificationRouter);
+
+// Mount Dashboard Analytics & Metrics Routes
+app.use('/api/dashboard', dashboardRouter);
 
 app.get(['/debug-sentry', '/api/debug-sentry'], async (req: Request, res: Response) => {
   const error = new Error('Sentry error for testing purposes');
@@ -807,6 +815,36 @@ app.get('/api/test-sentry-error', async (req: Request, res: Response) => {
   }
 });
 
+// Locate and serve static client assets (production SPA build)
+const possibleClientDistPaths = [
+  path.resolve(__dirname, '../client/dist'),
+  path.resolve(__dirname, '../../client/dist'),
+  path.resolve(process.cwd(), 'client/dist'),
+  path.resolve(process.cwd(), 'Helpdesk/client/dist'),
+];
+const clientDistPath = possibleClientDistPaths.find((p) => fs.existsSync(p));
+
+if (clientDistPath) {
+  console.log(`📦 Serving static frontend assets from: ${clientDistPath}`);
+  app.use(express.static(clientDistPath));
+
+  // Single Page Application (SPA) fallback for client-side routing
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    if (req.method === 'GET' && !req.path.startsWith('/api')) {
+      const indexPath = path.join(clientDistPath, 'index.html');
+      if (fs.existsSync(indexPath)) {
+        return res.sendFile(indexPath);
+      }
+    }
+    next();
+  });
+}
+
+// Explicit 404 handler for unmatched API routes
+app.all('/api/*splat', (req: Request, res: Response) => {
+  res.status(404).json({ error: `API endpoint not found: ${req.method} ${req.path}` });
+});
+
 // Mount Sentry error handler before custom error middleware
 Sentry.setupExpressErrorHandler(app);
 
@@ -838,6 +876,17 @@ const server = app.listen(PORT, async () => {
   console.log(`🚀 Express server running at http://localhost:${PORT}`);
   await deployStoredFunctions();
   await initQueue();
+
+  // Auto-seed default Admin & AI Agent accounts on first deployment if table is empty
+  try {
+    const userCount = await prisma.user.count();
+    if (userCount === 0) {
+      console.log('🌱 Database is empty. Running initial user seed for Admin, Agent, and AI Agent...');
+      await seedDatabase(prisma);
+    }
+  } catch (seedErr: any) {
+    console.warn('⚠️ Auto-seed check notice (continuing):', seedErr?.message || seedErr);
+  }
 });
 
 // Graceful shutdown handling

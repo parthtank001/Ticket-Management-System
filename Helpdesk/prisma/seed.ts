@@ -4,9 +4,9 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-const prisma = new PrismaClient();
+const defaultPrisma = new PrismaClient();
 
-async function main() {
+export async function seedDatabase(prismaClient: PrismaClient = defaultPrisma) {
   console.log('🌱 Starting database seeding...');
 
   const adminEmail = process.env.ADMIN_EMAIL || 'admin@example.com';
@@ -50,7 +50,7 @@ async function main() {
     console.log(`👤 Seeding user: ${userData.email} (${userData.role})...`);
 
     // 1. Upsert User record
-    const user = await prisma.user.upsert({
+    const user = await prismaClient.user.upsert({
       where: { email: userData.email },
       update: {
         name: userData.name,
@@ -73,7 +73,7 @@ async function main() {
     const hashedPassword = await hashPassword(userData.password);
 
     // 3. Find or create associated Account record for credential login
-    const existingAccount = await prisma.account.findFirst({
+    const existingAccount = await prismaClient.account.findFirst({
       where: {
         userId: user.id,
         providerId: 'credential',
@@ -81,7 +81,7 @@ async function main() {
     });
 
     if (existingAccount) {
-      await prisma.account.update({
+      await prismaClient.account.update({
         where: { id: existingAccount.id },
         data: {
           password: hashedPassword,
@@ -91,7 +91,7 @@ async function main() {
       });
       console.log(`   ✓ Updated credential account for ${userData.email}`);
     } else {
-      await prisma.account.create({
+      await prismaClient.account.create({
         data: {
           userId: user.id,
           accountId: user.id,
@@ -107,11 +107,13 @@ async function main() {
   console.log('✅ Database seeding completed successfully!');
 }
 
-main()
-  .catch((e) => {
-    console.error('❌ Error during seeding:', e);
-    process.exit(1);
-  })
-  .finally(async () => {
-    await prisma.$disconnect();
-  });
+if (require.main === module) {
+  seedDatabase()
+    .catch((e) => {
+      console.error('❌ Error during seeding:', e);
+      process.exit(1);
+    })
+    .finally(async () => {
+      await defaultPrisma.$disconnect();
+    });
+}

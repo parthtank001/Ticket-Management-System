@@ -1,4 +1,16 @@
 {
+  "name": "ai-ticket-management-system-root",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "postinstall": "npm --prefix Helpdesk install && npm --prefix Helpdesk/client install --legacy-peer-deps",
+    "build": "npm --prefix Helpdesk run build",
+    "start": "npm --prefix Helpdesk start",
+    "start:prod": "npm --prefix Helpdesk run start:prod",
+    "prisma:generate": "npm --prefix Helpdesk run prisma:generate",
+    "prisma:migrate": "npm --prefix Helpdesk run prisma:migrate",
+    "seed": "npm --prefix Helpdesk run seed"
+  },
   "dependencies": {
     "@ai-sdk/google": "^4.0.87",
     "@ai-sdk/openai": "^4.0.81",

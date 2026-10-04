@@ -547,7 +547,29 @@ When creating, maintaining, or refactoring Playwright E2E tests:
    - Use semantic selectors (`page.getByRole`, `page.getByText`, `page.locator`).
    - Use web-first assertions with auto-waiting (`expect(locator).toBeVisible({ timeout: ... })`) without manual sleeps.
    - Clean state and cookies before each test case (`test.beforeEach`).
-   - Use default seeded accounts (`admin@example.com` / `password123` and `agent@example.com` / `password123`).
+
+## 8. Production Deployment (Render.com)
+
+### 8.1 Deployment Architecture
+- **Full-Stack Unified Web Service**: In production, the Express backend serves all REST API endpoints under `/api/*` and simultaneously hosts the production React SPA static assets (`client/dist`) with Single Page Application fallback (`index.html`) for client-side routing.
+- **Database Provisioning**: Render Managed PostgreSQL Database with automated migrations (`prisma migrate deploy`) and automatic first-boot database seeding if user count is zero.
+- **Background Queue (`pg-boss`)**: Automatically initializes on PostgreSQL connection with graceful event-loop fallback for zero-downtime background job processing.
+- **Infrastructure as Code**:
+  - `render.yaml` (Blueprint specification) located at the repository root and `Helpdesk/` folder for 1-click stack creation.
+  - `Dockerfile` & `.dockerignore` for container-based deployments.
+  - Health check endpoint at `GET /api/health`.
+
+### 8.2 Environment Variables on Render
+- `NODE_ENV=production`
+- `DATABASE_URL`: Linked from Render PostgreSQL database connection string.
+- `BETTER_AUTH_SECRET`: Random 32+ character authentication secret.
+- `BETTER_AUTH_URL`: Canonical service URL (or auto-synced `RENDER_EXTERNAL_URL`).
+- `AI_PROVIDER`: `gemini` (default) or `openai`.
+- `GEMINI_API_KEY` / `OPENAI_API_KEY`: API keys for AI auto-classification, auto-resolution, summary, and draft polishing.
+- `ADMIN_EMAIL` / `ADMIN_PASSWORD`: Default credentials for the initial administrator.
+- `AGENT_EMAIL` / `AGENT_PASSWORD`: Default credentials for human support agent.
+- `AI_AGENT_EMAIL` / `AI_AGENT_PASSWORD`: Automated AI agent account credentials.
+
 
 
 

@@ -8,7 +8,7 @@ CREATE TYPE "Category" AS ENUM ('GENERAL_QUESTION', 'TECHNICAL_QUESTION', 'REFUN
 CREATE TYPE "Priority" AS ENUM ('LOW', 'MEDIUM', 'HIGH', 'URGENT');
 
 -- CreateEnum
-CREATE TYPE "TicketStatus" AS ENUM ('NEW', 'ASSIGNED', 'IN_PROGRESS', 'PENDING_STUDENT', 'RESOLVED', 'CLOSED');
+CREATE TYPE "TicketStatus" AS ENUM ('NEW', 'PROCESSING', 'OPEN', 'RESOLVED', 'CLOSED');
 
 -- CreateEnum
 CREATE TYPE "SenderType" AS ENUM ('STUDENT', 'AGENT', 'SYSTEM');
@@ -22,6 +22,7 @@ CREATE TABLE "user" (
     "image" TEXT,
     "role" "Role" NOT NULL DEFAULT 'AGENT',
     "isActive" BOOLEAN NOT NULL DEFAULT true,
+    "deletedAt" TIMESTAMP(3),
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
@@ -76,12 +77,13 @@ CREATE TABLE "verification" (
 
 -- CreateTable
 CREATE TABLE "Ticket" (
-    "id" TEXT NOT NULL,
-    "ticketNumber" SERIAL NOT NULL,
+    "id" SERIAL NOT NULL,
     "subject" TEXT NOT NULL,
     "studentEmail" TEXT NOT NULL,
-    "studentName" TEXT,
-    "category" "Category" NOT NULL DEFAULT 'GENERAL_QUESTION',
+    "studentName" TEXT NOT NULL,
+    "body" TEXT NOT NULL DEFAULT '',
+    "bodyHtml" TEXT,
+    "category" "Category",
     "priority" "Priority" NOT NULL DEFAULT 'MEDIUM',
     "status" "TicketStatus" NOT NULL DEFAULT 'NEW',
     "summary" TEXT,
@@ -91,21 +93,6 @@ CREATE TABLE "Ticket" (
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "Ticket_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
-CREATE TABLE "TicketMessage" (
-    "id" TEXT NOT NULL,
-    "ticketId" TEXT NOT NULL,
-    "senderType" "SenderType" NOT NULL,
-    "senderEmail" TEXT NOT NULL,
-    "body" TEXT NOT NULL,
-    "isInternalNote" BOOLEAN NOT NULL DEFAULT false,
-    "messageId" TEXT,
-    "inReplyTo" TEXT,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-    CONSTRAINT "TicketMessage_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -120,17 +107,24 @@ CREATE TABLE "KnowledgeBaseDocument" (
     CONSTRAINT "KnowledgeBaseDocument_pkey" PRIMARY KEY ("id")
 );
 
+-- CreateTable
+CREATE TABLE "webhook_log" (
+    "id" TEXT NOT NULL,
+    "source" TEXT NOT NULL DEFAULT 'inbound_email',
+    "payload" TEXT NOT NULL,
+    "status" TEXT NOT NULL,
+    "ticketId" INTEGER,
+    "reason" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "webhook_log_pkey" PRIMARY KEY ("id")
+);
+
 -- CreateIndex
 CREATE UNIQUE INDEX "user_email_key" ON "user"("email");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "session_token_key" ON "session"("token");
-
--- CreateIndex
-CREATE UNIQUE INDEX "Ticket_ticketNumber_key" ON "Ticket"("ticketNumber");
-
--- CreateIndex
-CREATE UNIQUE INDEX "TicketMessage_messageId_key" ON "TicketMessage"("messageId");
 
 -- AddForeignKey
 ALTER TABLE "session" ADD CONSTRAINT "session_userId_fkey" FOREIGN KEY ("userId") REFERENCES "user"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -140,7 +134,3 @@ ALTER TABLE "account" ADD CONSTRAINT "account_userId_fkey" FOREIGN KEY ("userId"
 
 -- AddForeignKey
 ALTER TABLE "Ticket" ADD CONSTRAINT "Ticket_assignedAgentId_fkey" FOREIGN KEY ("assignedAgentId") REFERENCES "user"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "TicketMessage" ADD CONSTRAINT "TicketMessage_ticketId_fkey" FOREIGN KEY ("ticketId") REFERENCES "Ticket"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
