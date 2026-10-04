@@ -4,11 +4,10 @@
 services:
   - type: web
     name: helpdesk-ai-system
-    runtime: node
+    runtime: docker
+    dockerfilePath: Dockerfile
+    dockerContext: .
     plan: free # Change to starter or standard for always-on instance without cold starts
-    rootDir: Helpdesk
-    buildCommand: npm install --include=dev && npm --prefix client install --include=dev --legacy-peer-deps && (chmod -R +x node_modules/.bin || true) && npx prisma generate && npm run build
-    startCommand: (chmod -R +x node_modules/.bin || true) && npx prisma migrate deploy && npm start
     healthCheckPath: /api/health
     autoDeploy: true
     envVars:
