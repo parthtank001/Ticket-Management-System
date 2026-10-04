@@ -30,12 +30,6 @@ services:
       - key: BETTER_AUTH_SECRET
         generateValue: true
 
-      - key: BETTER_AUTH_URL
-        fromService:
-          type: web
-          name: helpdesk-ai-system
-          property: host
-
       # AI Provider Configuration (Default: Gemini / Fallback: OpenAI)
       - key: AI_PROVIDER
         value: gemini
