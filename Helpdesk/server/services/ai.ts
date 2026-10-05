@@ -361,11 +361,19 @@ Polished 2-3 line message body:`;
 
     return `${greeting}${cleanedPolishedBody}${signoff}`;
   } catch (error: any) {
-    console.warn(`[${aiConfig.provider}] AI Polish Reply primary attempt (${aiConfig.modelName}) failed, trying fallback:`, error?.message || error);
+    const errorMsg = error?.message || String(error);
+    const isAuthError =
+      errorMsg.includes('authentication credentials') ||
+      errorMsg.includes('API key') ||
+      errorMsg.includes('401') ||
+      errorMsg.includes('403') ||
+      errorMsg.includes('unauthorized');
 
-    // Fallback 1: Gemini Waterfall across active models
+    console.warn(`[${aiConfig.provider}] AI Polish Reply primary attempt (${aiConfig.modelName}) failed, trying fallback:`, errorMsg);
+
+    // Fallback 1: Gemini Waterfall across active models (only if not an auth failure)
     const geminiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY;
-    if (isNonEmptyApiKey(geminiKey)) {
+    if (isNonEmptyApiKey(geminiKey) && (!isAuthError || aiConfig.provider !== 'gemini')) {
       const fallbackModels = ['gemini-3.6-flash', 'gemini-3.5-flash-lite', 'gemini-flash-latest', 'gemini-3.7-flash', 'gemini-3.8-flash'].filter(
         (m) => m !== aiConfig.modelName
       );
@@ -376,7 +384,7 @@ Polished 2-3 line message body:`;
             model: googleProvider(fallbackModel),
             prompt,
             maxRetries: 0,
-            abortSignal: AbortSignal.timeout(10000),
+            abortSignal: AbortSignal.timeout(6000),
           });
           const cleanedGemini = cleanAiPolishedBody(geminiText);
           if (cleanedGemini) {
@@ -386,20 +394,21 @@ Polished 2-3 line message body:`;
           }
         } catch (gemErr: any) {
           console.warn(`[gemini-fallback] Attempt with ${fallbackModel} failed:`, gemErr?.message || gemErr);
+          if (String(gemErr).includes('authentication credentials')) break;
         }
       }
     }
 
     // Fallback 2: OpenAI if configured
     const openaiKey = process.env.OPENAI_API_KEY || process.env.AI_API_KEY;
-    if (isNonEmptyApiKey(openaiKey)) {
+    if (isNonEmptyApiKey(openaiKey) && (!isAuthError || aiConfig.provider !== 'openai')) {
       try {
         const openaiProvider = createOpenAI({ apiKey: openaiKey!.trim() });
         const { text: fallbackText } = await generateText({
           model: openaiProvider('gpt-4o-mini'),
           prompt,
           maxRetries: 1,
-          abortSignal: AbortSignal.timeout(10000),
+          abortSignal: AbortSignal.timeout(6000),
         });
         const cleanedFallback = cleanAiPolishedBody(fallbackText);
         if (cleanedFallback) {

@@ -393,9 +393,41 @@ export function heuristicPolishReply(
   );
 
   // 4. Format sentence capitalization and terminal punctuation
-  const formattedBody = formatSentence(cleaned);
+  let formattedBody = formatSentence(cleaned);
 
-  // 5. Wrap in salutation and sign-off
+  // 5. Ensure the body consists of 2-3 complete, professional lines/sentences
+  const sentences = formattedBody
+    .split(/(?<=[.!?])\s+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  const hasCourtesyClosing = /\b(?:please\s+(?:let\s+(?:us|me)\s+know|feel\s+free\s+to|contact\s+us)|let\s+(?:us|me)\s+know\s+if|hope\s+this\s+helps|rest\s+assured)\b/i.test(
+    formattedBody
+  );
+
+  const lowerText = cleaned.toLowerCase();
+
+  if (sentences.length === 1 && !hasCourtesyClosing) {
+    if (lowerText.includes('refund')) {
+      formattedBody = `${formattedBody} Please allow 3 to 5 business days for the credit to appear on your original payment statement. Please let us know if you have any questions or need further assistance.`;
+    } else if (lowerText.includes('password') || lowerText.includes('login') || lowerText.includes('log in') || lowerText.includes('access')) {
+      formattedBody = `${formattedBody} Please check your email inbox and follow the instructions to verify access. Please let us know if you encounter any difficulties logging in.`;
+    } else if (lowerText.includes('video') || lowerText.includes('play') || lowerText.includes('stream') || lowerText.includes('bug') || lowerText.includes('error') || lowerText.includes('glitch') || lowerText.includes('loading')) {
+      formattedBody = `${formattedBody} Please clear your browser cache, reload the page, and try again. Please let us know if the issue persists so we can assist you further.`;
+    } else if (lowerText.includes('cert') || lowerText.includes('course') || lowerText.includes('enroll') || lowerText.includes('lesson') || lowerText.includes('module')) {
+      formattedBody = `${formattedBody} You can view and access all materials directly from your student dashboard. Please feel free to reach out if you have any questions or need assistance.`;
+    } else if (lowerText.includes('invoice') || lowerText.includes('bill') || lowerText.includes('receipt') || lowerText.includes('payment')) {
+      formattedBody = `${formattedBody} You can review and download all invoice records under the Billing section of your account. Please let us know if you need any additional documentation.`;
+    } else if (lowerText.includes('pdf') || lowerText.includes('doc') || lowerText.includes('link') || lowerText.includes('url')) {
+      formattedBody = `${formattedBody} Please verify that the resource opens properly on your device. Please let us know if you encounter any errors or need further assistance.`;
+    } else {
+      formattedBody = `${formattedBody} Please let us know if you have any questions or if there is anything else we can assist you with.`;
+    }
+  } else if (sentences.length === 2 && !hasCourtesyClosing) {
+    formattedBody = `${formattedBody} Please let us know if you have any further questions or if you need additional assistance.`;
+  }
+
+  // 6. Wrap in salutation and sign-off
   const greeting = `Hello ${firstName},\n\n`;
   const signoff = `\n\nBest regards,\nCode with Mosh Support`;
 
