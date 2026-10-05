@@ -13,7 +13,7 @@ jobs:
     steps:
       - name: Send Keep-Alive HTTP Request
         run: |
-          URL="${{ secrets.RENDER_APP_URL || 'https://ticket-management-system-5w8o.onrender.com' }}/api/health"
+          URL="${{ secrets.RENDER_APP_URL || 'https://helpdesk-ai-system.onrender.com' }}/api/health"
           echo "Pinging: $URL"
           HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 "$URL" || echo "000")
           echo "HTTP Status: $HTTP_STATUS"
