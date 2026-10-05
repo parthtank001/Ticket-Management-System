@@ -16,6 +16,7 @@ import dashboardRouter from './routes/dashboard';
 import path from 'path';
 import fs from 'fs';
 import { seedDatabase } from '../prisma/seed';
+import { seedTickets } from '../scripts/seed-100-tickets';
 import type { Category, Priority, TicketStatus, SenderType } from '@helpdesk/core';
 import {
   createTicketSchema,
@@ -169,6 +170,19 @@ app.get('/api/agents', requireAuth, async (req: Request, res: Response) => {
     orderBy: { name: 'asc' },
   });
   res.json(agents);
+});
+
+// Seed Sample Tickets Endpoint (Authenticated admin/agent)
+app.post('/api/tickets/seed', requireAuth, async (req: Request, res: Response) => {
+  try {
+    console.log('🌱 Triggered manual ticket seeding via API...');
+    await seedTickets(prisma);
+    const count = await prisma.ticket.count();
+    res.json({ message: 'Successfully seeded 100 realistic tickets', totalTickets: count });
+  } catch (err: any) {
+    console.error('Error seeding tickets via API:', err);
+    res.status(500).json({ error: err.message || 'Failed to seed tickets' });
+  }
 });
 
 // Get all tickets with server-side sorting, filtering & optional pagination (Authenticated support staff only)
@@ -882,6 +896,17 @@ const server = app.listen(PORT, async () => {
     await seedDatabase(prisma);
   } catch (seedErr: any) {
     console.warn('⚠️ Auto-seed credentials sync notice (continuing):', seedErr?.message || seedErr);
+  }
+
+  // Auto-seed demo tickets if database has 0 tickets
+  try {
+    const ticketCount = await prisma.ticket.count();
+    if (ticketCount === 0) {
+      console.log('🌱 No tickets found in database. Auto-seeding 100 demo tickets...');
+      await seedTickets(prisma);
+    }
+  } catch (ticketSeedErr: any) {
+    console.warn('⚠️ Auto-seed tickets notice (continuing):', ticketSeedErr?.message || ticketSeedErr);
   }
 });
 

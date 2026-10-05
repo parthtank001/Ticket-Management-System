@@ -914,11 +914,11 @@ const realisticTopics = [
   },
 ];
 
-async function seedTickets() {
+export async function seedTickets(prismaClient: PrismaClient = prisma) {
   console.log('🚀 Starting generation of 100 realistic tickets in PostgreSQL database...');
 
   // 1. Fetch available support agents to assign
-  const agents = await prisma.user.findMany({
+  const agents = await prismaClient.user.findMany({
     where: { role: 'AGENT' },
   });
 
@@ -926,7 +926,7 @@ async function seedTickets() {
 
   // Clear existing tickets first to guarantee a clean 100-ticket benchmark dataset
   console.log('🧹 Clearing old test tickets...');
-  await prisma.ticket.deleteMany({});
+  await prismaClient.ticket.deleteMany({});
 
   const allTicketsToInsert: TicketSeedData[] = [...rawTickets];
 
@@ -987,7 +987,7 @@ async function seedTickets() {
 
     const initialBody = tData.messages[0]?.body || `Inquiry regarding ${tData.subject}`;
 
-    await prisma.ticket.create({
+    await prismaClient.ticket.create({
       data: {
         subject: tData.subject,
         studentName: tData.studentName,
@@ -1010,11 +1010,13 @@ async function seedTickets() {
   console.log(`✅ Successfully seeded ${insertedCount} diverse, realistic tickets!`);
 }
 
-seedTickets()
-  .catch((e) => {
-    console.error('❌ Error during ticket seeding:', e);
-    process.exit(1);
-  })
-  .finally(async () => {
-    await prisma.$disconnect();
-  });
+if (process.argv[1] && process.argv[1].includes('seed-100-tickets')) {
+  seedTickets()
+    .catch((e) => {
+      console.error('❌ Error during ticket seeding:', e);
+      process.exit(1);
+    })
+    .finally(async () => {
+      await prisma.$disconnect();
+    });
+}
