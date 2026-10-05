@@ -51,7 +51,11 @@ services:
       - AGENT_PASSWORD=password123
       - AI_AGENT_EMAIL=ai@example.com
       - AI_AGENT_PASSWORD=password123
-      - SUPPORT_EMAIL=support@example.com
+      - SUPPORT_EMAIL=${SUPPORT_EMAIL:-support@sandbox4943779f95474358aca05128896546b0.mailgun.org}
+      - MAILGUN_API_KEY=${MAILGUN_API_KEY:-}
+      - MAILGUN_SIGNING_KEY=${MAILGUN_SIGNING_KEY:-}
+      - MAILGUN_DOMAIN=${MAILGUN_DOMAIN:-sandbox4943779f95474358aca05128896546b0.mailgun.org}
+      - MAILGUN_HOST=${MAILGUN_HOST:-api.mailgun.net}
       - WEBHOOK_SECRET=whsec_helpdesk_inbound_secret_token_key_2026
 
 volumes:

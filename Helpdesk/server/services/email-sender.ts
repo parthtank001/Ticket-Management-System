@@ -50,7 +50,12 @@ export async function sendOutboundEmail(options: SendEmailOptions): Promise<Send
   const mailgunApiKey = process.env.MAILGUN_API_KEY?.trim();
   const mailgunDomain = process.env.MAILGUN_DOMAIN?.trim();
   const mailgunHost = process.env.MAILGUN_HOST?.trim() || 'api.mailgun.net';
-  const supportEmail = process.env.SUPPORT_EMAIL || `support@${mailgunDomain || 'example.com'}`;
+  
+  // Ensure the from email address domain aligns with the configured Mailgun domain
+  let supportEmail = process.env.SUPPORT_EMAIL?.trim();
+  if (!supportEmail || supportEmail.includes('example.com')) {
+    supportEmail = `support@${mailgunDomain || 'example.com'}`;
+  }
 
   // Ensure subject contains [Ticket #<id>] tag for conversation threading
   let formattedSubject = subject;

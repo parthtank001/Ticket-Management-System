@@ -64,13 +64,13 @@ services:
 
       # Email Integration (Mailgun - Inbound & Outbound)
       - key: SUPPORT_EMAIL
-        value: support@example.com
+        value: support@sandbox4943779f95474358aca05128896546b0.mailgun.org
 
       - key: MAILGUN_API_KEY
         sync: false
 
       - key: MAILGUN_DOMAIN
-        sync: false
+        value: sandbox4943779f95474358aca05128896546b0.mailgun.org
 
       - key: MAILGUN_SIGNING_KEY
         sync: false
