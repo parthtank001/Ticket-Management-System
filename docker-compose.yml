@@ -52,6 +52,7 @@ services:
       - AI_AGENT_EMAIL=ai@example.com
       - AI_AGENT_PASSWORD=password123
       - SUPPORT_EMAIL=support@example.com
+      - WEBHOOK_SECRET=whsec_helpdesk_inbound_secret_token_key_2026
 
 volumes:
   pgdata:

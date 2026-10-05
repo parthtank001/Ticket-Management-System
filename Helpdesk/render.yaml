@@ -80,7 +80,7 @@ services:
 
       # Webhooks & Security
       - key: WEBHOOK_SECRET
-        generateValue: true
+        value: whsec_helpdesk_inbound_secret_token_key_2026
 
       # Sentry Telemetry & Error Tracking (Optional)
       - key: SENTRY_DSN
