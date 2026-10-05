@@ -1,0 +1,24 @@
+name: Keep Render Server Live
+
+on:
+  schedule:
+    # Runs every 12 minutes (Render spins down after 15 minutes of inactivity)
+    - cron: '*/12 * * * *'
+  workflow_dispatch: # Allows manual trigger from GitHub Actions tab
+
+jobs:
+  ping:
+    name: Ping Health Endpoint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send Keep-Alive HTTP Request
+        run: |
+          URL="${{ secrets.RENDER_APP_URL || 'https://ticket-management-system-5w8o.onrender.com' }}/api/health"
+          echo "Pinging: $URL"
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 "$URL" || echo "000")
+          echo "HTTP Status: $HTTP_STATUS"
+          if [ "$HTTP_STATUS" -ge 200 ] && [ "$HTTP_STATUS" -lt 400 ]; then
+            echo "✅ Server is alive and responsive!"
+          else
+            echo "⚠️ Ping received status: $HTTP_STATUS (Server might be waking up)"
+          fi
