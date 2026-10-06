@@ -95,9 +95,15 @@ export const TicketReplyForm: React.FC<TicketReplyFormProps> = ({
       setReplyBody('');
       setIsPolished(false);
 
-      const msgIdNotice = res?.emailMessageId ? ` (ID: ${res.emailMessageId})` : '';
-      setSuccessInfo(`✓ Reply sent and recorded${msgIdNotice}`);
-      setTimeout(() => setSuccessInfo(null), 5000);
+      if (res?.emailDispatched) {
+        const msgIdNotice = res?.emailMessageId ? ` (Message ID: ${res.emailMessageId})` : '';
+        setSuccessInfo(`✓ Reply recorded and email dispatched to student${msgIdNotice}`);
+      } else if (res?.emailError) {
+        setFormError(`⚠️ Reply saved to ticket, but Mailgun email dispatch failed: ${res.emailError}`);
+      } else {
+        setSuccessInfo(`✓ Reply saved to ticket.`);
+      }
+      setTimeout(() => setSuccessInfo(null), 6000);
 
       onSuccess?.();
     } catch (err: any) {
